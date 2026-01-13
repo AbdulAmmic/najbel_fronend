@@ -1,0 +1,166 @@
+[
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "path": "/api/v1/openapi.json"
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "path": "/docs"
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "path": "/docs/oauth2-redirect"
+  },
+  {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "path": "/redoc"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/auth/login"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/users/"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/users/me"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/appointments/"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/appointments/my-appointments"
+  },
+  {
+    "methods": [
+      "PUT"
+    ],
+    "path": "/api/v1/appointments/{appointment_id}"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/dashboard/stats"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/dashboard/patients"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/attendance/check-in"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/attendance/check-out"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/attendance/my-history"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/prescriptions/"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/prescriptions/"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/prescriptions/{id}"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/medical-records/"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/medical-records/"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/medical-records/{id}"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/vitals/"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/vitals/"
+  },
+  {
+    "methods": [
+      "GET"
+    ],
+    "path": "/api/v1/labs/"
+  },
+  {
+    "methods": [
+      "POST"
+    ],
+    "path": "/api/v1/labs/"
+  },
+  {
+    "methods": [],
+    "path": "/api/v1/ws"
+  }
+]
