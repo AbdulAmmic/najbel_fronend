@@ -99,11 +99,11 @@ export default function OverviewPage() {
     ];
 
     return (
-        <div className="p-6 max-w-[1600px] mx-auto space-y-8">
+        <div className="p-4 max-w-[1600px] mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Clinic Overview</h1>
+                    <h1 className="text-xl font-bold text-gray-900">Clinic Overview</h1>
                     <p className="text-gray-500 mt-1">Real-time insights and performance metrics</p>
                 </div>
                 <div className="flex gap-3">
@@ -123,21 +123,21 @@ export default function OverviewPage() {
                 variants={container}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
             >
                 {statCards.map((stat, i) => (
                     <motion.div
                         key={i}
                         variants={item}
-                        className="group p-6 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                        className="group p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
                     >
                         <div className="flex items-start justify-between">
                             <div>
                                 <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                                <h3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</h3>
+                                <h3 className="text-xl font-bold text-gray-900 mt-2">{stat.value}</h3>
                             </div>
                             <div className={`p-3 rounded-xl bg-${stat.color}-50 text-${stat.color}-600 group-hover:bg-${stat.color}-600 group-hover:text-white transition-colors duration-300`}>
-                                <stat.icon className="w-5 h-5" />
+                                <stat.icon className="w-4 h-4" />
                             </div>
                         </div>
 
@@ -154,8 +154,8 @@ export default function OverviewPage() {
             </motion.div>
 
             {/* Charts Section Placeholder */}
-            <div className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="grid lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-semibold text-gray-900">Revenue Analytics</h3>
                         <button className="text-sm text-blue-600 font-medium hover:underline">View Report</button>
@@ -165,7 +165,7 @@ export default function OverviewPage() {
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-semibold text-gray-900">Department Performance</h3>
                         <button className="p-1 hover:bg-gray-100 rounded-lg">
