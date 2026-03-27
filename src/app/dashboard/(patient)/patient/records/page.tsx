@@ -1,93 +1,78 @@
 "use client";
 
-import { FileText, Search, Filter, Eye, Download } from "lucide-react";
-import { consultations } from "@/services/api";
 import { useState, useEffect } from "react";
+import { FileText, Search, Eye } from "lucide-react";
+import { consultations } from "@/services/api";
 
 export default function PatientRecordsPage() {
     const [records, setRecords] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
-        const fetchRecords = async () => {
+        const fetch = async () => {
             try {
-                const data = await consultations.getMyHistory();
+                const data = await consultations.getMyHistory().catch(() => []);
                 setRecords(data);
-            } catch (err) {
-                console.error("Failed to fetch records", err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         };
-        fetchRecords();
+        fetch();
     }, []);
 
+    const filtered = records.filter(r =>
+        (r.title || "").toLowerCase().includes(search.toLowerCase()) ||
+        (r.diagnosis || "").toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
-        <div className="space-y-8">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                    <FileText className="w-8 h-8" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
-                    <p className="text-gray-500">Your health history and documents</p>
+        <div className="max-w-lg mx-auto pb-8 -mx-1">
+            <div className="px-1 pt-1 mb-4">
+                <h1 className="text-xl font-bold text-gray-900">Medical Records</h1>
+                <p className="text-[11px] text-gray-400 mt-0.5">Your health history</p>
+            </div>
+
+            <div className="mx-1 mb-3">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                    <input
+                        type="text"
+                        placeholder="Search records..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 transition text-[13px] placeholder:text-gray-300"
+                    />
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <div className="flex flex-col md:flex-row gap-4 mb-8">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                            type="text"
-                            placeholder="Search records..."
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-blue-500 outline-none transition-all"
-                        />
-                    </div>
-                    <button className="px-6 py-3 bg-gray-50 text-gray-600 rounded-xl font-semibold hover:bg-gray-100 transition flex items-center gap-2">
-                        <Filter className="w-5 h-5" />
-                        Filter
-                    </button>
-                </div>
-
+            <div className="mx-1 space-y-1.5">
                 {loading ? (
-                    <div className="py-20 text-center text-gray-500">Loading your records...</div>
-                ) : records.length === 0 ? (
-                    <div className="py-20 text-center space-y-4">
-                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto">
-                            <FileText className="w-10 h-10 text-gray-300" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900">No records found</h3>
-                            <p className="text-gray-500">You don't have any medical records yet.</p>
-                        </div>
+                    <div className="flex items-center justify-center py-16">
+                        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                        <FileText className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm font-semibold text-gray-700 mb-1">No records</p>
+                        <p className="text-[11px] text-gray-400">Your medical journey starts here</p>
                     </div>
                 ) : (
-                    <div className="grid gap-4">
-                        {records.map((record) => (
-                            <div key={record.id} className="p-4 border border-gray-100 rounded-2xl hover:border-blue-100 hover:bg-blue-50/30 transition group">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white rounded-xl shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                            <FileText className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900">{record.title || "Medical Report"}</h4>
-                                            <p className="text-sm text-gray-500">{new Date(record.created_at).toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button className="p-2 text-gray-400 hover:text-blue-600 transition">
-                                            <Eye className="w-5 h-5" />
-                                        </button>
-                                        <button className="p-2 text-gray-400 hover:text-blue-600 transition">
-                                            <Download className="w-5 h-5" />
-                                        </button>
-                                    </div>
+                    filtered.map((record) => (
+                        <div key={record.id} className="bg-white rounded-xl p-3 border border-gray-100/80 flex items-center justify-between hover:border-blue-100 transition group">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition">
+                                    <FileText className="w-4 h-4 text-blue-500" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-900 text-[13px]">{record.title || "Medical Report"}</p>
+                                    <p className="text-[10px] text-gray-400">{new Date(record.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                            <button className="p-1.5 text-gray-300 hover:text-blue-500 transition">
+                                <Eye className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ))
                 )}
             </div>
         </div>

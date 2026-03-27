@@ -2,21 +2,27 @@
 
 import { Wallet, FileText, Calendar, Activity, Pill, TrendingUp } from "lucide-react";
 
-export default function PatientSummary() {
+export default function PatientSummary({
+  walletBalance = "₦0.00",
+  nextVisit = "No upcoming visit",
+  payments = [],
+  diagnoses = [],
+  activeMedications = 0
+}: any) {
   return (
     <div className="space-y-4 p-4">
-      
+
       {/* Simple Stats Grid - Top Section */}
       <div className="grid grid-cols-2 gap-3">
         <SimpleStatCard
           title="Wallet Balance"
-          value="₦12,500"
+          value={walletBalance}
           icon={Wallet}
           color="green"
         />
         <SimpleStatCard
           title="Next Visit"
-          value="Tomorrow"
+          value={nextVisit}
           icon={Calendar}
           color="blue"
         />
@@ -27,32 +33,29 @@ export default function PatientSummary() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-gray-900">Recent Payments</h3>
           <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-            All Paid
+            Latest
           </span>
         </div>
         <div className="space-y-3">
-          <PaymentItem
-            title="Consultation Fee"
-            date="Jan 15, 2024"
-            amount="₦5,000"
-            status="paid"
-          />
-          <PaymentItem
-            title="Lab Tests"
-            date="Jan 10, 2024"
-            amount="₦7,500"
-            status="paid"
-          />
-          <PaymentItem
-            title="Medication"
-            date="Jan 5, 2024"
-            amount="₦3,200"
-            status="paid"
-          />
+          {payments.length > 0 ? (
+            payments.map((payment: any, i: number) => (
+              <PaymentItem
+                key={i}
+                title={payment.title || "Payment"}
+                date={new Date(payment.date).toLocaleDateString()}
+                amount={payment.amount}
+                status={payment.status}
+              />
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No recent payments</p>
+          )}
         </div>
-        <button className="w-full mt-3 py-2 text-sm text-blue-600  border-blue-200 rounded-lg hover:bg-blue-50">
-          View All Payments
-        </button>
+        {payments.length > 0 && (
+          <button className="w-full mt-3 py-2 text-sm text-blue-600  border-blue-200 rounded-lg hover:bg-blue-50">
+            View All Payments
+          </button>
+        )}
       </div>
 
       {/* Diagnosis History - Simple List */}
@@ -64,41 +67,38 @@ export default function PatientSummary() {
           </span>
         </div>
         <div className="space-y-3">
-          <DiagnosisItem
-            condition="Upper Respiratory Infection"
-            date="Jan 15, 2024"
-            doctor="Dr. Musa"
-            status="treated"
-          />
-          <DiagnosisItem
-            condition="High Blood Pressure"
-            date="Dec 20, 2023"
-            doctor="Dr. Fatima"
-            status="monitoring"
-          />
-          <DiagnosisItem
-            condition="Seasonal Allergy"
-            date="Nov 10, 2023"
-            doctor="Dr. Ahmed"
-            status="resolved"
-          />
+          {diagnoses.length > 0 ? (
+            diagnoses.map((diagnosis: any, i: number) => (
+              <DiagnosisItem
+                key={i}
+                condition={diagnosis.condition}
+                date={new Date(diagnosis.date).toLocaleDateString()}
+                doctor={diagnosis.doctor}
+                status={diagnosis.status || "treated"}
+              />
+            ))
+          ) : (
+            <p className="text-sm text-gray-500">No recent diagnosis</p>
+          )}
         </div>
-        <button className="w-full mt-3 py-2 text-sm text-blue-600  border-blue-200 rounded-lg hover:bg-blue-50">
-          View Medical History
-        </button>
+        {diagnoses.length > 0 && (
+          <button className="w-full mt-3 py-2 text-sm text-blue-600  border-blue-200 rounded-lg hover:bg-blue-50">
+            View Medical History
+          </button>
+        )}
       </div>
 
       {/* Quick Stats - Bottom Section */}
       <div className="grid grid-cols-2 gap-3">
         <SimpleStatCard
           title="Medications"
-          value="3 Active"
+          value={`${activeMedications} Active`}
           icon={Pill}
           color="purple"
         />
         <SimpleStatCard
           title="Health Score"
-          value="92/100"
+          value="Good"
           icon={TrendingUp}
           color="emerald"
         />
@@ -143,11 +143,10 @@ function PaymentItem({ title, date, amount, status }: any) {
       </div>
       <div className="text-right">
         <p className="font-semibold text-gray-900 text-sm">{amount}</p>
-        <span className={`text-xs px-2 py-0.5 rounded-full ${
-          status === 'paid' 
-            ? 'bg-green-100 text-green-700' 
+        <span className={`text-xs px-2 py-0.5 rounded-full ${status === 'paid'
+            ? 'bg-green-100 text-green-700'
             : 'bg-red-100 text-red-700'
-        }`}>
+          }`}>
           {status}
         </span>
       </div>

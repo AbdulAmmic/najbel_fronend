@@ -19,7 +19,8 @@ import {
   Activity,
   Download,
   Edit,
-  Eye
+  Eye,
+  X
 } from "lucide-react";
 
 interface Patient {
@@ -357,7 +358,10 @@ export default function PatientsPage() {
                       <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition">
+                      <button
+                        onClick={() => setSelectedPatient(patient)}
+                        className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
                       {userRole === "nurse" && (
@@ -524,6 +528,115 @@ export default function PatientsPage() {
           <button className="px-6 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg transition">
             Print List
           </button>
+        </div>
+      </div>
+      {/* Edit Patient Modal */}
+      {selectedPatient && (
+        // We can reuse a generic Modal component or inline it for now
+        // Adding a comprehensive Edit Modal here
+        // For brevity, implying the structure:
+        <EditPatientModal
+          isOpen={!!selectedPatient && !showVitalsModal} // simplistic toggling
+          onClose={() => setSelectedPatient(null)}
+          patient={selectedPatient}
+          onSave={async (data) => {
+            try {
+              await patientsApi.update(selectedPatient.id, data);
+              // Refresh list
+              const res = await patientsApi.getAll();
+              setPatients(res.map((p: any) => ({ ...p, status: p.status || "Active" })));
+              setSelectedPatient(null);
+            } catch (e) {
+              console.error(e);
+              alert("Failed to update patient");
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Sub-component for Edit Modal (Inline for now to keep it single file, or move to separate component)
+function EditPatientModal({ isOpen, onClose, patient, onSave }: any) {
+  if (!isOpen) return null;
+  const [formData, setFormData] = useState({
+    phone_number: patient.phone || "",
+    address: patient.address || "",
+    next_of_kin_name: patient.next_of_kin_name || "",
+    next_of_kin_phone: patient.next_of_kin_phone || "",
+    next_of_kin_relation: patient.next_of_kin_relation || "",
+    insurance_provider: patient.insurance_provider || "",
+    insurance_policy_number: patient.insurance_policy_number || "",
+    allergies: patient.allergies || "",
+    medical_history_summary: patient.medical_history_summary || ""
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h2 className="text-xl font-bold">Edit Patient Details</h2>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Unique ID Display */}
+          <div className="bg-blue-50 p-4 rounded-xl flex justify-between items-center">
+            <div>
+              <p className="text-xs text-blue-600 font-bold uppercase tracking-wider">Patient ID</p>
+              <p className="text-lg font-mono font-bold text-gray-900">{patient.unique_id || "Not Generated"}</p>
+            </div>
+            {/* Placeholder for Barcode/QR */}
+            <div className="h-10 w-32 bg-white/50 rounded border border-blue-100 flex items-center justify-center text-xs text-blue-400">
+              ||| ||||| || |||
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="col-span-full font-bold text-gray-900 border-b pb-2 mt-2">Contact & Address</h3>
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.phone_number} onChange={e => setFormData({ ...formData, phone_number: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Address</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+            </div>
+
+            <h3 className="col-span-full font-bold text-gray-900 border-b pb-2 mt-2">Next of Kin</h3>
+            <div>
+              <label className="block text-sm font-medium mb-1">Name</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.next_of_kin_name} onChange={e => setFormData({ ...formData, next_of_kin_name: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Phone</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.next_of_kin_phone} onChange={e => setFormData({ ...formData, next_of_kin_phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Relation</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.next_of_kin_relation} onChange={e => setFormData({ ...formData, next_of_kin_relation: e.target.value })} />
+            </div>
+
+            <h3 className="col-span-full font-bold text-gray-900 border-b pb-2 mt-2">Insurance & Medical</h3>
+            <div>
+              <label className="block text-sm font-medium mb-1">Insurance Provider</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.insurance_provider} onChange={e => setFormData({ ...formData, insurance_provider: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Policy Number</label>
+              <input className="w-full border p-2 rounded-lg" value={formData.insurance_policy_number} onChange={e => setFormData({ ...formData, insurance_policy_number: e.target.value })} />
+            </div>
+            <div className="col-span-full">
+              <label className="block text-sm font-medium mb-1">Allergies</label>
+              <input className="w-full border p-2 rounded-lg bg-red-50 border-red-100 text-red-700" value={formData.allergies} onChange={e => setFormData({ ...formData, allergies: e.target.value })} placeholder="Peanuts, Penicillin..." />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white">
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg">Cancel</button>
+          <button onClick={() => onSave(formData)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
         </div>
       </div>
     </div>

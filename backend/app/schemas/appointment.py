@@ -13,7 +13,8 @@ class AppointmentBase(BaseModel):
     notes: Optional[str] = None
 
 class AppointmentCreate(AppointmentBase):
-    pass
+    patient_id: Optional[int] = None
+    wallet_pin: Optional[str] = None
 
 class AppointmentUpdate(BaseModel):
     status: Optional[AppointmentStatus] = None
@@ -26,6 +27,7 @@ class Appointment(AppointmentBase):
     patient_id: int
     status: AppointmentStatus
     meeting_link: Optional[str] = None
+    reschedule_note: Optional[str] = None
     created_at: datetime
     
     doctor: Optional[DoctorInfo] = None

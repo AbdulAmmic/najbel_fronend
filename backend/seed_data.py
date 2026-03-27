@@ -90,6 +90,18 @@ def create_users(session: Session):
         )
         session.add(patient_profile)
 
+    # Receptionist
+    recep_email = "reception@najbel.com"
+    if not session.exec(select(User).where(User.email == recep_email)).first():
+        recep = User(
+            email=recep_email,
+            full_name="Receptionist Rita",
+            hashed_password=get_password_hash("recep123"),
+            role=UserRole.RECEPTIONIST,
+            is_active=True
+        )
+        session.add(recep)
+
     session.commit()
     print("Users Created.")
 

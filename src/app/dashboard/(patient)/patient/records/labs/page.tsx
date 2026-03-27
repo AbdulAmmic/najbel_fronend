@@ -1,141 +1,94 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity, Calendar, Download, Eye, FileText, Filter, Search } from "lucide-react";
+import { TestTubes, Search, Calendar } from "lucide-react";
 import { labs } from "@/services/api";
 
 export default function LabResultsPage() {
     const [labResults, setLabResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
-        const fetchLabs = async () => {
+        const fetch = async () => {
             try {
-                const data = await labs.getAll();
+                const data = await labs.getAll().catch(() => []);
                 setLabResults(data);
-            } catch (err) {
-                console.error("Failed to fetch lab results", err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         };
-        fetchLabs();
+        fetch();
     }, []);
 
-    const filteredResults = labResults.filter(lab =>
-        lab.test_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lab.result?.toLowerCase().includes(searchQuery.toLowerCase())
+    const filtered = labResults.filter(l =>
+        (l.test_name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (l.result || "").toLowerCase().includes(search.toLowerCase())
     );
 
-    const getStatusColor = (status: string) => {
-        switch (status?.toLowerCase()) {
-            case "normal":
-                return "bg-emerald-50 text-emerald-700 border-emerald-200";
-            case "abnormal":
-                return "bg-red-50 text-red-700 border-red-200";
-            case "pending":
-                return "bg-amber-50 text-amber-700 border-amber-200";
-            default:
-                return "bg-gray-50 text-gray-700 border-gray-200";
+    const statusStyle = (s: string) => {
+        switch (s?.toLowerCase()) {
+            case "normal": return "bg-emerald-500/10 text-emerald-600";
+            case "abnormal": return "bg-red-500/10 text-red-600";
+            case "pending": return "bg-amber-500/10 text-amber-600";
+            default: return "bg-gray-100 text-gray-500";
         }
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
-                    <Activity className="w-8 h-8" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Lab Results</h1>
-                    <p className="text-gray-500">View your laboratory test results and reports</p>
+        <div className="max-w-lg mx-auto pb-8 -mx-1">
+            <div className="px-1 pt-1 mb-4">
+                <h1 className="text-xl font-bold text-gray-900">Lab Results</h1>
+                <p className="text-[11px] text-gray-400 mt-0.5">Your laboratory tests</p>
+            </div>
+
+            <div className="mx-1 mb-3">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                    <input type="text" placeholder="Search labs..." value={search} onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 transition text-[13px] placeholder:text-gray-300"
+                    />
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <div className="flex flex-col md:flex-row gap-4 mb-8">
-                    <div className="flex-1 relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                            type="text"
-                            placeholder="Search lab results..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-blue-500 outline-none transition-all"
-                        />
-                    </div>
-                    <button className="px-6 py-3 bg-gray-50 text-gray-600 rounded-xl font-semibold hover:bg-gray-100 transition flex items-center gap-2">
-                        <Filter className="w-5 h-5" />
-                        Filter
-                    </button>
-                </div>
-
+            <div className="mx-1 space-y-1.5">
                 {loading ? (
-                    <div className="py-20 text-center text-gray-500">Loading lab results...</div>
-                ) : filteredResults.length === 0 ? (
-                    <div className="py-20 text-center space-y-4">
-                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto">
-                            <Activity className="w-10 h-10 text-gray-300" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900">No lab results found</h3>
-                            <p className="text-gray-500">You don't have any lab results yet.</p>
-                        </div>
+                    <div className="flex items-center justify-center py-16">
+                        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                        <TestTubes className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm font-semibold text-gray-700 mb-1">No lab results</p>
+                        <p className="text-[11px] text-gray-400">Results will appear here</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-600">Test Name</th>
-                                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-600">Result</th>
-                                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-600">Status</th>
-                                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-600">Date</th>
-                                    <th className="py-4 px-6 text-left text-sm font-semibold text-gray-600">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredResults.map((lab) => (
-                                    <tr key={lab.id} className="hover:bg-gray-50 transition">
-                                        <td className="py-4 px-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-                                                    <FileText className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-semibold text-gray-900">{lab.test_name}</p>
-                                                    <p className="text-sm text-gray-500">{lab.test_type || "Lab Test"}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6 font-medium text-gray-900">{lab.result || "Pending"}</td>
-                                        <td className="py-4 px-6">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(lab.status)}`}>
-                                                {lab.status || "Pending"}
+                    filtered.map((lab) => (
+                        <div key={lab.id} className="bg-white rounded-xl p-3 border border-gray-100/80 hover:border-purple-100 transition">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
+                                        <TestTubes className="w-4 h-4 text-purple-500" />
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900 text-[13px]">{lab.test_name}</p>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                                <Calendar className="w-2.5 h-2.5" />
+                                                {lab.test_date ? new Date(lab.test_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : "N/A"}
                                             </span>
-                                        </td>
-                                        <td className="py-4 px-6 text-sm text-gray-600">
-                                            <div className="flex items-center gap-2">
-                                                <Calendar className="w-4 h-4 text-gray-400" />
-                                                {new Date(lab.test_date).toLocaleDateString()}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6">
-                                            <div className="flex gap-2">
-                                                <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                                                    <Eye className="w-4 h-4" />
-                                                </button>
-                                                <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                                                    <Download className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                            {lab.test_type && <span className="text-[10px] text-gray-400">· {lab.test_type}</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[12px] text-gray-600 font-medium">{lab.result || "—"}</p>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${statusStyle(lab.status)}`}>
+                                        {(lab.status || "pending").toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>

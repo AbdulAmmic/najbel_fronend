@@ -29,10 +29,35 @@ def create_vitals(
     vitals_in: VitalsCreate,
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    if current_user.role not in [UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.NURSE]:
+    if current_user.role not in [UserRole.DOCTOR, UserRole.RECEPTIONIST, UserRole.NURSE, UserRole.PATIENT]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     
+    # If patient, ensure they are recording for themselves
+    if current_user.role == UserRole.PATIENT:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        if not patient:
+            raise HTTPException(status_code=400, detail="Patient profile not found")
+        
+        # If patient_id was not provided, use the current user's patient_id
+        if not vitals_in.patient_id:
+            vitals_in.patient_id = patient.id
+            
+        if patient.id != vitals_in.patient_id:
+             raise HTTPException(status_code=400, detail="Patients can only record vitals for themselves")
+    
     db_obj = Vitals.from_orm(vitals_in)
+
+    # Set verification status
+    if current_user.role in [UserRole.DOCTOR, UserRole.NURSE]:
+        db_obj.is_verified = True
+    elif current_user.role == UserRole.PATIENT:
+        db_obj.is_verified = False
+    else:
+        # Default for receptionist/others? Usually receptionists don't take vitals, 
+        # but if they do, maybe we trust them or keep it unverified until doctor sees.
+        # Let's say any staff is verified for now, or just doctor/nurse.
+        db_obj.is_verified = True
+
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Bell,
   UserCircle,
@@ -8,11 +8,12 @@ import {
   ChevronDown,
   Settings,
   Menu,
-  X
+  X,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, subscribeToNotifications } from "@/services/api";
-import { useEffect } from "react";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -24,8 +25,15 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
   const [notificationCount, setNotificationCount] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
 
   useEffect(() => {
+    // Online/Offline Listener
+    const handleStatusChange = () => setIsOfflineMode(!navigator.onLine);
+    window.addEventListener("online", handleStatusChange);
+    window.addEventListener("offline", handleStatusChange);
+    setIsOfflineMode(!navigator.onLine); // Initial check
+
     const fetchUser = async () => {
       try {
         const userData = await auth.getMe();
@@ -48,11 +56,11 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
     });
 
     return () => {
+      window.removeEventListener("online", handleStatusChange);
+      window.removeEventListener("offline", handleStatusChange);
       if (socket) socket.close();
     };
   }, []);
-
-
 
   return (
     <>
@@ -75,38 +83,29 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
               )}
             </button>
 
-            {/* Logo - Aligned with sidebar */}
-            <div className="flex items-center gap-3">
-              {/* Logo icon matching sidebar */}
-              <div className="relative">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 shadow-sm flex items-center justify-center">
-                  <div className="h-6 w-6 bg-white/90 rounded-lg" />
-                </div>
-                <div className="absolute -inset-1 bg-gradient-to-br from-blue-600 to-cyan-400 rounded-xl opacity-10 blur-sm" />
-              </div>
 
-              {/* Brand text */}
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                  Najbel Clinic
-                </h1>
-                <p className="text-xs text-gray-500 font-medium">
-                  Healthcare Management
-                </p>
-              </div>
-            </div>
 
 
           </div>
 
           {/* Right Section: Search & Actions */}
           <div className="flex items-center gap-3">
+
+            {/* Online/Offline Status Indicator */}
+            <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase transition-colors ${isOfflineMode
+              ? 'bg-gray-100 border-gray-300 text-gray-600'
+              : 'bg-green-50 border-green-200 text-green-700'
+              }`}>
+              {isOfflineMode ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
+              <span>{isOfflineMode ? 'Offline Mode' : 'System Online'}</span>
+            </div>
+
             {/* Search Bar - Desktop */}
             <div className="hidden md:block relative">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search patients, records, appointments..."
+                placeholder="Search..."
                 className="pl-10 pr-4 py-2.5 w-64 bg-gray-100/80 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
               />
             </div>
@@ -126,6 +125,8 @@ export default function Header({ onMenuClick, isSidebarCollapsed }: HeaderProps)
                 />
               )}
             </motion.button>
+
+            {/* User Profile... (Rest unchanged) */}
 
             {/* User Profile */}
             <div className="relative">

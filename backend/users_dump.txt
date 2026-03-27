@@ -1,0 +1,9 @@
+ID    Email                               Name                      Role            Active
+------------------------------------------------------------------------------------------
+1     admin@najbel.com                    Super Admin               UserRole.ADMIN  True
+2     doctor@najbel.com                   Dr. Gregory House         UserRole.DOCTOR True
+3     cardio@najbel.com                   Dr. Strange               UserRole.DOCTOR True
+4     patient@najbel.com                  John Doe                  UserRole.PATIENT True
+5     nurse@najbel.com                    Nurse Ratched             UserRole.NURSE  True
+6     pharmacy@najbel.com                 Pharmacist Phil           UserRole.PHARMACIST True
+7     accountant@najbel.com               Accountant Alex           UserRole.ACCOUNTANT True

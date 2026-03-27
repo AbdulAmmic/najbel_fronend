@@ -7,132 +7,95 @@ import { vitals as vitalsApi, auth } from "@/services/api";
 export default function VitalsPage() {
     const [vitalsList, setVitalsList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userName, setUserName] = useState("Patient");
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [vData, uData] = await Promise.all([
-                    vitalsApi.getAll(),
-                    auth.getMe()
+                const [vData] = await Promise.all([
+                    vitalsApi.getAll().catch(() => []),
                 ]);
                 setVitalsList(vData);
-                setUserName(uData.full_name);
-            } catch (err) {
-                console.error("Failed to fetch vitals", err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         };
         fetchData();
     }, []);
 
-    const latestVitals = vitalsList[0] || {};
+    const latest = vitalsList[0] || {};
 
     return (
-        <div className="max-w-6xl mx-auto">
-            <main className="p-4 lg:p-8 space-y-8">
-                <div>
-                    <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Vitals & Health</h1>
-                    <p className="text-gray-600">Track and monitor your key health indicators over time.</p>
+        <div className="max-w-lg mx-auto pb-8 -mx-1">
+            <div className="px-1 pt-1 mb-4">
+                <h1 className="text-xl font-bold text-gray-900">Vitals</h1>
+                <p className="text-[11px] text-gray-400 mt-0.5">Track your health indicators</p>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-16">
+                    <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
                 </div>
+            ) : (
+                <>
+                    {/* Latest Vitals */}
+                    <div className="grid grid-cols-2 gap-2 mx-1 mb-4">
+                        <VitalCard icon={<Weight className="w-4 h-4" />} label="Weight" value={latest.weight ? `${latest.weight} kg` : "—"} color="blue" />
+                        <VitalCard icon={<Droplets className="w-4 h-4" />} label="Blood Pressure" value={latest.blood_pressure || "—"} color="red" />
+                        <VitalCard icon={<Heart className="w-4 h-4" />} label="Heart Rate" value={latest.heart_rate ? `${latest.heart_rate} bpm` : "—"} color="pink" />
+                        <VitalCard icon={<Thermometer className="w-4 h-4" />} label="Temperature" value={latest.temperature ? `${latest.temperature}°C` : "—"} color="amber" />
+                    </div>
 
-                {loading ? (
-                    <div className="py-20 text-center text-gray-400">Loading health data...</div>
-                ) : (
-                    <div className="space-y-8">
-                        {/* Latest Vitals Overview */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <VitalCard
-                                icon={<Weight className="w-5 h-5" />}
-                                label="Weight"
-                                value={latestVitals.weight ? `${latestVitals.weight} kg` : "N/A"}
-                                color="blue"
-                            />
-                            <VitalCard
-                                icon={<Droplets className="w-5 h-5" />}
-                                label="Blood Pressure"
-                                value={latestVitals.blood_pressure || "N/A"}
-                                color="red"
-                            />
-                            <VitalCard
-                                icon={<Heart className="w-5 h-5" />}
-                                label="Heart Rate"
-                                value={latestVitals.heart_rate ? `${latestVitals.heart_rate} bpm` : "N/A"}
-                                color="pink"
-                            />
-                            <VitalCard
-                                icon={<Thermometer className="w-5 h-5" />}
-                                label="Temperature"
-                                value={latestVitals.temperature ? `${latestVitals.temperature}°C` : "N/A"}
-                                color="amber"
-                            />
+                    {/* History */}
+                    <div className="mx-1 bg-white rounded-xl border border-gray-100/80 overflow-hidden">
+                        <div className="px-3 py-2.5 bg-gray-50/50 border-b border-gray-100 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-blue-500" />
+                            <h3 className="text-[13px] font-bold text-gray-900">History</h3>
                         </div>
-
-                        {/* History Table */}
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
-                                <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                                    <Activity className="w-5 h-5 text-blue-600" />
-                                    Historical Trends
-                                </h3>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50/30">
-                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date Recorded</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">BP</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Heart Rate</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Weight</th>
-                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">SpO2</th>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="border-b border-gray-50">
+                                        <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase">Date</th>
+                                        <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase">BP</th>
+                                        <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase">HR</th>
+                                        <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase">Wt</th>
+                                        <th className="px-3 py-2 text-[10px] font-semibold text-gray-400 uppercase">SpO2</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {vitalsList.map((v) => (
+                                        <tr key={v.id} className="border-b border-gray-50 last:border-0">
+                                            <td className="px-3 py-2 text-[12px] font-medium text-gray-900">{new Date(v.recorded_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</td>
+                                            <td className="px-3 py-2 text-[12px] text-gray-600">{v.blood_pressure || '—'}</td>
+                                            <td className="px-3 py-2 text-[12px] text-gray-600">{v.heart_rate ? `${v.heart_rate}` : '—'}</td>
+                                            <td className="px-3 py-2 text-[12px] text-gray-600">{v.weight ? `${v.weight}` : '—'}</td>
+                                            <td className="px-3 py-2 text-[12px] text-gray-600">{v.oxygen_saturation ? `${v.oxygen_saturation}%` : '—'}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {vitalsList.map((v) => (
-                                            <tr key={v.id} className="hover:bg-gray-50/50 transition-colors">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                    {new Date(v.recorded_at).toLocaleDateString(undefined, {
-                                                        year: 'numeric', month: 'short', day: 'numeric'
-                                                    })}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{v.blood_pressure || '-'}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{v.heart_rate ? `${v.heart_rate} bpm` : '-'}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{v.weight ? `${v.weight} kg` : '-'}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{v.oxygen_saturation ? `${v.oxygen_saturation}%` : '-'}</td>
-                                            </tr>
-                                        ))}
-                                        {vitalsList.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-12 text-center text-gray-400">No vitals history found.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                    ))}
+                                    {vitalsList.length === 0 && (
+                                        <tr><td colSpan={5} className="px-3 py-8 text-center text-[12px] text-gray-400">No vitals history</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                )}
-            </main>
+                </>
+            )}
         </div>
     );
 }
 
 function VitalCard({ icon, label, value, color }: any) {
-    const colors: any = {
-        blue: "bg-blue-50 text-blue-600",
-        red: "bg-red-50 text-red-600",
-        pink: "bg-pink-50 text-pink-600",
-        amber: "bg-amber-50 text-amber-600",
+    const c: Record<string, string> = {
+        blue: "text-blue-500 bg-blue-50",
+        red: "text-red-500 bg-red-50",
+        pink: "text-pink-500 bg-pink-50",
+        amber: "text-amber-500 bg-amber-50",
     };
-
     return (
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${colors[color]}`}>
-                {icon}
-            </div>
-            <p className="text-sm font-medium text-gray-500 mb-1">{label}</p>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <div className="bg-white rounded-xl p-3 border border-gray-100/80">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${c[color]}`}>{icon}</div>
+            <p className="text-[10px] text-gray-400 font-medium">{label}</p>
+            <p className="text-lg font-bold text-gray-900">{value}</p>
         </div>
     );
 }

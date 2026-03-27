@@ -14,24 +14,33 @@ import {
     UserPlus
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useWebSocket } from "@/contexts/WebSocketContext";
 
 export default function OverviewPage() {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const { lastMessage } = useWebSocket();
+
+    const fetchStats = async () => {
+        try {
+            const data = await dashboard.getStats();
+            setStats(data);
+        } catch (error) {
+            console.error("Failed to fetch dashboard stats", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const data = await dashboard.getStats();
-                setStats(data);
-            } catch (error) {
-                console.error("Failed to fetch dashboard stats", error);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchStats();
     }, []);
+
+    useEffect(() => {
+        if (lastMessage) {
+            fetchStats();
+        }
+    }, [lastMessage]);
 
     const container = {
         hidden: { opacity: 0 },

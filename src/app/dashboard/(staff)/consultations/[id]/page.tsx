@@ -183,7 +183,7 @@ export default function ConsultationRoom({ params }: { params: Promise<{ id: str
 
                 {/* Live Chat Component */}
                 <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-                    <LiveChat consultationId={Number(id)} userName={currentUser?.full_name || "Doctor"} />
+                    <LiveChat consultationId={Number(id)} userName={currentUser?.full_name || "Doctor"} userRole="doctor" />
                 </div>
             </div>
 

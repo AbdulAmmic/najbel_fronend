@@ -17,12 +17,17 @@ class Invoice(SQLModel, table=True):
     amount: float
     status: InvoiceStatus = Field(default=InvoiceStatus.PENDING)
     due_date: datetime
+    
+    payment_method: Optional[str] = None # cash, card, wallet, insurance
+    insurance_provider: Optional[str] = None
+    policy_number: Optional[str] = None
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
     patient: "Patient" = Relationship(back_populates="invoices")
-    items: List["InvoiceItem"] = Relationship(back_populates="invoice")
-    transactions: List["Transaction"] = Relationship(back_populates="invoice")
+    items: List["InvoiceItem"] = Relationship(back_populates="invoice", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    transactions: List["Transaction"] = Relationship(back_populates="invoice", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class InvoiceItem(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -14,6 +14,7 @@ class VitalsBase(SQLModel):
 
 class Vitals(VitalsBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    is_verified: bool = Field(default=True)
     
     patient: "Patient" = Relationship(back_populates="vitals")
 

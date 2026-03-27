@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class VitalsBase(BaseModel):
-    patient_id: int
+    patient_id: Optional[int] = None
     weight: Optional[float] = None
     height: Optional[float] = None
     blood_pressure: Optional[str] = None
@@ -17,6 +17,7 @@ class VitalsCreate(VitalsBase):
 class Vitals(VitalsBase):
     id: int
     recorded_at: datetime
+    is_verified: bool
 
     class Config:
         orm_mode = True

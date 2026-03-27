@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Search, Calendar, User, ArrowRight } from "lucide-react";
+import { FileText, Calendar } from "lucide-react";
 import { consultations } from "@/services/api";
 import { useState, useEffect } from "react";
 
@@ -9,68 +9,54 @@ export default function VisitHistoryPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchHistory = async () => {
+        const fetch = async () => {
             try {
-                const data = await consultations.getMyHistory();
+                const data = await consultations.getMyHistory().catch(() => []);
                 setVisits(data);
-            } catch (err) {
-                console.error("Failed to fetch history", err);
-            } finally {
-                setLoading(false);
-            }
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         };
-        fetchHistory();
+        fetch();
     }, []);
 
     return (
-        <div className="space-y-8">
-            <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                    <FileText className="w-8 h-8" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Visit History</h1>
-                    <p className="text-gray-500">Your past consultations and diagnoses</p>
-                </div>
+        <div className="max-w-lg mx-auto pb-8 -mx-1">
+            <div className="px-1 pt-1 mb-4">
+                <h1 className="text-xl font-bold text-gray-900">Visit History</h1>
+                <p className="text-[11px] text-gray-400 mt-0.5">Past consultations</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+            <div className="mx-1 space-y-1.5">
                 {loading ? (
-                    <div className="py-20 text-center text-gray-500">Loading history...</div>
+                    <div className="flex items-center justify-center py-16">
+                        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
                 ) : visits.length === 0 ? (
-                    <div className="py-20 text-center space-y-4">
-                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300">
-                            <Calendar className="w-8 h-8" />
-                        </div>
-                        <p className="text-gray-500">No past visits recorded.</p>
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                        <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm font-semibold text-gray-700 mb-1">No past visits</p>
+                        <p className="text-[11px] text-gray-400">Visit records will appear here</p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {visits.map((visit) => (
-                            <div key={visit.id} className="p-5 border border-gray-100 rounded-2xl hover:border-blue-200 hover:bg-blue-50/30 transition group">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex gap-4">
-                                        <div className="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
-                                            <FileText className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 text-lg">Consultation #{visit.id}</h4>
-                                            <p className="text-sm text-gray-500 mt-1">Diagnosis: <span className="text-gray-700 font-medium">{visit.diagnosis || "Pending"}</span></p>
-                                            <p className="text-sm text-gray-500 mt-1">{visit.symptoms && `Symptoms: ${visit.symptoms}`}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                                        {/* Mock date if not in model, typically Consultation has created_at or we use appointment date */}
-                                        <div className="flex items-center gap-1">
-                                            <Calendar className="w-4 h-4" />
-                                            <span>Recent</span>
-                                        </div>
-                                    </div>
+                    visits.map((visit) => (
+                        <div key={visit.id} className="bg-white rounded-xl p-3 border border-gray-100/80 hover:border-blue-100 transition">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                    <FileText className="w-4 h-4 text-blue-500" />
                                 </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-[13px]">Consultation #{visit.id}</p>
+                                    <p className="text-[10px] text-gray-400 truncate">
+                                        {visit.diagnosis ? `Diagnosis: ${visit.diagnosis}` : "Pending"}
+                                        {visit.symptoms && ` · ${visit.symptoms}`}
+                                    </p>
+                                </div>
+                                <span className="text-[10px] text-gray-400 flex items-center gap-0.5 shrink-0">
+                                    <Calendar className="w-2.5 h-2.5" /> Recent
+                                </span>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))
                 )}
             </div>
         </div>

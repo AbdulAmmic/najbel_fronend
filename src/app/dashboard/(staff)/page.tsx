@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { dashboard, appointments } from "@/services/api";
 import {
   Calendar,
@@ -265,30 +266,98 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* Quick Actions */}
-      <section className="bg-gradient-to-r from-blue-50/50 to-indigo-50/50 rounded-2xl border border-gray-200 p-8 shadow-sm">
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Quick Actions
-          </h2>
-          <p className="text-gray-600">Frequently used tasks for quick access</p>
+      {/* Department & Capabilities Grid */}
+      <section className="mt-8">
+        <div className="mb-6">
+          <h2 className="text-xl font-bold text-gray-900">Department Access</h2>
+          <p className="text-gray-500">Access full hospital capabilities and modules</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          {quickActions.map((a, i) => (
-            <button
-              key={i}
-              className={`flex flex-col items-center justify-center gap-4 p-6 rounded-2xl border border-gray-200 hover:scale-[1.02] transition-all duration-300 ${a.color} shadow-sm hover:shadow-md`}
-            >
-              <div className="p-3 rounded-xl bg-white">
-                {a.icon}
-              </div>
-              <div className="text-center">
-                <span className="font-semibold text-gray-900">{a.label}</span>
-                <p className="text-xs text-gray-500 mt-2">{a.description}</p>
-              </div>
-            </button>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Doctor Console */}
+          <Link href="/dashboard/Doctor" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <UserCheck className="w-24 h-24 text-blue-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-blue-50 w-fit rounded-xl mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+              <UserCheck className="w-6 h-6 text-blue-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Doctor Console</h3>
+            <p className="text-sm text-gray-500">Consultations, Queue, Patient History</p>
+          </Link>
+
+          {/* Pharmacy Management */}
+          <Link href="/dashboard/pharmacy" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Pill className="w-24 h-24 text-emerald-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-emerald-50 w-fit rounded-xl mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <Pill className="w-6 h-6 text-emerald-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Pharmacy</h3>
+            <p className="text-sm text-gray-500">Inventory, Dispensing, Prescriptions</p>
+          </Link>
+
+          {/* Laboratory */}
+          <Link href="/dashboard/laboratory" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <FileText className="w-24 h-24 text-purple-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-purple-50 w-fit rounded-xl mb-4 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+              <FileText className="w-6 h-6 text-purple-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Laboratory</h3>
+            <p className="text-sm text-gray-500">Test Requests, Results Entry, LIMS</p>
+          </Link>
+
+          {/* Radiology */}
+          <Link href="/dashboard/radiology" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Activity className="w-24 h-24 text-indigo-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-indigo-50 w-fit rounded-xl mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+              <Activity className="w-6 h-6 text-indigo-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Radiology (RIS)</h3>
+            <p className="text-sm text-gray-500">X-Rays, Scans, Imaging Reports</p>
+          </Link>
+
+          {/* Wards / In-Patient */}
+          <Link href="/dashboard/beds" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Bed className="w-24 h-24 text-rose-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-rose-50 w-fit rounded-xl mb-4 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+              <Bed className="w-6 h-6 text-rose-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">In-Patient Wards</h3>
+            <p className="text-sm text-gray-500">Admissions, Bed Allocation, Rounds</p>
+          </Link>
+
+          {/* Billing */}
+          <Link href="/dashboard/billing" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <TrendingUp className="w-24 h-24 text-amber-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-amber-50 w-fit rounded-xl mb-4 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <TrendingUp className="w-6 h-6 text-amber-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Billing & Finance</h3>
+            <p className="text-sm text-gray-500">Invoices, HMO, Payments</p>
+          </Link>
+
+          {/* HR / Admin */}
+          <Link href="/dashboard/schedule" className="group bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Users className="w-24 h-24 text-gray-600 transform rotate-12" />
+            </div>
+            <div className="p-3 bg-gray-50 w-fit rounded-xl mb-4 group-hover:bg-gray-700 group-hover:text-white transition-colors">
+              <Users className="w-6 h-6 text-gray-600 group-hover:text-white" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">HR & Admin</h3>
+            <p className="text-sm text-gray-500">Staff, Shifts, Settings</p>
+          </Link>
+
         </div>
       </section>
 

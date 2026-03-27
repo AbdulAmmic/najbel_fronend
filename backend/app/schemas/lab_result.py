@@ -5,7 +5,7 @@ from datetime import datetime
 class LabResultBase(BaseModel):
     patient_id: int
     test_name: str
-    result: str
+    result: Optional[str] = None
     units: Optional[str] = None
     reference_range: Optional[str] = None
     notes: Optional[str] = None

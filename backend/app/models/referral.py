@@ -28,14 +28,7 @@ class Referral(ReferralBase, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    # We use explicit sa_relationship_kwargs where necessary if ambiguous, 
-    # but here distinct FKs should handle it. 
-    # Note: SQLModel might need specific relationship attributes for multiple FKs to same table.
-    # Let's simple define them.
-    
-    # We might need to define these relationships carefully in the User/Doctor model 
-    # or just use them as one-way here for simplicity first.
-    pass
+    patient: "Patient" = Relationship(back_populates="referrals")
 
 # Forward refs
 from .user import Doctor, Patient

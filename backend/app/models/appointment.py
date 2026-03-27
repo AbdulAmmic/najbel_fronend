@@ -10,6 +10,10 @@ class AppointmentType(str, Enum):
 class AppointmentStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
+    RESCHEDULED = "rescheduled"
+    CHECKED_IN = "checked-in"
+    READY_FOR_DOCTOR = "ready-for-doctor"
+    IN_CONSULTATION = "in-consultation"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
@@ -23,10 +27,13 @@ class AppointmentBase(SQLModel):
     appointment_time: datetime
     type: AppointmentType = Field(default=AppointmentType.OFFLINE)
     status: AppointmentStatus = Field(default=AppointmentStatus.PENDING)
+    checked_in_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
     communication_preference: CommunicationPreference = Field(default=CommunicationPreference.IN_APP_CHAT)
     reason: Optional[str] = None
     meeting_link: Optional[str] = None  # For online appointments
     notes: Optional[str] = None
+    reschedule_note: Optional[str] = None
 
 class Appointment(AppointmentBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

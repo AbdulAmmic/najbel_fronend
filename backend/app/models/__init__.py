@@ -1,4 +1,5 @@
 from .user import User, Doctor, Patient, UserRole
+from .chat import ChatMessage
 from .appointment import Appointment, AppointmentType, AppointmentStatus
 from .attendance import AttendanceLog
 from .prescription import Prescription
@@ -11,3 +12,6 @@ from .transaction import Transaction, TransactionType, TransactionStatus, Paymen
 from .consultation import Consultation
 from .bed import Bed, BedStatus
 from .referral import Referral, ReferralStatus, ReferralUrgency
+from .notification import Notification, NotificationType
+from .drug_order import DrugOrder, DrugOrderItem, OrderStatus
+

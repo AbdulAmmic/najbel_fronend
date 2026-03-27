@@ -73,7 +73,40 @@ def seed():
             session.add(d_prof2)
             
             session.commit()
+            # Additional Staff Roles
+            roles_to_create = [
+                ("Nurse Joy", "nurse@najbel.com", UserRole.NURSE),
+                ("Pharmacist Phil", "pharmacist@najbel.com", UserRole.PHARMACIST),
+                ("Kyle Rayner (Rad)", "radiologist@najbel.com", UserRole.RADIOLOGIST),
+                ("Steve (Store)", "store@najbel.com", UserRole.STORE_OFFICER),
+                ("Dexter (Lab)", "labtech@najbel.com", UserRole.LAB_TECH),
+                ("Admin Main", "admin@najbel.com", UserRole.ADMIN),
+                ("Super User", "super@najbel.com", UserRole.SUPER_ADMIN),
+            ]
+
+            for name, email, role in roles_to_create:
+                if not session.exec(select(User).where(User.email == email)).first():
+                    print(f"Creating {role} ({name})...")
+                    user = User(
+                        email=email,
+                        full_name=name,
+                        hashed_password=get_password_hash("password"),
+                        role=role,
+                        is_active=True
+                    )
+                    session.add(user)
+            
+            session.commit()
             print("Seeding Successful!")
+            print("------------------------------------------------")
+            print("Login Credentials (Password: 'password'):")
+            print("Doctor: doctor1@najbel.com")
+            print("Nurse: nurse@najbel.com")
+            print("Radiologist: radiologist@najbel.com")
+            print("Pharmacist: pharmacist@najbel.com")
+            print("Store Officer: store@najbel.com")
+            print("Admin: admin@najbel.com")
+            print("------------------------------------------------")
 
     except Exception as e:
         print(f"SEED ERROR: {e}")

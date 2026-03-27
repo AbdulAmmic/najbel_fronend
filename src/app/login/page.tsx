@@ -18,10 +18,9 @@ export default function NajbelLoginPage() {
     setLoading(true);
     setError("");
 
-    // Get form data
-    const form = e.target as HTMLFormElement;
-    const email = (form.elements[0] as HTMLInputElement).value;
-    const password = (form.elements[2] as HTMLInputElement).value; // Index 2 because of icon container? Better use name attribute or IDs but let's assume order
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const email = (formData.get("email") as string).trim();
+    const password = (formData.get("password") as string).trim();
 
     try {
       const { auth } = await import("@/services/api");
@@ -34,6 +33,12 @@ export default function NajbelLoginPage() {
 
       if (user.role === "patient") {
         router.push("/dashboard/patient");
+      } else if (user.role === "doctor") {
+        router.push("/dashboard/Doctor");
+      } else if (user.role === "receptionist" || user.role === "reception") {
+        router.push("/dashboard/reception");
+      } else if (user.role === "admin" || user.role === "super_admin") {
+        router.push("/dashboard/admin");
       } else {
         router.push("/dashboard");
       }
@@ -136,6 +141,7 @@ export default function NajbelLoginPage() {
                   </div>
                   <input
                     type="text"
+                    name="email"
                     required
                     className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                     placeholder="Enter your username"
@@ -152,7 +158,7 @@ export default function NajbelLoginPage() {
                   <button
                     type="button"
                     className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                    onClick={() => {/* Add forgot password logic */ }}
+                    onClick={() => router.push("/forgot-password")}
                   >
                     Forgot password?
                   </button>
@@ -163,6 +169,7 @@ export default function NajbelLoginPage() {
                   </div>
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="password"
                     required
                     className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                     placeholder="Enter your password"

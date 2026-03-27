@@ -4,38 +4,33 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  FileText,
-  Activity,
-  Pill,
-  Stethoscope,
-  Settings,
-  LogOut,
   ChevronLeft,
   ChevronRight,
-  Home,
-  DollarSign,
-  FileBarChart,
-  HelpCircle,
-  Shield
+  LogOut
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-type SidebarItem = {
-  icon: React.ComponentType<any>;
-  label: string;
-  path: string;
-  badge?: number;
-  isActive?: boolean;
-  subItems?: { label: string; path: string }[];
-};
+import { ROLE_NAVIGATION, BOTTOM_ITEMS, SidebarItem } from "@/config/navigation";
+import { auth } from "@/services/api";
 
 export default function ClinicSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  // On desktop: collapsed = icon-strip. On mobile: collapsed = hidden drawer.
+  const [collapsed, setCollapsed] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const [activeItem, setActiveItem] = useState("Dashboard");
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("Doctor");
+  const [userInitials, setUserInitials] = useState<string>("DR");
+
+  // Dynamic Items based on Role
+  const [visibleItems, setVisibleItems] = useState<SidebarItem[]>([]);
 
   const toggleExpand = (label: string) => {
     setExpandedItems(prev =>
@@ -45,151 +40,38 @@ export default function ClinicSidebar() {
     );
   };
 
-  const sidebarItems: SidebarItem[] = [
-    {
-      icon: Home,
-      label: "Overview",
-      path: "/dashboard/overview",
-      isActive: activeItem === "Overview"
-    },
-    {
-      icon: LayoutDashboard,
-      label: "Dashboard",
-      path: "/dashboard",
-      isActive: activeItem === "Dashboard"
-    },
-    {
-      icon: Users,
-      label: "Patients",
-      path: "/dashboard/patients",
-      badge: 12,
-      isActive: activeItem === "Patients"
-    },
-    {
-      icon: Calendar,
-      label: "Schedule",
-      path: "/dashboard/schedule",
-      isActive: activeItem === "Schedule",
-      subItems: [
-        { label: "Appointments", path: "/dashboard/schedule/appointments" },
-        { label: "Operating Rooms", path: "/dashboard/schedule/or" },
-        { label: "Staff Roster", path: "/dashboard/schedule/roster" }
-      ]
-    },
-    {
-      icon: Stethoscope,
-      label: "Consultations",
-      path: "/dashboard/consultations",
-      badge: 5,
-      isActive: activeItem === "Consultations"
-    },
-    {
-      icon: Pill,
-      label: "Pharmacy",
-      path: "/dashboard/pharmacy",
-      isActive: activeItem === "Pharmacy",
-      subItems: [
-        { label: "Inventory", path: "/dashboard/pharmacy/inventory" },
-        { label: "Prescriptions", path: "/dashboard/pharmacy/prescriptions" },
-        { label: "Suppliers", path: "/dashboard/pharmacy/suppliers" }
-      ]
-    },
-    {
-      icon: FileText,
-      label: "Medical Records",
-      path: "/dashboard/records",
-      isActive: activeItem === "Medical Records",
-      subItems: [
-        { label: "Patient Files", path: "/dashboard/records/patient-files" },
-        { label: "Lab Results", path: "/dashboard/records/lab-results" },
-        { label: "Imaging", path: "/dashboard/records/imaging" }
-      ]
-    },
-    {
-      icon: DollarSign,
-      label: "Billing",
-      path: "/dashboard/billing",
-      isActive: activeItem === "Billing"
-    },
-    {
-      icon: Activity,
-      label: "Analytics",
-      path: "/dashboard/analytics",
-      isActive: activeItem === "Analytics"
-    },
-    {
-      icon: FileBarChart,
-      label: "Reports",
-      path: "/dashboard/reports",
-      isActive: activeItem === "Reports"
-    }
-  ];
-
-  // Role-based logic
-  const [userRole, setUserRole] = useState<string | null>(null);
-
   useEffect(() => {
-    const fetchRole = async () => {
-      try {
-        // Retrieve from localStorage if available immediately (hacky but fast)
-        const storedRole = localStorage.getItem("user_role");
-        if (storedRole) setUserRole(storedRole);
-        const userStr = localStorage.getItem("user");
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          setUserRole(user.role);
-        }
-      } catch (e) {
-        console.error(e);
+    const initSidebar = async () => {
+      let role = null;
+      let name = "Doctor";
+
+      // Try getting from localStorage primarily for speed
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        role = u.role;
+        name = u.full_name;
+      } else {
+        // Fallback to API if not in local
+        try {
+          const u = await auth.getMe();
+          role = u.role;
+          name = u.full_name;
+        } catch (e) { console.error(e) }
+      }
+
+      if (role) {
+        setUserRole(role);
+        setUserName(name);
+        setUserInitials(name.split(' ').map((n: any) => n[0]).join('').substring(0, 2).toUpperCase());
+
+        // Set Navigation
+        const nav = ROLE_NAVIGATION[role] || ROLE_NAVIGATION["doctor"]; // Fallback to doctor/default
+        setVisibleItems(nav);
       }
     };
-    fetchRole();
+    initSidebar();
   }, []);
-
-  const bottomItems: SidebarItem[] = [
-    {
-      icon: Settings,
-      label: "Settings",
-      path: "/dashboard/settings",
-      isActive: activeItem === "Settings"
-    },
-    {
-      icon: Shield,
-      label: "Admin",
-      path: "/dashboard/admin",
-      isActive: activeItem === "Admin"
-    },
-    {
-      icon: HelpCircle,
-      label: "Help & Support",
-      path: "/dashboard/help",
-      isActive: activeItem === "Help & Support"
-    }
-  ];
-
-  // Filter items based on role
-  // Define allowed roles for each path or label
-  const filterItems = (items: SidebarItem[]) => {
-    if (!userRole) return []; // Or return keys that are public? Assuming staff usually logged in.
-    if (userRole === "admin") return items; // Admin sees all
-
-    return items.filter(item => {
-      // Define rules
-      if (item.label === "Medical Records") return ["doctor", "nurse", "admin"].includes(userRole);
-      if (item.label === "Consultations") return ["doctor"].includes(userRole);
-      if (item.label === "Pharmacy") return ["pharmacist", "admin"].includes(userRole);
-      if (item.label === "Billing") return ["accountant", "admin", "receptionist"].includes(userRole);
-      if (item.label === "Admin") return ["admin"].includes(userRole);
-      if (item.label === "Schedule") return ["doctor", "nurse", "receptionist", "admin"].includes(userRole);
-      if (item.label === "Patients") return ["doctor", "nurse", "receptionist", "admin"].includes(userRole);
-
-      return true; // Default allow (Overview, Dashboard, etc.)
-    });
-  };
-
-  const visibleSidebarItems = filterItems(sidebarItems);
-  const visibleBottomItems = filterItems(bottomItems);
-
 
   return (
     <>
@@ -208,13 +90,13 @@ export default function ClinicSidebar() {
 
       {/* Sidebar */}
       <motion.aside
-        initial={{ x: -300 }}
-        animate={{ x: collapsed ? -300 : 0 }}
-        transition={{ type: "spring", damping: 25 }}
-        className={`fixed md:sticky top-0 left-0 h-screen z-50 flex flex-col ${collapsed ? "-translate-x-full md:translate-x-0" : ""
-          }`}
+        // Mobile: slide in/out as a drawer. Desktop: always visible, width-based collapse.
+        initial={false}
+        animate={isMobile ? { x: collapsed ? -300 : 0 } : { x: 0 }}
+        transition={{ type: "spring", damping: 28, stiffness: 200 }}
+        className={`fixed md:sticky top-0 left-0 h-screen z-50 flex flex-col`}
       >
-        {/* Toggle Button */}
+        {/* Toggle Button (desktop) */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute -right-3 top-8 z-50 hidden md:flex items-center justify-center h-6 w-6 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow-md transition-all hover:scale-110"
@@ -226,8 +108,10 @@ export default function ClinicSidebar() {
           )}
         </button>
 
-        {/* Sidebar Container */}
-        <div className="flex flex-col h-full bg-white/95 backdrop-blur-xl border-r border-gray-200/60 w-64 md:w-72">
+        {/* Sidebar Container — desktop: icon-strip (72px) or full (240px). Mobile always 256px when open */}
+        <div className={`flex flex-col h-full bg-white/95 backdrop-blur-xl border-r border-gray-200/60 overflow-hidden transition-all duration-300 ${
+          isMobile ? 'w-64' : collapsed ? 'w-[72px]' : 'w-60'
+        }`}>
           {/* Logo Section */}
           <div className="p-6 border-b border-gray-200/50">
             <div className="flex items-center gap-3">
@@ -259,7 +143,7 @@ export default function ClinicSidebar() {
 
           {/* Navigation Items */}
           <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-            {visibleSidebarItems.map((item) => (
+            {visibleItems.map((item) => (
               <SidebarItemComponent
                 key={item.label}
                 item={item}
@@ -279,7 +163,7 @@ export default function ClinicSidebar() {
 
           {/* Bottom Section */}
           <div className="border-t border-gray-200/50 py-4 px-3 space-y-1">
-            {visibleBottomItems.map((item) => (
+            {BOTTOM_ITEMS.map((item) => (
               <SidebarItemComponent
                 key={item.label}
                 item={item}
@@ -325,11 +209,11 @@ export default function ClinicSidebar() {
                     className="flex items-center gap-3"
                   >
                     <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-400 flex items-center justify-center">
-                      <span className="text-xs font-semibold text-white">SJ</span>
+                      <span className="text-xs font-semibold text-white">{userInitials}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Dr. Sarah Johnson</p>
-                      <p className="text-xs text-gray-500">CMO - Admin</p>
+                      <p className="text-sm font-semibold text-gray-900">{userName}</p>
+                      <p className="text-xs text-gray-500 capitalize">{userRole?.replace('_', ' ') || "Staff"}</p>
                     </div>
                   </motion.div>
                 )}
@@ -367,7 +251,7 @@ function SidebarItemComponent({
 }) {
   const isExpanded = expandedItems?.includes(item.label);
   const hasSubItems = item.subItems && item.subItems.length > 0;
-  const router = useRouter(); // Requires import
+  const router = useRouter();
 
   return (
     <div className="space-y-0.5">

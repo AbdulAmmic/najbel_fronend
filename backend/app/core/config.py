@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     # SQLite for now
     DATABASE_URL: str = "sqlite:///./najbel.db"
 
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    # DEEPSEEK_API_KEY: str = "sk-d96513e88e9148c1a52f596ce74c6c36" 
+    GEMINI_API_KEY: str = "AIzaSyBuIgcUs-dyvQscKKjMGAjAehEMUjnUdEc"
+
+    BACKEND_CORS_ORIGINS: List[str] = ["*"]
 
     class Config:
         case_sensitive = True

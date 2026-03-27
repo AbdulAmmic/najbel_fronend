@@ -48,11 +48,26 @@ export default function RegisterPage() {
             router.push("/login?registered=true");
         } catch (err: any) {
             console.error("Registration failed", err);
-            // Basic error handling - backend returns 400 for duplicate email
-            if (err.response?.status === 400) {
-                setError(err.response.data.detail || "Registration failed. Please try again.");
+            console.error("Registration failed", err);
+            // Handle specific error codes
+            if (err.response) {
+                if (err.response.status === 400) {
+                    setError(err.response.data.detail || "Registration failed.");
+                } else if (err.response.status === 422) {
+                    // Validation error - show specifics
+                    const details = err.response.data.detail;
+                    if (Array.isArray(details)) {
+                        const messages = details.map((d: any) => `${d.loc[1]}: ${d.msg}`).join(", ");
+                        setError(`Validation Error: ${messages}`);
+                        console.log("Validation details:", details);
+                    } else {
+                        setError(`Validation Error: ${JSON.stringify(details)}`);
+                    }
+                } else {
+                    setError(`Error: ${err.response.statusText || "Unexpected error"}`);
+                }
             } else {
-                setError("An unexpected error occurred.");
+                setError("Network error. Please try again.");
             }
         } finally {
             setLoading(false);

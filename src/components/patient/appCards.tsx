@@ -19,8 +19,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AppointmentCard({ appointment }: any) {
+  const router = useRouter();
   const [showActions, setShowActions] = useState(false);
 
   const statusConfig: any = {
@@ -183,7 +185,7 @@ export default function AppointmentCard({ appointment }: any) {
           {appointment.status === "confirmed" && (
             <>
               <button
-                onClick={() => appointment.meetingLink && window.open(appointment.meetingLink, '_blank')}
+                onClick={() => router.push(`/dashboard/meeting/${appointment.id}`)}
                 disabled={!appointment.meetingLink}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow ${!appointment.meetingLink ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
@@ -200,7 +202,7 @@ export default function AppointmentCard({ appointment }: any) {
           {appointment.status === "pending" && (
             <>
               <Link
-                href="/dashboard/patient/messages"
+                href={`/dashboard/patient/messages?id=${appointment.id}`}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow"
               >
                 <MessageSquare className="w-5 h-5" />

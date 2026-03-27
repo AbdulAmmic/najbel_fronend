@@ -72,3 +72,35 @@ def get_prescription(
             raise HTTPException(status_code=403, detail="Not enough permissions")
             
     return prescription
+
+@router.put("/{id}", response_model=PrescriptionSchema)
+async def update_prescription(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    prescription_in: PrescriptionUpdate,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Update a prescription (e.g. mark as dispensed).
+    """
+    prescription = db.get(Prescription, id)
+    if not prescription:
+        raise HTTPException(status_code=404, detail="Prescription not found")
+        
+    # Permission check: Pharmacist, Doctor, or Admin can update status
+    if current_user.role not in [UserRole.PHARMACIST, UserRole.DOCTOR, UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    prescription_data = prescription_in.dict(exclude_unset=True)
+    for key, value in prescription_data.items():
+        setattr(prescription, key, value)
+
+    db.add(prescription)
+    db.commit()
+    db.refresh(prescription)
+    
+    # Broadcast notification
+    await manager.global_broadcast(f"prescription_update: {prescription.id}")
+    
+    return prescription

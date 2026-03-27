@@ -1,271 +1,375 @@
 "use client";
 
-import AppointmentsHeader from "@/components/patient/appointmentHeader";
-import AppointmentTabs from "@/components/patient/appointTabs";
-import AppointmentsGrid from "@/components/patient/appointGrid";
-import CalendarPreview from "@/components/patient/calenderPatAppoin";
 import { useState, useEffect } from "react";
-import { Clock, X } from "lucide-react";
-import { appointments as appointmentsApi } from "@/services/api";
+import {
+  Clock, X, Calendar, Plus, Search, Video, MapPin, CheckCircle2,
+  ChevronRight, Stethoscope, Activity, ArrowUpRight, CalendarClock
+} from "lucide-react";
+import { appointments as appointmentsApi, auth, users } from "@/services/api";
+import { useRouter } from "next/navigation";
 
 export default function PatientAppointmentsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("upcoming");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
   const [appointmentsList, setAppointmentsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentGate, setShowPaymentGate] = useState(false);
-  const [hasPaid, setHasPaid] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
+  const [walletPin, setWalletPin] = useState("");
+  const [hasWalletPin, setHasWalletPin] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [doctors, setDoctors] = useState<any[]>([]);
-
-  // Booking Form State
   const [bookingData, setBookingData] = useState({
-    doctor_id: "",
-    appointment_time: "",
-    type: "offline",
-    communication_preference: "in_app_chat",
-    reason: "",
-    notes: ""
+    doctor_id: "", appointment_time: "", type: "offline",
+    communication_preference: "in_app_chat", reason: "", notes: ""
   });
 
   const fetchAppointments = async () => {
     try {
       const data = await appointmentsApi.getAll();
-      const mappedData = data.map((apt: any) => ({
+      const mapped = data.map((apt: any) => ({
         id: apt.id,
         doctor: apt.doctor?.user?.full_name || "Unknown Doctor",
         specialty: apt.doctor?.specialization || "General",
-        date: new Date(apt.appointment_time).toLocaleDateString(),
+        date: new Date(apt.appointment_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
         time: new Date(apt.appointment_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        type: apt.type === 'online' ? 'video' : 'clinic',
+        type: apt.type || 'offline',
         status: apt.status,
-        duration: "30 mins",
         notes: apt.notes,
-        meetingLink: apt.meeting_link,
-        doctorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + (apt.doctor?.user?.full_name || "Doc"),
+        reschedule_note: apt.reschedule_note,
       }));
-      setAppointmentsList(mappedData);
-    } catch (err) {
-      console.error("Failed to fetch appointments", err);
-    }
+      setAppointmentsList(mapped);
+    } catch (err) { console.error("Failed to fetch appointments", err); }
   };
 
   const fetchDoctors = async () => {
     try {
-      // Assuming doctors are fetched from a generic profiles or staff endpoint
-      // Using dashboard patients as a proxy for now or if we have a staff service
-      const response = await fetch('http://localhost:8000/api/v1/dashboard/stats'); // Just to triggers some api activity
-      // Actually let's just use hardcoded doctors for now if we don't have a direct endpoint, 
-      // but wait, I can probably use the existing patientsApi.getAll() to see if there's a staff one.
-      // Let's assume we have a way to list doctors.
-      setDoctors([
-        { id: 1, name: "Dr. Musa Abdullahi", specialty: "General" },
-        { id: 2, name: "Dr. Sarah Ibrahim", specialty: "Cardiology" }
-      ]);
-    } catch (err) {
-      console.error("Failed to fetch doctors", err);
-    }
+      const res = await import("@/services/api").then(m => m.default.get("/users/doctors"));
+      setDoctors(res.data);
+    } catch (err) { console.error("Failed to fetch doctors", err); }
+  };
+
+  const fetchMe = async () => {
+    try {
+      const me = await auth.getMe();
+      setHasWalletPin(me.has_wallet_pin);
+    } catch (err) { console.error("Failed to fetch user data", err); }
   };
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchAppointments(), fetchDoctors()]);
+      await Promise.all([fetchAppointments(), fetchDoctors(), fetchMe()]);
       setLoading(false);
     };
     load();
   }, []);
 
-  const stats = {
-    upcoming: appointmentsList.filter(a => a.status === "confirmed" || a.status === "pending").length,
-    past: appointmentsList.filter(a => a.status === "completed").length,
-    cancelled: appointmentsList.filter(a => a.status === "cancelled").length,
+  const filtered = appointmentsList.filter(apt => {
+    if (activeTab === "upcoming") return apt.status === "confirmed" || apt.status === "pending" || apt.status === "rescheduled";
+    if (activeTab === "history") return apt.status === "completed" || apt.status === "cancelled";
+    return true;
+  }).filter(apt =>
+    apt.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    apt.specialty.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case "confirmed": return "bg-emerald-500/10 text-emerald-600";
+      case "pending": return "bg-amber-500/10 text-amber-600";
+      case "rescheduled": return "bg-orange-500/10 text-orange-600";
+      case "completed": return "bg-blue-500/10 text-blue-600";
+      case "cancelled": return "bg-red-500/10 text-red-600";
+      default: return "bg-gray-100 text-gray-500";
+    }
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <main className="p-4 lg:p-6">
+    <div className="max-w-lg mx-auto pb-8 -mx-1">
+      {/* Header */}
+      <div className="px-1 pt-1 mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Appointments</h1>
+            <p className="text-[11px] text-gray-400 mt-0.5">Manage your visits</p>
+          </div>
+          <button
+            onClick={() => setShowBookingForm(true)}
+            className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-        {/* Header Section */}
-        <AppointmentsHeader
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          filterType={filterType}
-          setFilterType={setFilterType}
-          stats={stats}
-          onBookClick={() => {
-            if (hasPaid) {
-              setShowBookingForm(true);
-            } else {
-              setShowPaymentGate(true);
-            }
-          }}
-        />
+      {/* Search */}
+      <div className="mx-1 mb-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+          <input
+            type="text"
+            placeholder="Search doctor or specialty..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 transition text-[13px] placeholder:text-gray-300"
+          />
+        </div>
+      </div>
 
-        {/* Payment Gate Modal */}
-        {showPaymentGate && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                <Clock className="w-8 h-8 text-blue-600" />
+      {/* Tabs */}
+      <div className="flex gap-1 mx-1 mb-4 p-0.5 bg-gray-100 rounded-lg w-fit">
+        {["upcoming", "history"].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-1.5 rounded-md text-[11px] font-semibold capitalize transition ${activeTab === tab ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* List */}
+      <div className="space-y-2 mx-1">
+        {loading ? (
+          <div className="flex flex-col items-center py-16 gap-2">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-[11px] text-gray-400">Loading...</p>
+          </div>
+        ) : filtered.length > 0 ? (
+          filtered.map(apt => (
+            <div key={apt.id} className="bg-white rounded-xl p-3 border border-gray-100/80 hover:border-blue-100 transition">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
+                    {apt.doctor.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-[13px]">{apt.doctor}</p>
+                    <p className="text-[10px] text-gray-400">{apt.specialty}</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${statusColor(apt.status)}`}>
+                  {apt.status?.toUpperCase()}
+                </span>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Consultation Fee</h2>
-                <p className="text-gray-600 mt-2">
-                  A consultation fee of ₦5,000 is required to book a new appointment.
-                </p>
+              <div className="flex items-center gap-3 mb-2.5">
+                <div className="flex-1 flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <Calendar className="w-3 h-3 text-gray-400" /> {apt.date}
+                </div>
+                <div className="flex-1 flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <Clock className="w-3 h-3 text-gray-400" /> {apt.time}
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-gray-400 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  {apt.type === 'online' ? <Video className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+                  {apt.type === 'online' ? 'Online' : 'Clinic'}
+                </div>
               </div>
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Amount Due</p>
-                <p className="text-3xl font-bold text-gray-900">₦5,000.00</p>
-              </div>
-              <div className="flex gap-3">
+              {apt.status === 'confirmed' && apt.type === 'online' && (
                 <button
-                  onClick={() => setShowPaymentGate(false)}
-                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                  onClick={() => router.push(`/dashboard/meeting/${apt.id}`)}
+                  className="w-full py-2 bg-blue-600 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-blue-700 active:scale-[0.98] transition"
                 >
-                  Cancel
+                  <Video className="w-3.5 h-3.5" /> Join Video Call <ArrowUpRight className="w-3 h-3" />
                 </button>
-                <button
-                  onClick={() => {
-                    setHasPaid(true);
-                    setShowPaymentGate(false);
-                    setShowBookingForm(true);
-                  }}
-                  className="flex-1 py-3 px-4 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all shadow-md active:scale-95"
-                >
-                  I Paid
-                </button>
-              </div>
+              )}
+              {apt.status === 'rescheduled' && (
+                <div className="space-y-2">
+                  {apt.reschedule_note && (
+                    <div className="flex items-start gap-2 bg-orange-50 rounded-lg p-2.5 border border-orange-100">
+                      <CalendarClock className="w-3.5 h-3.5 text-orange-500 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-orange-700">
+                        <span className="font-semibold">Doctor's note:</span> {apt.reschedule_note}
+                      </p>
+                    </div>
+                  )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await appointmentsApi.acceptReschedule(apt.id);
+                        setAppointmentsList(prev => prev.map(a => a.id === apt.id ? { ...a, status: 'confirmed', reschedule_note: null } : a));
+                      } catch (err: any) {
+                        alert(err?.response?.data?.detail || "Failed to accept reschedule");
+                      }
+                    }}
+                    className="w-full py-2 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-emerald-700 active:scale-[0.98] transition"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Accept New Schedule
+                  </button>
+                </div>
+              )}
             </div>
+          ))
+        ) : (
+          <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+            <Calendar className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-gray-700 mb-1">No appointments</p>
+            <p className="text-[11px] text-gray-400">Schedule a visit to get started</p>
+            <button
+              onClick={() => setShowBookingForm(true)}
+              className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-[11px] font-semibold"
+            >
+              Book Visit
+            </button>
           </div>
         )}
+      </div>
 
-        {/* Booking Form Modal */}
-        {showBookingForm && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl space-y-6 relative">
-              <button
-                onClick={() => setShowBookingForm(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full"
-              >
-                <X className="w-6 h-6 text-gray-500" />
-              </button>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Book New Appointment</h2>
-                <p className="text-gray-500 text-sm mt-1">Proposed appointments will appear as 'Pending' until confirmed by the clinic.</p>
+      {/* Payment Gate Modal (Wallet PIN Entry) */}
+      {showPaymentGate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[120] flex items-end sm:items-center justify-center" onClick={() => setShowPaymentGate(false)}>
+          <div className="bg-white rounded-t-xl sm:rounded-xl p-5 w-full sm:max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 sm:hidden" />
+            <div className="text-center mb-5">
+              <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">{hasWalletPin ? "Confirm Payment" : "Set Wallet PIN"}</h2>
+              <p className="text-[11px] text-gray-400 mt-1">{hasWalletPin ? "Consultation fee required" : "Secure your wallet before booking"}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4 mb-5 text-center">
+              <p className="text-[10px] text-gray-400 font-medium mb-1">
+                {hasWalletPin ? "Enter your 4-digit Wallet PIN to authorize deduction." : "Create a 4-digit Wallet PIN to protect your funds."}
+              </p>
+              <div className="flex justify-center mt-3">
+                <input
+                  type="text"
+                  maxLength={4}
+                  autoFocus
+                  value={walletPin}
+                  onChange={(e) => setWalletPin(e.target.value)}
+                  placeholder="PIN"
+                  className="w-[180px] text-center text-3xl font-black bg-white border-2 border-gray-200 rounded-xl py-3 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all text-gray-900 shadow-sm"
+                />
+              </div>
+            </div>
+            <button
+              disabled={walletPin.length < 4 || isSubmitting}
+              onClick={async () => {
+                setIsSubmitting(true);
+                try {
+                  if (!hasWalletPin) {
+                    await users.updatePin(walletPin);
+                    setHasWalletPin(true);
+                  }
+
+                  await appointmentsApi.create({
+                    ...bookingData,
+                    doctor_id: parseInt(bookingData.doctor_id),
+                    appointment_time: new Date(bookingData.appointment_time).toISOString(),
+                    wallet_pin: walletPin
+                  });
+                  setShowPaymentGate(false);
+                  setShowBookingForm(false);
+                  setWalletPin("");
+                  fetchAppointments();
+                } catch (err: any) {
+                  alert(err?.response?.data?.detail || "Payment auth failed. Check your PIN and Wallet Balance.");
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-semibold text-sm active:scale-[0.98] transition"
+            >
+              {isSubmitting ? "Processing..." : (hasWalletPin ? "Authorize & Book" : "Set PIN & Book")}
+            </button>
+            <button onClick={() => setShowPaymentGate(false)} className="w-full py-2 mt-2 text-gray-400 text-[11px] font-medium">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Booking Form Modal — Full-screen bottom sheet on mobile, centered card on desktop */}
+      {showBookingForm && !showPaymentGate && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[110] overflow-hidden" onClick={() => setShowBookingForm(false)}>
+          {/* Mobile: slides up from bottom, full width, scrollable */}
+          {/* Desktop: centered card */}
+          <div className="absolute inset-x-0 bottom-0 sm:relative sm:inset-auto sm:flex sm:items-center sm:justify-center sm:min-h-full sm:p-4">
+            <div
+              className="bg-white rounded-t-xl sm:rounded-xl w-full sm:max-w-md shadow-xl max-h-[92vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Drag handle (mobile) */}
+              <div className="sticky top-0 bg-white pt-3 pb-2 px-5 border-b border-gray-50 z-10 sm:border-0 sm:pb-0">
+                <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-3 sm:hidden" />
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-gray-900">Book Appointment</h2>
+                  <button onClick={() => setShowBookingForm(false)} className="p-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-gray-600 active:scale-95 transition">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Select Doctor</label>
+              <div className="p-5 space-y-4">
+                {/* Doctor Select */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Doctor</label>
                   <select
                     value={bookingData.doctor_id}
                     onChange={(e) => setBookingData({ ...bookingData, doctor_id: e.target.value })}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                    className="w-full px-3 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 text-[13px]"
                   >
-                    <option value="">Select Specialist</option>
-                    {doctors.map(d => (
-                      <option key={d.id} value={d.id}>{d.name} - {d.specialty}</option>
-                    ))}
+                    <option value="">Select doctor...</option>
+                    {doctors.map(d => <option key={d.id} value={d.id}>{d.name} · {d.specialty}</option>)}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Appointment Type</label>
-                  <select
-                    value={bookingData.type}
-                    onChange={(e) => setBookingData({ ...bookingData, type: e.target.value })}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                  >
-                    <option value="online">Online Video Call</option>
-                    <option value="offline">In-Person Visit</option>
-                  </select>
+
+                {/* Type */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Type</label>
+                  <div className="flex bg-gray-50 rounded-lg p-0.5 border border-gray-100">
+                    <button onClick={() => setBookingData({ ...bookingData, type: 'online' })} className={`flex-1 py-2.5 rounded-lg text-[11px] font-semibold transition ${bookingData.type === 'online' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>Online</button>
+                    <button onClick={() => setBookingData({ ...bookingData, type: 'offline' })} className={`flex-1 py-2.5 rounded-lg text-[11px] font-semibold transition ${bookingData.type === 'offline' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}>Clinic</button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Communication Preference</label>
-                  <select
-                    value={bookingData.communication_preference}
-                    onChange={(e) => setBookingData({ ...bookingData, communication_preference: e.target.value })}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
-                  >
-                    <option value="in_app_chat">IN-APP CHAT</option>
-                    <option value="video_whatsapp">VIDEO WHATSAPP</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Preferred Date & Time</label>
+
+                {/* Date & Time */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Date & Time</label>
                   <input
                     type="datetime-local"
                     value={bookingData.appointment_time}
                     onChange={(e) => setBookingData({ ...bookingData, appointment_time: e.target.value })}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                    className="w-full px-3 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 text-[13px]"
                   />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Reason for Visit</label>
+
+                {/* Reason */}
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5 block">Reason</label>
                   <textarea
-                    rows={2}
-                    placeholder="Briefly describe your symptoms or reason for the consultation"
+                    rows={3}
+                    placeholder="Describe your health concern..."
                     value={bookingData.reason}
                     onChange={(e) => setBookingData({ ...bookingData, reason: e.target.value })}
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium resize-none"
+                    className="w-full px-3 py-3 bg-gray-50 rounded-xl border border-gray-100 outline-none focus:border-blue-500 text-[13px] resize-none placeholder:text-gray-300"
                   />
                 </div>
+
+                {/* Submit */}
+                <div className="pt-1 pb-2">
+                  <button
+                    onClick={async () => {
+                      if (!bookingData.doctor_id || !bookingData.appointment_time) { alert("Please fill required fields"); return; }
+                      // Trigger payment gate
+                      setShowPaymentGate(true);
+                    }}
+                    className="w-full py-3.5 bg-blue-600 text-white rounded-xl font-semibold text-sm active:scale-[0.98] transition"
+                  >
+                    Continue to Payment
+                  </button>
+                  <button onClick={() => setShowBookingForm(false)} className="w-full py-2 mt-1 text-gray-400 text-[11px] font-medium sm:hidden">
+                    Cancel
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={async () => {
-                  if (!bookingData.doctor_id || !bookingData.appointment_time) {
-                    alert("Please select a doctor and date/time.");
-                    return;
-                  }
-                  try {
-                    await appointmentsApi.create({
-                      ...bookingData,
-                      doctor_id: parseInt(bookingData.doctor_id),
-                      appointment_time: new Date(bookingData.appointment_time).toISOString()
-                    });
-                    alert("Appointment request submitted and is now pending!");
-                    setShowBookingForm(false);
-                    setHasPaid(false);
-                    fetchAppointments(); // Refresh list
-                  } catch (err) {
-                    console.error("Booking failed", err);
-                    alert("Failed to book appointment. Please try again.");
-                  }
-                }}
-                className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg active:scale-[0.98]"
-              >
-                Schedule Appointment
-              </button>
             </div>
           </div>
-        )}
-
-        {/* Tabs */}
-        <AppointmentTabs
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          stats={stats}
-        />
-
-        {/* Appointments Grid */}
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading appointments...</div>
-        ) : (
-          <AppointmentsGrid
-            appointments={appointmentsList}
-            activeTab={activeTab}
-            searchQuery={searchQuery}
-            filterType={filterType}
-          />
-        )}
-
-        {/* Calendar Preview */}
-        <div className="mt-8">
-          <CalendarPreview />
         </div>
-      </main>
+      )}
     </div>
   );
 }

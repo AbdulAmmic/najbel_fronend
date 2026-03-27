@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { appointments, vitals } from "@/services/api";
+import { appointments, beds } from "@/services/api"; // Added beds service
 import {
     HeartPulse,
     Users,
@@ -12,30 +12,49 @@ import {
     ArrowRight,
     BedDouble
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import RecordVitalsModal from "@/components/dashboard/nurse/RecordVitalsModal";
 
 export default function NurseDashboard() {
     const [queue, setQueue] = useState<any[]>([]);
+    const [bedList, setBedList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedPatient, setSelectedPatient] = useState<any>(null);
+    const [isVitalsModalOpen, setIsVitalsModalOpen] = useState(false);
+
+    const fetchData = async () => {
+        try {
+            const [apptData, bedsData] = await Promise.all([
+                appointments.getAll(),
+                beds.getAll().catch(() => []) // Handle case if beds API fails or empty
+            ]);
+
+            // Filter for patients waiting for vitals
+            // Accepting 'scheduled', 'confirmed', 'checked-in' for now to ensure visibility
+            const pendingVitals = apptData.filter((a: any) =>
+                ['scheduled', 'confirmed', 'checked-in'].includes(a.status)
+            );
+            setQueue(pendingVitals);
+            setBedList(bedsData);
+        } catch (error) {
+            console.error("Failed to fetch nurse dashboard data", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchQueue = async () => {
-            try {
-                // In a real scenario, we might have a specific endpoint for 'checked-in' patients
-                // For now, filtering appointments that are 'confirmed' or 'arrived'
-                const data = await appointments.getAll();
-                const pendingVitals = data.filter((a: any) =>
-                    a.status === 'confirmed' || a.status === 'checked-in'
-                );
-                setQueue(pendingVitals);
-            } catch (error) {
-                console.error("Failed to fetch nurse queue", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchQueue();
+        fetchData();
     }, []);
+
+    const handleOpenVitals = (patient: any) => {
+        setSelectedPatient(patient);
+        setIsVitalsModalOpen(true);
+    };
+
+    const handleVitalsSuccess = () => {
+        fetchData(); // Refresh queue
+    };
 
     if (loading) {
         return (
@@ -63,14 +82,7 @@ export default function NurseDashboard() {
                                 RN
                             </div>
                         ))}
-                        <div className="h-10 w-10 rounded-full border-2 border-white bg-gray-50 flex items-center justify-center text-xs font-bold text-gray-400">
-                            +2
-                        </div>
                     </div>
-                    <button className="bg-rose-600 text-white px-6 py-2.5 rounded-xl font-medium shadow-lg shadow-rose-600/20 hover:bg-rose-700 transition-colors flex items-center gap-2">
-                        <HeartPulse className="w-4 h-4" />
-                        Record Vitals
-                    </button>
                 </div>
             </div>
 
@@ -81,8 +93,13 @@ export default function NurseDashboard() {
                     <div className="grid grid-cols-3 gap-6">
                         {[
                             { label: "Waiting for Vitals", val: queue.length, icon: Users, color: "blue" },
-                            { label: "Critical Attention", val: "2", icon: Activity, color: "rose" },
-                            { label: "Beds Available", val: "8/12", icon: BedDouble, color: "emerald" },
+                            { label: "Critical Attention", val: "0", icon: Activity, color: "rose" }, // Placeholder
+                            {
+                                label: "Beds Available",
+                                val: `${bedList.filter((b: any) => b.status === 'available').length}/${bedList.length}`,
+                                icon: BedDouble,
+                                color: "emerald"
+                            },
                         ].map((stat, i) => (
                             <div key={i} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                                 <div className={`p-4 rounded-xl bg-${stat.color}-50 text-${stat.color}-600`}>
@@ -133,7 +150,11 @@ export default function NurseDashboard() {
                                                     </span>
                                                     <span>•</span>
                                                     <span className="flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" /> Arrived 10m ago
+                                                        <Clock className="w-3 h-3" /> {new Date(pt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${pt.status === 'checked-in' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                                        }`}>
+                                                        {pt.status.replace('-', ' ')}
                                                     </span>
                                                 </p>
                                             </div>
@@ -144,11 +165,12 @@ export default function NurseDashboard() {
                                                 <span className="text-xs font-medium text-gray-400">Reason</span>
                                                 <span className="text-sm text-gray-700">{pt.reason || "Checkup"}</span>
                                             </div>
-                                            <button className="px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 text-gray-600 font-medium rounded-lg transition-all shadow-sm">
-                                                Call Patient
-                                            </button>
-                                            <button className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md shadow-blue-600/20">
-                                                <ArrowRight className="w-4 h-4" />
+                                            <button
+                                                onClick={() => handleOpenVitals(pt)}
+                                                className="px-4 py-2 bg-rose-600 text-white font-medium rounded-lg hover:bg-rose-700 transition-all shadow-sm shadow-rose-600/20 flex items-center gap-2"
+                                            >
+                                                <HeartPulse className="w-4 h-4" />
+                                                Record Vitals
                                             </button>
                                         </div>
                                     </motion.div>
@@ -164,40 +186,46 @@ export default function NurseDashboard() {
                     <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white shadow-xl">
                         <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                             <Thermometer className="w-5 h-5 text-rose-400" />
-                            Quick Vitals Entry
+                            Quick Actions
                         </h3>
-                        <div className="space-y-4">
-                            <input type="text" placeholder="Patient ID / Name" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-rose-500 transition-colors" />
-                            <div className="grid grid-cols-2 gap-4">
-                                <input type="text" placeholder="BP (mmHg)" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-rose-500 transition-colors" />
-                                <input type="text" placeholder="Temp (°C)" className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:border-rose-500 transition-colors" />
-                            </div>
-                            <button className="w-full py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-medium transition-colors shadow-lg shadow-rose-900/50">
-                                Save Vitals
-                            </button>
-                        </div>
+                        <p className="text-gray-400 text-sm mb-4">
+                            Select a patient from the queue to record their vitals.
+                        </p>
                     </div>
 
                     {/* Bed Allocation - Simple List */}
                     <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                        <h3 className="font-bold text-gray-900 mb-4">Bed Allocation Preview</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            {[1, 2, 3, 4, 5, 6].map(bed => (
-                                <div key={bed} className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${bed % 3 === 0
-                                        ? 'bg-rose-50 border-rose-100 text-rose-700'
-                                        : 'bg-emerald-50 border-emerald-100 text-emerald-700'
-                                    }`}>
-                                    <BedDouble className="w-5 h-5" />
-                                    <span className="text-xs font-bold">Bed {bed}</span>
-                                </div>
-                            ))}
-                        </div>
+                        <h3 className="font-bold text-gray-900 mb-4">Ward Status</h3>
+                        {bedList.length === 0 ? (
+                            <p className="text-sm text-gray-500 text-center py-4">No beds configured.</p>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                                {bedList.map((bed: any) => (
+                                    <div key={bed.id} className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-2 transition-all ${bed.status === 'occupied'
+                                            ? 'bg-rose-50 border-rose-100 text-rose-700'
+                                            : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                                        }`}>
+                                        <BedDouble className="w-5 h-5" />
+                                        <span className="text-xs font-bold">{bed.room_number || `Bed ${bed.id}`}</span>
+                                        <span className="text-[10px] uppercase font-semibold opacity-75">{bed.status}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <button className="w-full mt-4 py-2 text-sm text-gray-500 hover:text-gray-900 font-medium">
                             Manage All Ward Rooms
                         </button>
                     </div>
                 </div>
             </div>
+
+            {/* Vitals Modal */}
+            <RecordVitalsModal
+                isOpen={isVitalsModalOpen}
+                onClose={() => setIsVitalsModalOpen(false)}
+                patient={selectedPatient}
+                onSuccess={handleVitalsSuccess}
+            />
         </div>
     );
 }

@@ -3,28 +3,29 @@
 import Header from "@/components/Layouts/header";
 import Sidebar from "@/components/Layouts/sidebar";
 import RouteGuard from "@/components/auth/RouteGuard";
-import { useState } from "react";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
 
 export default function StaffLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const [sidebarCollapsed] = useState(false);
-
     return (
-        <RouteGuard allowedRoles={["admin", "doctor", "nurse", "receptionist", "laboratory", "pharmacy"]}>
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
-                <Header />
-                <div className="flex">
-                    <aside className={`${sidebarCollapsed ? "md:w-0" : "md:w-72"} transition-all`}>
+        <WebSocketProvider>
+            <RouteGuard allowedRoles={["admin", "doctor", "nurse", "receptionist", "laboratory", "pharmacy"]}>
+                <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
+                    <Header />
+                    {/* flex row: sidebar always visible on md+, children fill remaining space */}
+                    <div className="flex relative">
+                        {/* Sidebar: on mobile it's a fixed overlay drawer, on desktop it's sticky */}
                         <Sidebar />
-                    </aside>
-                    <main className="flex-1">
-                        {children}
-                    </main>
+                        {/* Main content area — takes all remaining horizontal space */}
+                        <main className="flex-1 min-w-0 overflow-x-hidden">
+                            {children}
+                        </main>
+                    </div>
                 </div>
-            </div>
-        </RouteGuard>
+            </RouteGuard>
+        </WebSocketProvider>
     );
 }

@@ -11,6 +11,9 @@ class BedStatus(str, Enum):
 class BedBase(SQLModel):
     ward_name: str
     bed_number: str
+    room_number: Optional[str] = Field(default=None)
+    daily_rate: float = Field(default=0.0)
+    description: Optional[str] = Field(default=None)
     status: BedStatus = Field(default=BedStatus.AVAILABLE)
     patient_id: Optional[int] = Field(default=None, foreign_key="patient.id", nullable=True)
 

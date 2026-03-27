@@ -29,6 +29,7 @@ class Transaction(SQLModel, table=True):
     status: TransactionStatus = Field(default=TransactionStatus.COMPLETED)
     reference: str = Field(unique=True)
     cashier_name: Optional[str] = None
+    bank_id: Optional[int] = Field(default=None, foreign_key="bank.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships

@@ -5,7 +5,7 @@ router = APIRouter()
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    await manager.connect(websocket, "global")
     try:
         while True:
             data = await websocket.receive_text()
@@ -13,4 +13,4 @@ async def websocket_endpoint(websocket: WebSocket):
             # For this task, we mainly use it for server->client broadcast
             await websocket.send_text(f"Message received: {data}")
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, "global")
