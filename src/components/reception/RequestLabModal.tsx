@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Search, User, FlaskConical, AlertCircle, DollarSign, CheckCircle, ChevronRight, FileText } from "lucide-react";
-import { labs, patients } from "@/services/api";
+import { labs, patients, labCatalog } from "@/services/api";
 
 interface RequestLabModalProps {
     onClose: () => void;
@@ -22,26 +22,41 @@ export default function RequestLabModal({ onClose, onSuccess, initialPatient }: 
 
     // Step 2: Form Data
     const [formData, setFormData] = useState({
-        test_name: "General Blood Test",
-        notes: "",
-        priority: "normal"
+        patient_id: initialPatient?.id || "",
+        test_name: "",
+        test_names: [] as string[],
+        urgency: "routine",
+        notes: ""
     });
     const [loading, setLoading] = useState(false);
 
-    // Lab Fees (Mock - in real app would come from backend conf)
-    const FEES: Record<string, number> = {
-        "General Blood Test": 5000,
-        "Malaria Test": 3500,
-        "Typhoid Test": 4000,
-        "Urinalysis": 2500,
-        "X-Ray Chest": 12000,
-        "Full Blood Count": 7000
+    const [catalog, setCatalog] = useState<any[]>([]);
+    const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+    const calculateTotalFee = () => {
+        return catalog
+            .filter(t => formData.test_names.includes(t.name))
+            .reduce((sum, t) => sum + (t.price || 0), 0);
     };
 
-    const currentFee = FEES[formData.test_name] || 5000;
+    useEffect(() => {
+        const fetchCatalog = async () => {
+            try {
+                const data = await labCatalog.getAll();
+                setCatalog(data);
+            } catch (error) {
+                console.error("Failed to fetch lab catalog", error);
+            } finally {
+                setLoadingCatalog(false);
+            }
+        };
+        fetchCatalog();
+    }, []);
 
     useEffect(() => {
         if (initialPatient) {
+            setSelectedPatient(initialPatient);
+            setFormData(prev => ({ ...prev, patient_id: initialPatient.id }));
             setStep(2);
         }
     }, [initialPatient]);
@@ -71,24 +86,32 @@ export default function RequestLabModal({ onClose, onSuccess, initialPatient }: 
 
     const handlePatientSelect = (patient: any) => {
         setSelectedPatient(patient);
+        setFormData(prev => ({ ...prev, patient_id: patient.id }));
         setStep(2);
     };
 
     const handleSubmit = async () => {
+        if (formData.test_names.length === 0) {
+            alert("Please select at least one test.");
+            return;
+        }
         setLoading(true);
         try {
-            await labs.create({
-                patient_id: selectedPatient.id,
-                test_name: formData.test_name,
-                notes: formData.notes,
-                priority: formData.priority,
-                status: "requested"
-            });
+            await Promise.all(formData.test_names.map(testName =>
+                labs.create({
+                    patient_id: Number(formData.patient_id),
+                    test_name: testName,
+                    urgency: formData.urgency || "routine",
+                    notes: formData.notes || "",
+                    status: "requested"
+                })
+            ));
+
             onSuccess();
             onClose();
         } catch (error) {
-            console.error("Lab request failed", error);
-            alert("Failed to request lab test. Please try again.");
+            console.error("Failed to submit lab request", error);
+            alert("Error submitting request. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -196,26 +219,52 @@ export default function RequestLabModal({ onClose, onSuccess, initialPatient }: 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Test Name</label>
-                                        <select
-                                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 appearance-none shadow-sm"
-                                            value={formData.test_name}
-                                            onChange={(e) => setFormData({ ...formData, test_name: e.target.value })}
-                                        >
-                                            {Object.keys(FEES).map(test => (
-                                                <option key={test} value={test}>{test}</option>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Select Tests</label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                            {catalog.map(test => (
+                                                <label key={test.id} className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-lg cursor-pointer hover:border-blue-200 hover:shadow-sm transition-all">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        checked={formData.test_names.includes(test.name)}
+                                                        onChange={(e) => {
+                                                            const names = formData.test_names;
+                                                            if (e.target.checked) {
+                                                                setFormData({ ...formData, test_names: [...names, test.name] });
+                                                            } else {
+                                                                setFormData({ ...formData, test_names: names.filter(n => n !== test.name) });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-medium text-gray-800">{test.name}</span>
+                                                        <span className="text-xs text-blue-600 font-semibold">₦{(test.price || 0).toLocaleString()}</span>
+                                                    </div>
+                                                </label>
                                             ))}
-                                        </select>
+                                            {catalog.length === 0 && !loadingCatalog && (
+                                                <div className="col-span-full text-center text-gray-500 py-4">No tests available</div>
+                                            )}
+                                            {loadingCatalog && (
+                                                <div className="col-span-full text-center text-gray-500 py-4">Loading tests...</div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center justify-between mt-2 px-1">
+                                            <span className="text-xs text-gray-500">Selected: {formData.test_names.length} tests</span>
+                                            <span className="text-sm font-bold text-blue-600">
+                                                Total: ₦{calculateTotalFee().toLocaleString()}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Priority</label>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Urgency</label>
                                         <div className="flex gap-3">
-                                            {['normal', 'urgent'].map((p) => (
+                                            {['routine', 'urgent'].map((p) => (
                                                 <button
                                                     key={p}
-                                                    onClick={() => setFormData({ ...formData, priority: p })}
-                                                    className={`flex-1 py-3 px-4 rounded-xl border font-medium capitalize transition-all ${formData.priority === p
+                                                    onClick={() => setFormData({ ...formData, urgency: p })}
+                                                    className={`flex-1 py-3 px-4 rounded-xl border font-medium capitalize transition-all ${formData.urgency === p
                                                         ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-200'
                                                         : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                                                         }`}
@@ -261,18 +310,18 @@ export default function RequestLabModal({ onClose, onSuccess, initialPatient }: 
                                     <span className="font-bold text-gray-900">{selectedPatient?.full_name || selectedPatient?.user?.full_name}</span>
                                 </div>
                                 <div className="flex justify-between py-2 border-b border-gray-200">
-                                    <span className="text-gray-500">Test Required</span>
-                                    <span className="font-bold text-gray-900">{formData.test_name}</span>
+                                    <span className="text-gray-500">Tests Required</span>
+                                    <span className="font-bold text-gray-900">{formData.test_names.join(', ')}</span>
                                 </div>
                                 <div className="flex justify-between py-2 border-b border-gray-200">
-                                    <span className="text-gray-500">Priority</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${formData.priority === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                                        {formData.priority}
+                                    <span className="text-gray-500">Urgency</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${formData.urgency === 'urgent' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                        {formData.urgency}
                                     </span>
                                 </div>
                                 <div className="flex justify-between py-2 items-center">
                                     <span className="text-gray-500">Estimated Cost</span>
-                                    <span className="text-2xl font-bold text-gray-900">₦{currentFee.toLocaleString()}</span>
+                                    <span className="text-2xl font-bold text-gray-900">₦{calculateTotalFee().toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -299,7 +348,7 @@ export default function RequestLabModal({ onClose, onSuccess, initialPatient }: 
                     {step === 2 && (
                         <button
                             onClick={() => setStep(3)}
-                            disabled={!formData.test_name}
+                            disabled={formData.test_names.length === 0}
                             className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center gap-2 group disabled:opacity-50"
                         >
                             Next Step

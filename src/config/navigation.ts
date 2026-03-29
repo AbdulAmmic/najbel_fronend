@@ -78,7 +78,15 @@ export const ROLE_NAVIGATION: Record<string, SidebarItem[]> = {
                 { label: "Beds", path: "/dashboard/admin/management?tab=beds" }
             ]
         },
-        { icon: Box, label: "Inventory", path: "/dashboard/inventory" },
+        { 
+            icon: Box, 
+            label: "Inventory", 
+            path: "/dashboard/inventory",
+            subItems: [
+                { label: "Hospital Store", path: "/dashboard/inventory" },
+                { label: "Pharmacy Inventory", path: "/dashboard/pharmacy/inventory" },
+            ]
+        },
         { icon: FileBarChart, label: "Reports", path: "/dashboard/reports" },
         {
             icon: FlaskConical,
@@ -100,7 +108,6 @@ export const ROLE_NAVIGATION: Record<string, SidebarItem[]> = {
         { icon: Stethoscope, label: "Consultations", path: "/dashboard/consultations" },
         { icon: FileText, label: "EMR / Records", path: "/dashboard/records" },
         { icon: Pill, label: "Prescriptions", path: "/dashboard/Doctor/prescriptions" },
-        { icon: Microscope, label: "Lab Requests", path: "/dashboard/laboratory/requests" },
         { icon: Scan, label: "Radiology", path: "/dashboard/radiology/requests" },
         { icon: Activity, label: "Telemedicine", path: "/dashboard/telemedicine" },
     ],

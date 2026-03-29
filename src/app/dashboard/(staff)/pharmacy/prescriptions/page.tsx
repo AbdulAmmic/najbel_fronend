@@ -3,47 +3,45 @@
 import { useState, useEffect } from "react";
 import {
     Pill, Search, CheckCircle2, XCircle, DollarSign, AlertCircle,
-    Clock, User2, ChevronRight, X, Send, RefreshCw, Stethoscope
+    Clock, User2, ChevronRight, X, Send, RefreshCw, Stethoscope,
+    Calendar, Package, User, Check, History, Layers, Bed
 } from "lucide-react";
-import api from "@/services/api";
+import { pharmacy as pharmacyService } from "@/services/api";
+import { motion, AnimatePresence } from "framer-motion";
+import { format } from "date-fns";
 
-type RxStatus = "active" | "dispensed" | "unavailable" | "cancelled";
-
-interface Prescription {
+interface PrescriptionItem {
     id: number;
-    medication: string;
+    drug_name: string;
     dosage: string;
     frequency: string;
     duration: string;
-    instructions?: string;
-    status: RxStatus;
-    created_at: string;
+    quantity: number;
+    unit_price: number;
+    status: string;
+    is_internal: boolean;
+}
+
+interface Prescription {
+    id: number;
     patient_id: number;
     patient_name: string;
+    doctor_name: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    items: PrescriptionItem[];
+    instructions?: string;
+    clinical_notes?: string;
+    is_admitted?: boolean;
 }
-
-interface ProcessItem {
-    medication: string;
-    available: boolean;
-    unit_price: string;
-    quantity: string;
-}
-
-const STATUS_STYLE: Record<RxStatus, string> = {
-    active: "bg-blue-50 text-blue-700",
-    dispensed: "bg-emerald-50 text-emerald-700",
-    unavailable: "bg-red-50 text-red-600",
-    cancelled: "bg-gray-100 text-gray-500",
-};
 
 export default function PharmacyPrescriptionsPage() {
     const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
-    const [filterStatus, setFilterStatus] = useState<string>("active");
-    const [selected, setSelected] = useState<Prescription | null>(null);
-    const [processItems, setProcessItems] = useState<ProcessItem[]>([]);
-    const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
+    const [processing, setProcessing] = useState<number | null>(null);
     const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
     const showToast = (msg: string, ok = true) => {
@@ -54,293 +52,283 @@ export default function PharmacyPrescriptionsPage() {
     const fetchRx = async () => {
         setLoading(true);
         try {
-            const res = await api.get("/pharmacy/prescriptions");
-            setPrescriptions(Array.isArray(res.data) ? res.data : []);
+            const data = activeTab === "queue" 
+                ? await pharmacyService.getQueue() 
+                : await pharmacyService.getHistory();
+            setPrescriptions(Array.isArray(data) ? data : []);
         } catch (e) {
-            console.error(e);
+            console.error("Failed to fetch pharmacy data:", e);
+            showToast("Failed to connect to pharmacy service.", false);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { fetchRx(); }, []);
+    useEffect(() => { fetchRx(); }, [activeTab]);
 
-    const openProcess = (rx: Prescription) => {
-        setSelected(rx);
-        // Each prescription is one medication — split by comma if multiple
-        const meds = rx.medication.split(",").map(m => m.trim()).filter(Boolean);
-        setProcessItems(meds.map(m => ({
-            medication: m,
-            available: true,
-            unit_price: "",
-            quantity: "1",
-        })));
-    };
-
-    const toggleAvailable = (i: number) =>
-        setProcessItems(prev => prev.map((p, idx) => idx === i ? { ...p, available: !p.available } : p));
-
-    const setItemField = (i: number, key: keyof ProcessItem, val: string) =>
-        setProcessItems(prev => prev.map((p, idx) => idx === i ? { ...p, [key]: val } : p));
-
-    const handleProcess = async () => {
-        if (!selected) return;
-        setSaving(true);
+    const handleDispenseItem = async (itemId: number) => {
+        setProcessing(itemId);
         try {
-            const res = await api.post(`/pharmacy/prescriptions/${selected.id}/process`, {
-                items: processItems.map(p => ({
-                    medication: p.medication,
-                    available: p.available,
-                    unit_price: parseFloat(p.unit_price) || 0,
-                    quantity: parseInt(p.quantity) || 1,
-                })),
-            });
-            const d = res.data;
-            const avail = processItems.filter(p => p.available).length;
-            const unavail = processItems.filter(p => !p.available).length;
-            showToast(
-                `Processed! ${avail} available · ${unavail} unavailable` +
-                (d.invoice_created ? ` · Invoice ₦${d.invoice_total?.toLocaleString()} sent to patient` : ""),
-                true
-            );
-            setSelected(null);
+            await pharmacyService.updateItemStatus(itemId, "dispensed");
+            showToast("Item marked as dispensed");
             fetchRx();
         } catch (err: any) {
-            showToast(err?.response?.data?.detail || "Processing failed.", false);
+            showToast(err?.response?.data?.detail || "Dispensing failed", false);
         } finally {
-            setSaving(false);
+            setProcessing(null);
+        }
+    };
+
+    const handleMarkUnavailable = async (itemId: number) => {
+        setProcessing(itemId);
+        try {
+            await pharmacyService.updateItemStatus(itemId, "out_of_stock");
+            showToast("Item marked as out of stock", false);
+            fetchRx();
+        } catch (err: any) {
+            showToast(err?.response?.data?.detail || "Update failed", false);
+        } finally {
+            setProcessing(null);
         }
     };
 
     const filtered = prescriptions.filter(rx => {
         const s = search.toLowerCase();
-        const matchSearch = !s || rx.patient_name.toLowerCase().includes(s) || rx.medication.toLowerCase().includes(s);
-        const matchStatus = filterStatus === "all" || rx.status === filterStatus;
-        return matchSearch && matchStatus;
+        return !s || rx.patient_name.toLowerCase().includes(s) || rx.id.toString().includes(s);
     });
 
-    const counts = {
-        active: prescriptions.filter(r => r.status === "active").length,
-        dispensed: prescriptions.filter(r => r.status === "dispensed").length,
-        unavailable: prescriptions.filter(r => r.status === "unavailable").length,
+    const getStatusStyles = (status: string) => {
+        switch (status) {
+            case "sent_to_pharmacy": return "bg-blue-50 text-blue-700 border-blue-100";
+            case "paid": return "bg-emerald-50 text-emerald-700 border-emerald-100";
+            case "dispensing": return "bg-amber-50 text-amber-700 border-amber-100";
+            case "completed": return "bg-green-50 text-green-700 border-green-100";
+            case "failed": return "bg-red-50 text-red-700 border-red-100";
+            case "partial": return "bg-orange-50 text-orange-700 border-orange-100";
+            default: return "bg-gray-50 text-gray-500 border-gray-100";
+        }
     };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
+        <div className="min-h-screen bg-slate-50/50 p-6 md:p-8">
             {/* Toast */}
-            {toast && (
-                <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[300] px-5 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2 max-w-sm text-center ${toast.ok ? "bg-emerald-600 text-white" : "bg-red-500 text-white"}`}>
-                    {toast.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                    {toast.msg}
-                </div>
-            )}
+            <AnimatePresence>
+                {toast && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: -20, x: "-50%" }}
+                        animate={{ opacity: 1, y: 0, x: "-50%" }}
+                        exit={{ opacity: 0, y: -20, x: "-50%" }}
+                        className={`fixed top-6 left-1/2 z-[300] px-6 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-3 min-w-[300px] justify-center ${toast.ok ? "bg-slate-900 text-white" : "bg-red-500 text-white"}`}
+                    >
+                        {toast.ok ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <AlertCircle className="w-5 h-5" />}
+                        {toast.msg}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Header */}
-            <div className="bg-white border-b border-gray-100 px-5 py-5">
-                <div className="max-w-3xl mx-auto">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">Prescriptions Queue</h1>
-                            <p className="text-xs text-gray-400 mt-0.5">Review and dispense doctor prescriptions</p>
+            <div className="max-w-6xl mx-auto space-y-8">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                            <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-xl shadow-indigo-200">
+                                <Package className="w-6 h-6 text-white" />
+                            </div>
+                            Pharmacy Prescription Queue
+                        </h1>
+                        <p className="text-slate-500 mt-2 font-medium flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            {activeTab === "queue" ? "Manage and dispense active prescriptions" : "History of dispensed and completed records"}
+                        </p>
+                    </motion.div>
+
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        {/* Tab Switcher */}
+                        <div className="bg-white p-1.5 rounded-2xl border border-slate-200 flex shadow-sm">
+                            <button
+                                onClick={() => setActiveTab("queue")}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'queue' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                            >
+                                <Layers className="w-4 h-4" />
+                                ACTIVE QUEUE
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("history")}
+                                className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'history' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-500 hover:bg-slate-50'}`}
+                            >
+                                <History className="w-4 h-4" />
+                                HISTORY
+                            </button>
                         </div>
-                        <button onClick={fetchRx} className="p-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl transition active:scale-90">
-                            <RefreshCw className="w-4 h-4 text-gray-600" />
+                        
+                        <button onClick={fetchRx} className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all shadow-sm active:scale-95">
+                            <RefreshCw className={`w-5 h-5 text-slate-600 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
                         </button>
                     </div>
+                </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                        {[
-                            { label: "Pending", value: counts.active, color: "text-blue-600", bg: "bg-blue-50" },
-                            { label: "Dispensed", value: counts.dispensed, color: "text-emerald-600", bg: "bg-emerald-50" },
-                            { label: "Unavailable", value: counts.unavailable, color: "text-red-500", bg: "bg-red-50" },
-                        ].map((s, i) => (
-                            <div key={i} className={`${s.bg} rounded-2xl p-3 text-center`}>
-                                <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
-                                <div className="text-[10px] text-gray-500 font-medium mt-0.5">{s.label}</div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Search + Filter */}
-                    <div className="flex gap-2">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input value={search} onChange={e => setSearch(e.target.value)}
-                                placeholder="Search patient or medication..."
-                                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:bg-white transition text-gray-700 placeholder:text-gray-400"
-                            />
-                        </div>
-                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-                            className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 outline-none capitalize appearance-none"
-                        >
-                            <option value="all">All</option>
-                            <option value="active">Pending</option>
-                            <option value="dispensed">Dispensed</option>
-                            <option value="unavailable">Unavailable</option>
-                        </select>
+                {/* Filter & Search */}
+                <div className="flex items-center gap-3 w-full">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search patient or Ref ID..."
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm font-semibold"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
                     </div>
                 </div>
-            </div>
 
-            {/* List */}
-            <div className="max-w-3xl mx-auto px-5 py-5 pb-28 space-y-3">
-                {loading ? (
-                    <div className="flex justify-center py-20">
-                        <div className="w-7 h-7 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center py-20 gap-3 text-gray-300">
-                        <Pill className="w-10 h-10" />
-                        <p className="text-sm text-gray-400 font-medium">No prescriptions found</p>
-                    </div>
-                ) : filtered.map(rx => (
-                    <div key={rx.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
-                                    <Pill className="w-5 h-5 text-violet-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-bold text-sm text-gray-900 truncate">{rx.medication}</p>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_STYLE[rx.status] || "bg-gray-100 text-gray-500"}`}>
-                                            {rx.status === "active" ? "Pending" : rx.status}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-0.5">{rx.dosage} · {rx.frequency} · {rx.duration}</p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        <User2 className="w-3 h-3 text-gray-400" />
-                                        <p className="text-xs text-gray-500 font-semibold">{rx.patient_name}</p>
-                                        <Clock className="w-3 h-3 text-gray-300 ml-1" />
-                                        <p className="text-xs text-gray-400">{new Date(rx.created_at).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
+                {/* Main Queue */}
+                <div className="space-y-4">
+                    {loading && prescriptions.length === 0 ? (
+                        <div className="flex justify-center py-20">
+                            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="bg-white rounded-[2.5rem] p-20 flex flex-col items-center gap-6 border border-dashed border-slate-200">
+                            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center">
+                                <Search className="w-10 h-10 text-slate-300" />
                             </div>
-
-                            {rx.status === "active" ? (
-                                <button onClick={() => openProcess(rx)}
-                                    className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition active:scale-95 shrink-0"
+                            <div className="text-center">
+                                <p className="text-lg font-bold text-slate-900">No records found</p>
+                                <p className="text-sm text-slate-400 font-medium mt-1">
+                                    {activeTab === "queue" ? "Ready prescriptions will appear here." : "Completed records will be archived here."}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <AnimatePresence mode="popLayout">
+                            {filtered.map((rx, idx) => (
+                                <motion.div
+                                    key={rx.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
                                 >
-                                    Process <ChevronRight className="w-3 h-3" />
-                                </button>
-                            ) : (
-                                <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${STATUS_STYLE[rx.status]}`}>
-                                    {rx.status === "dispensed" ? "✓ Done" : "✗ N/A"}
-                                </div>
-                            )}
-                        </div>
-                        {rx.instructions && (
-                            <div className="mt-3 p-2.5 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700 flex gap-2 items-start">
-                                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                                {rx.instructions}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            {/* Process Modal */}
-            {selected && (
-                <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
-                    <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setSelected(null)} />
-                    <div className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 max-h-[92vh] overflow-y-auto">
-                        <div className="flex justify-center pt-3 sm:hidden">
-                            <div className="w-10 h-1 bg-gray-200 rounded-full" />
-                        </div>
-                        <div className="sticky top-0 bg-white border-b border-gray-50 px-6 py-5 rounded-t-3xl z-10">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 className="font-bold text-gray-900 text-base">Process Prescription</h2>
-                                    <p className="text-xs text-gray-400 mt-0.5">Patient: {selected.patient_name}</p>
-                                </div>
-                                <button onClick={() => setSelected(null)} className="p-2 rounded-xl hover:bg-gray-100 transition">
-                                    <X className="w-4 h-4 text-gray-400" />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="px-6 py-5 space-y-4">
-                            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex items-start gap-2">
-                                <Stethoscope className="w-4 h-4 shrink-0 mt-0.5" />
-                                Mark each medication as available or not. An invoice will be auto-generated for available items and sent to the patient.
-                            </div>
-
-                            {processItems.map((item, i) => (
-                                <div key={i} className={`border rounded-2xl p-4 transition-all ${item.available ? "border-emerald-200 bg-emerald-50/30" : "border-red-200 bg-red-50/20"}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <p className="font-bold text-sm text-gray-900">{item.medication}</p>
-                                        <button onClick={() => toggleAvailable(i)}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${item.available ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}
-                                        >
-                                            {item.available ? <><CheckCircle2 className="w-3.5 h-3.5" /> In Stock</> : <><XCircle className="w-3.5 h-3.5" /> Not Available</>}
-                                        </button>
-                                    </div>
-
-                                    {item.available && (
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-[10px] font-semibold text-gray-500">Qty</label>
-                                                <div className="flex items-center bg-white border border-gray-200 rounded-xl mt-1 overflow-hidden">
-                                                    <span className="px-2 text-gray-400 text-xs">×</span>
-                                                    <input type="number" min="1" value={item.quantity}
-                                                        onChange={e => setItemField(i, "quantity", e.target.value)}
-                                                        className="flex-1 py-2.5 pr-3 text-sm font-bold text-gray-800 outline-none bg-transparent"
-                                                    />
+                                    <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
+                                        {/* Patient Info */}
+                                        <div className="md:w-64 shrink-0 space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+                                                    <User className="w-6 h-6 text-slate-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-black text-slate-900 truncate leading-tight">{rx.patient_name}</p>
+                                                        {rx.is_admitted && (
+                                                            <div className="px-1.5 py-0.5 bg-rose-50 text-[8px] font-black text-rose-600 border border-rose-100 rounded-md flex items-center gap-1 shrink-0 animate-pulse">
+                                                                <Bed className="w-2 h-2" />
+                                                                BED
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Ref: #{rx.id}</p>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <label className="text-[10px] font-semibold text-gray-500">Unit Price (₦)</label>
-                                                <div className="flex items-center bg-white border border-gray-200 rounded-xl mt-1 overflow-hidden">
-                                                    <DollarSign className="w-3.5 h-3.5 text-gray-400 ml-2 shrink-0" />
-                                                    <input type="number" min="0" placeholder="0.00" value={item.unit_price}
-                                                        onChange={e => setItemField(i, "unit_price", e.target.value)}
-                                                        className="flex-1 py-2.5 pr-3 text-sm font-bold text-gray-800 outline-none bg-transparent"
-                                                    />
-                                                </div>
+                                            
+                                            <div className={`px-4 py-2 rounded-xl border text-xs font-black text-center tracking-tight transition-colors ${getStatusStyles(rx.status)}`}>
+                                                {rx.status.replace(/_/g, ' ').toUpperCase()}
                                             </div>
 
-                                            {item.unit_price && item.quantity && (
-                                                <div className="col-span-2 bg-white rounded-xl px-3 py-2 border border-gray-100 flex justify-between items-center">
-                                                    <span className="text-xs text-gray-500">Subtotal</span>
-                                                    <span className="text-sm font-black text-emerald-600">
-                                                        ₦{(parseFloat(item.unit_price) * parseInt(item.quantity)).toLocaleString()}
-                                                    </span>
+                                            <div className="space-y-2 pt-2">
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                                                    <Stethoscope className="w-3.5 h-3.5" />
+                                                    Dr. {rx.doctor_name}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    {activeTab === 'queue' 
+                                                        ? format(new Date(rx.created_at), "MMM d, h:mm a")
+                                                        : `Dispensed: ${format(new Date(rx.updated_at), "MMM d, h:mm a")}`
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Items List */}
+                                        <div className="flex-1 space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {rx.items.map((item) => (
+                                                    <div 
+                                                        key={item.id} 
+                                                        className={`p-4 rounded-2xl border transition-all ${
+                                                            item.status === 'dispensed' 
+                                                            ? 'bg-emerald-50/50 border-emerald-100' 
+                                                            : item.status === 'out_of_stock'
+                                                            ? 'bg-red-50/50 border-red-100'
+                                                            : 'bg-slate-50/50 border-slate-100 hover:border-indigo-200'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-4">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Pill className={`w-4 h-4 ${item.status === 'dispensed' ? 'text-emerald-500' : 'text-indigo-500'}`} />
+                                                                    <p className="font-extrabold text-sm text-slate-900 truncate">{item.drug_name}</p>
+                                                                </div>
+                                                                <p className="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-wide">
+                                                                    {item.dosage} • {item.frequency} • {item.duration}
+                                                                </p>
+                                                                {item.is_internal && (
+                                                                    <span className="inline-block mt-2 px-2 py-0.5 bg-indigo-50 text-[9px] font-black text-indigo-600 rounded-lg uppercase tracking-wider">Internal Stock</span>
+                                                                )}
+                                                            </div>
+
+                                                            {activeTab === 'queue' && item.status === 'pending' ? (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <button
+                                                                        onClick={() => handleDispenseItem(item.id)}
+                                                                        disabled={processing === item.id}
+                                                                        className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50"
+                                                                    >
+                                                                        {processing === item.id ? "..." : "DISPENSE"}
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleMarkUnavailable(item.id)}
+                                                                        disabled={processing === item.id}
+                                                                        className="text-[9px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+                                                                    >
+                                                                        OUT OF STOCK
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className={`flex items-center gap-1.5 font-black text-[10px] uppercase tracking-widest ${item.status === 'dispensed' ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                                    {item.status === 'dispensed' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                                                    {item.status}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {rx.instructions && (
+                                                <div className="mt-4 p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-3">
+                                                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                                    <p className="text-xs font-semibold text-amber-800 leading-relaxed italic">"{rx.instructions}"</p>
+                                                </div>
+                                            )}
+
+                                            {rx.clinical_notes && (
+                                                <div className="mt-3 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-start gap-3">
+                                                    <FileText className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <p className="text-[10px] font-black text-indigo-400 uppercase mb-1">Clinical Remarks</p>
+                                                        <p className="text-xs font-medium text-slate-700 leading-relaxed">{rx.clinical_notes}</p>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                </motion.div>
                             ))}
-
-                            {/* Total */}
-                            {processItems.some(p => p.available && p.unit_price) && (
-                                <div className="bg-gray-900 text-white rounded-2xl px-5 py-4 flex justify-between items-center">
-                                    <span className="text-sm font-bold">Invoice Total</span>
-                                    <span className="text-lg font-black text-emerald-400">
-                                        ₦{processItems.filter(p => p.available && p.unit_price && p.quantity)
-                                            .reduce((sum, p) => sum + parseFloat(p.unit_price) * parseInt(p.quantity), 0)
-                                            .toLocaleString()}
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="flex gap-3 pt-1">
-                                <button onClick={() => setSelected(null)}
-                                    className="flex-1 py-3.5 bg-gray-100 text-gray-700 text-sm font-bold rounded-2xl transition active:scale-95"
-                                >Cancel</button>
-                                <button onClick={handleProcess} disabled={saving}
-                                    className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-2xl shadow-lg shadow-blue-200 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {saving && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-                                    <Send className="w-4 h-4" />
-                                    {saving ? "Processing..." : "Confirm & Dispatch"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                        </AnimatePresence>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

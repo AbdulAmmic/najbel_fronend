@@ -38,7 +38,11 @@ def get_all_patients(
                 "blood_group": p.blood_group,
                 "genotype": p.genotype,
                 "insurance_provider": p.insurance_provider,
-                "status": "Active" if user_info.is_active else "Inactive"
+                "status": "Active" if user_info.is_active else "Inactive",
+                "is_admitted": p.is_admitted,
+                "ward_name": p.bed.ward_name if p.is_admitted and p.bed else None,
+                "bed_number": p.bed.bed_number if p.is_admitted and p.bed else None,
+                "room_number": p.bed.room_number if p.is_admitted and p.bed else None,
             })
     return result
 
@@ -66,7 +70,10 @@ def get_patient(
         "full_name": user_info.full_name,
         "email": user_info.email,
         "phone_number": user_info.phone_number,
-        "address": user_info.address
+        "address": user_info.address,
+        "ward_name": patient.bed.ward_name if patient.is_admitted and patient.bed else None,
+        "bed_number": patient.bed.bed_number if patient.is_admitted and patient.bed else None,
+        "room_number": patient.bed.room_number if patient.is_admitted and patient.bed else None,
     }
 
 @router.put("/{patient_id}", response_model=Any)

@@ -30,9 +30,7 @@ def create_scan_request(
     scan_in: dict,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-    # Strict: Only Doctors can order scans
-    _ = Depends(RoleChecker([UserRole.DOCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN])) 
+    current_user: User = Depends(RoleChecker([UserRole.DOCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     # Basic validation
     scan = RadiologyScan(

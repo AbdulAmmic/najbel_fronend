@@ -1,0 +1,16 @@
+
+--- 2026-03-28 21:25:10.861780 ---
+Body: {'name': 'Tramadol', 'description': 'Something', 'quantity': 3773, 'reorder_level': 10, 'batch_number': 'BATR78', 'expiry_date': '2026-01-30', 'supplier': '', 'unit_price': 799.99, 'category': 'Antibiotics'}
+Errors: [{'type': 'missing', 'loc': ('body', 'user'), 'msg': 'Field required', 'input': None}, {'type': 'missing', 'loc': ('body', 'item_in'), 'msg': 'Field required', 'input': None}]
+
+--- 2026-03-28 21:31:30.432387 ---
+Body: {'name': 'Tramadol', 'description': 'Something', 'quantity': 3773, 'reorder_level': 10, 'batch_number': 'BATR78', 'expiry_date': '2026-01-30', 'supplier': '', 'unit_price': 799.99, 'category': 'Antibiotics'}
+Errors: [{'type': 'missing', 'loc': ('body', 'user'), 'msg': 'Field required', 'input': None}, {'type': 'missing', 'loc': ('body', 'item_in'), 'msg': 'Field required', 'input': None}]
+
+--- 2026-03-28 21:38:59.635147 ---
+Body: {'name': 'Tramadol', 'description': 'Something', 'quantity': 3773, 'reorder_level': 10, 'batch_number': 'BATR78', 'expiry_date': '2026-01-30', 'supplier': '', 'unit_price': 799.99, 'category': 'Antibiotics'}
+Errors: [{'type': 'missing', 'loc': ('body', 'user'), 'msg': 'Field required', 'input': None}, {'type': 'missing', 'loc': ('body', 'item_in'), 'msg': 'Field required', 'input': None}]
+
+--- 2026-03-28 21:39:10.131290 ---
+Body: None
+Errors: [{'type': 'missing', 'loc': ('body',), 'msg': 'Field required', 'input': None}]

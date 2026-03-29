@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 from app.api import deps
 from app.models.user import User, UserRole, Patient
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceItem
+from app.schemas import finance as finance_schemas
 from app.models.wallet import Wallet
 from app.models.transaction import Transaction, TransactionType, TransactionStatus, PaymentMethod
 from app.models.service_template import ServiceTemplate
@@ -17,7 +18,10 @@ from app.core import security
 
 router = APIRouter()
 
-@router.get("/invoices", response_model=List[Invoice])
+from sqlalchemy.orm import selectinload
+from app.models.prescription import Prescription
+
+@router.get("/invoices", response_model=List[finance_schemas.Invoice])
 def get_invoices(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
@@ -26,7 +30,7 @@ def get_invoices(
     """
     Get all invoices. Filterable by status.
     """
-    query = select(Invoice)
+    query = select(Invoice).options(selectinload(Invoice.items))
     
     if current_user.role == UserRole.PATIENT:
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
@@ -37,8 +41,24 @@ def get_invoices(
     if status:
         query = query.where(Invoice.status == status)
         
-    invoices = db.exec(query).all()
-    return invoices
+    invoices = db.exec(query.order_by(Invoice.created_at.desc())).all()
+    
+    # Enrich with patient names
+    results = []
+    for inv in invoices:
+        patient = db.get(Patient, inv.patient_id)
+        patient_name = "Unknown Patient"
+        if patient:
+            user = db.get(User, patient.user_id)
+            patient_name = user.full_name if user else "Unknown Patient"
+        
+        # Merge model fields with dynamic enrichment
+        inv_data = inv.dict()
+        inv_data["patient_name"] = patient_name
+        inv_data["items"] = inv.items
+        results.append(inv_data)
+            
+    return results
 
 @router.post("/invoices", response_model=Invoice)
 def create_invoice(
@@ -113,15 +133,39 @@ def pay_invoice(
         if not wallet_pin or not current_user.hashed_pin or not security.verify_password(wallet_pin, current_user.hashed_pin):
             raise HTTPException(status_code=400, detail="Invalid wallet PIN")
 
+    if payment_method in ["cash", "card", "transfer"]:
+        # If paying by cash/card/transfer at the desk, we "fund" the wallet first
+        # to ensure every payment is reflected as a wallet deduction for the patient.
+        wallet = db.exec(select(Wallet).where(Wallet.patient_id == invoice.patient_id)).first()
+        if not wallet:
+            wallet = Wallet(patient_id=invoice.patient_id, balance=0)
+            db.add(wallet)
+            db.commit()
+            db.refresh(wallet)
+        
+        # 1. Record the "Funding" transaction (Credit)
+        fund_txn = Transaction(
+            patient_id=invoice.patient_id,
+            amount=invoice.amount,
+            type=TransactionType.TOPUP,
+            payment_method=PaymentMethod(payment_method),
+            status=TransactionStatus.COMPLETED,
+            reference=f"FUND-{payment_method.upper()}-{int(datetime.utcnow().timestamp())}",
+            cashier_name=current_user.full_name
+        )
+        db.add(fund_txn)
+        wallet.balance += invoice.amount
+        db.add(wallet)
+        
+        # Now switch to wallet payment method for the actual deduction logic
+        payment_method = "wallet"
+
     if payment_method == "wallet":
         # Check wallet balance
         wallet = db.exec(select(Wallet).where(Wallet.patient_id == invoice.patient_id)).first()
         if not wallet:
-             # Create wallet if not exists (should technically exist on patient creation)
              wallet = Wallet(patient_id=invoice.patient_id, balance=0)
              db.add(wallet)
-             db.commit()
-             db.refresh(wallet)
              
         if wallet.balance < invoice.amount and not wallet.allow_overdraft:
             raise HTTPException(status_code=400, detail="Insufficient wallet balance")
@@ -131,7 +175,7 @@ def pay_invoice(
         wallet.updated_at = datetime.utcnow()
         db.add(wallet)
         
-        # Record Transaction
+        # Record Transaction (Debit)
         txn = Transaction(
             invoice_id=invoice.id,
             patient_id=invoice.patient_id,
@@ -140,23 +184,37 @@ def pay_invoice(
             payment_method=PaymentMethod.WALLET,
             status=TransactionStatus.COMPLETED,
             reference=f"TXN-WAL-{int(datetime.utcnow().timestamp())}",
-            cashier_name="System"
+            cashier_name=current_user.full_name if current_user.role != UserRole.PATIENT else "System"
         )
         db.add(txn)
         
         invoice.status = InvoiceStatus.PAID
-        invoice.payment_method = "wallet"
+        invoice.payment_method = payment_method or "wallet"
+        db.add(invoice)
+
+        # Update linked Prescription if any
+        prescription = db.exec(select(Prescription).where(Prescription.invoice_id == invoice.id)).first()
+        if prescription:
+            prescription.status = "sent_to_pharmacy"
+            prescription.updated_at = datetime.utcnow()
+            db.add(prescription)
+            
+        # Update linked LabResult if any
+        from app.models.lab_result import LabResult
+        lab_result = db.exec(select(LabResult).where(LabResult.invoice_id == invoice.id)).first()
+        if lab_result:
+            # Move from 'requested' to 'paid' (or similar state that signals techs)
+            if lab_result.status == "requested":
+                lab_result.status = "paid"
+                lab_result.updated_at = datetime.utcnow()
+                db.add(lab_result)
 
         # E-mail notification for debit
         patient_record = db.get(Patient, invoice.patient_id)
         if patient_record:
             user_record = db.get(User, patient_record.user_id)
             if user_record and user_record.email:
-                # Get a summary of items
                 item_desc = invoice.items[0].description if invoice.items else "Service Payment"
-                if len(invoice.items) > 1:
-                    item_desc += " and other items"
-                
                 email_html = generate_wallet_alert_email(
                     user_record.full_name, 
                     "debit", 
@@ -164,31 +222,11 @@ def pay_invoice(
                     wallet.balance,
                     description=f"Invoice {invoice.invoice_number} - {item_desc}"
                 )
-                send_email_background(user_record.email, "Najbel Clinic Wallet Debit", email_html)
+                send_email_background(user_record.email, "Najbel Clinic Wallet Debit", email_html, background_tasks)
 
     elif payment_method == "insurance":
-        # Just mark as pending insurance processing for now
-        # In real world, would validate policy here
-        invoice.status = "pending_insurance" # Custom status or handle in Enum
+        invoice.status = "pending_insurance"
         invoice.payment_method = "insurance"
-        # transaction might be pending
-        
-    else: # Cash/Card
-        invoice.status = InvoiceStatus.PAID
-        invoice.payment_method = payment_method
-        
-        # Record Transaction
-        txn = Transaction(
-            invoice_id=invoice.id,
-            patient_id=invoice.patient_id,
-            amount=invoice.amount,
-            type=TransactionType.PAYMENT,
-            payment_method=PaymentMethod(payment_method) if payment_method in ["cash", "card"] else PaymentMethod.CASH,
-            status=TransactionStatus.COMPLETED,
-            reference=f"TXN-{payment_method.upper()}-{int(datetime.utcnow().timestamp())}",
-            cashier_name=current_user.full_name
-        )
-        db.add(txn)
 
     db.add(invoice)
     db.commit()
@@ -199,11 +237,23 @@ def pay_invoice(
 
 @router.get("/wallet")
 def get_user_wallet(
+    patient_id: Optional[int] = Query(None),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    # Assuming current_user is a patient or has a patient record
-    patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+    if patient_id:
+        if current_user.role == UserRole.PATIENT:
+            # Patients can only see their own wallet unless they have a child/etc (not implemented yet)
+            # For now, just ensure they match
+            actual_patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+            if not actual_patient or actual_patient.id != patient_id:
+                 raise HTTPException(status_code=403, detail="Not permitted to view other wallets")
+            patient = actual_patient
+        else:
+            patient = db.get(Patient, patient_id)
+    else:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        
     if not patient:
          raise HTTPException(status_code=404, detail="Patient record not found")
          

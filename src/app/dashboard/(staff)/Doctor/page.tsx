@@ -8,17 +8,171 @@ import {
     Heart, Thermometer, Droplets, Wind, ChevronRight,
     ArrowUpRight, Play, CheckCircle2, Video, Bed,
     Stethoscope, FileText, TrendingUp, AlertCircle,
-    LayoutDashboard, Search
+    LayoutDashboard, Search, Printer
 } from "lucide-react";
 import {
     auth, appointments, labs, prescriptions, vitals,
     patientService, medicalRecords, beds
 } from "@/services/api";
+import { motion, AnimatePresence } from "framer-motion";
 
 // ─── helpers ──────────────────────────────────────────────────
 const fmt   = (d: string) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 const fmtT  = (d: string) => new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const init  = (n: string) => n?.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+
+const handlePrint = (item: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    // Robust result data parsing
+    let results = [];
+    try {
+        if (item.result_data && item.result_data.startsWith('[')) {
+            results = JSON.parse(item.result_data);
+        }
+    } catch (e) { console.error("Parse error", e); }
+
+    const patientName = item.patient?.user?.full_name || item.patient?.full_name || 'Generic Patient';
+    const patientPhone = item.patient?.user?.phone || item.patient?.phone || 'N/A';
+    const doctorName = item.doctor?.user?.full_name || 'N/A';
+    const docDate = item.validated_at || item.recorded_at;
+    const requestDate = docDate ? new Date(docDate).toLocaleString('en-GB', { 
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+    }) : 'N/A';
+
+    // Fix "See details" label if table exists
+    const mainResult = (item.result === "See details" && results.length > 0) 
+        ? "Detailed Clinical Findings (See Table)" 
+        : (item.result || 'Pending');
+
+    const resultHtml = results.length > 0 ? `
+        <div style="margin-top: 25px;">
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 800; margin-bottom: 8px;">Detailed Result Parameters</div>
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                <thead>
+                    <tr style="background-color: #f1f5f9; border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px 15px; text-align: left; font-size: 10px; color: #475569; text-transform: uppercase; font-weight: 800;">Parameter</th>
+                        <th style="padding: 12px 15px; text-align: center; font-size: 10px; color: #475569; text-transform: uppercase; font-weight: 800;">Value</th>
+                        <th style="padding: 12px 15px; text-align: center; font-size: 10px; color: #475569; text-transform: uppercase; font-weight: 800;">Unit</th>
+                        <th style="padding: 12px 15px; text-align: right; font-size: 10px; color: #475569; text-transform: uppercase; font-weight: 800;">Normal Range</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${results.map((r: any) => `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 10px 15px; font-weight: 700; color: #1e293b; font-size: 12px;">${r.parameter}</td>
+                            <td style="padding: 10px 15px; text-align: center; color: #2563eb; font-weight: 900; font-size: 14px;">${r.result}</td>
+                            <td style="padding: 10px 15px; text-align: center; color: #64748b; font-size: 11px; font-weight: 600;">${r.unit || '-'}</td>
+                            <td style="padding: 10px 15px; text-align: right; color: #475569; font-weight: 600; font-size: 11px;">${r.reference || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    ` : `
+        <div style="padding: 40px; text-align: center; color: #64748b; border: 2px dashed #e2e8f0; border-radius: 16px; margin-top: 25px; background: #f8fafc;">
+            <div style="font-size: 10px; text-transform: uppercase; font-weight: 800; color: #94a3b8; letter-spacing: 1px;">Summary Result</div>
+            <div style="font-size: 24px; font-weight: 900; color: #1e293b; margin-top: 8px;">${mainResult}</div>
+        </div>
+    `;
+
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Investigation Report - ${item.short_id}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Inter', -apple-system, sans-serif; padding: 50px; color: #1e293b; line-height: 1.5; }
+                    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 4px solid #2563eb; padding-bottom: 25px; margin-bottom: 30px; }
+                    .clinic-name { font-size: 28px; font-weight: 900; color: #2563eb; letter-spacing: -0.5px; }
+                    .report-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #64748b; margin-top: 4px; }
+                    .patient-card { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; margin-bottom: 35px; background: #f8fafc; padding: 25px; border-radius: 16px; border: 1px solid #f1f5f9; }
+                    .label { font-size: 9px; color: #94a3b8; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; }
+                    .value { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 4px; }
+                    .conclusion-badge { background: #eff6ff; border-left: 4px solid #2563eb; padding: 15px 20px; border-radius: 0 12px 12px 0; margin-bottom: 30px; }
+                    .footer { margin-top: 80px; padding-top: 25px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; font-weight: 600; }
+                    @media print { body { padding: 20px; } .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div>
+                        <div class="clinic-name">NAJBEL CLINIC</div>
+                        <div class="report-title">Laboratory Investigation Report</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="label">Specimen ID</div>
+                        <div class="value" style="color: #2563eb; font-size: 24px; font-weight: 900;">#${item.short_id}</div>
+                    </div>
+                </div>
+
+                <div class="patient-card">
+                    <div>
+                        <div class="label">Patient Name</div>
+                        <div class="value" style="font-size: 18px;">${patientName}</div>
+                        <div style="margin-top: 15px; display: flex; gap: 20px;">
+                            <div>
+                                <div class="label">Patient ID</div>
+                                <div class="value">PID-${item.patient?.id || 'N/A'}</div>
+                            </div>
+                            <div>
+                                <div class="label">Requesting Physician</div>
+                                <div class="value" style="color: #2563eb;">${doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="label">Investigation</div>
+                        <div class="value" style="font-size: 18px;">${item.test_name}</div>
+                        <div style="margin-top: 15px;">
+                            <div class="label">Report Generated</div>
+                            <div class="value">${requestDate}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="conclusion-badge">
+                    <div class="label">General Clinical Conclusion</div>
+                    <div class="value" style="font-size: 20px; color: #1e40af;">${mainResult}</div>
+                </div>
+
+                ${resultHtml}
+
+                <div style="margin-top: 45px; background: #fff; border: 1px solid #f1f5f9; padding: 20px; border-radius: 12px;">
+                    <div class="label">Clinical Notes & Interpretation</div>
+                    <div class="value" style="font-weight: 500; color: #334155; font-style: italic; margin-top: 8px;">
+                        "${item.notes || 'The clinical findings for this investigation are within expected qualitative parameters for the requested panel.'}"
+                    </div>
+                </div>
+
+                <div style="margin-top: 100px; display: flex; justify-content: flex-end; gap: 80px;">
+                    <div style="text-align: center; min-width: 180px;">
+                        <div style="border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; font-weight: 800; color: #1e293b; font-size: 13px;">
+                            ${item.validator?.full_name || 'Authorized Signatory'}
+                        </div>
+                        <div class="label" style="margin-top: 8px;">Laboratory Scientist</div>
+                    </div>
+                    <div style="text-align: center; min-width: 180px;">
+                        <div style="border-bottom: 2px solid #cbd5e1; height: 26px; margin-bottom: 8px;"></div>
+                        <div class="label" style="margin-top: 8px;">Pathologist Signature</div>
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <div>Najbel Clinic Clinical Diagnostics Center </div>
+                    <div>Official Medical Record · Page 1 of 1</div>
+                </div>
+                <script>
+                    window.onload = () => {
+                        window.print();
+                    };
+                </script>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+};
 
 const STATUS_COLOR: Record<string, string> = {
     confirmed:    "bg-emerald-100 text-emerald-700",
@@ -50,6 +204,7 @@ export default function DoctorDashboard() {
     const [vitalsList, setVitalsList]   = useState<any[]>([]);
     const [records, setRecords]         = useState<any[]>([]);
     const [bedsList, setBedsList]       = useState<any[]>([]);
+    const [expandedLab, setExpandedLab]   = useState<number | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -84,6 +239,7 @@ export default function DoctorDashboard() {
     const todayAppts    = appts.filter(a => a.appointment_time?.startsWith(today));
     const waiting       = appts.filter(a => ["confirmed","checked-in"].includes(a.status?.toLowerCase()) && !a.completed);
     const pendingLabs   = labResults.filter(l => !["completed","validated"].includes(l.status));
+    const readyLabs     = labResults.filter(l => l.status === "validated");
     const activeRx      = rxList.filter(r => r.status === "active");
     const occupiedBeds  = bedsList.filter(b => b.status === "occupied").length;
 
@@ -298,6 +454,28 @@ export default function DoctorDashboard() {
                                     )}
                                 </div>
 
+                                {/* Ready Investigations mini */}
+                                {readyLabs.length > 0 && (
+                                    <div className="bg-white rounded-2xl border border-violet-100 shadow-sm p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="font-bold text-gray-900 text-sm">Ready Results</h3>
+                                            <div className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
+                                        </div>
+                                        <div className="bg-violet-50 rounded-xl p-3 flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xl font-black text-violet-600">{readyLabs.length}</p>
+                                                <p className="text-[9px] font-bold text-violet-400 uppercase">Validated</p>
+                                            </div>
+                                            <button 
+                                                onClick={() => setSection("labs")}
+                                                className="w-8 h-8 bg-white text-violet-600 rounded-lg flex items-center justify-center shadow-sm hover:translate-x-1 transition-transform"
+                                            >
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Bed status mini */}
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                                     <h3 className="font-bold text-gray-900 text-sm mb-3">Ward Beds</h3>
@@ -462,13 +640,25 @@ export default function DoctorDashboard() {
                             <Link href="/dashboard/laboratory/requests" className="text-xs text-blue-600 font-semibold flex items-center gap-1">All Labs <ArrowUpRight className="w-3 h-3" /></Link>
                         </div>
 
+                        {/* Ready for Review alert */}
+                        {readyLabs.length > 0 && (
+                            <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                                <CheckCircle2 className="w-5 h-5 text-violet-600 shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-violet-900">{readyLabs.length} investigations ready for clinical review</p>
+                                    <p className="text-xs text-violet-700 mt-0.5">Click to view detailed findings and print reports</p>
+                                </div>
+                                <div className="h-8 px-3 bg-violet-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center">Ready</div>
+                            </div>
+                        )}
+
                         {/* Pending alert */}
                         {pendingLabs.length > 0 && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
                                 <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
                                 <div>
-                                    <p className="text-sm font-bold text-amber-900">{pendingLabs.length} lab results pending review</p>
-                                    <p className="text-xs text-amber-700 mt-0.5">Check and validate outstanding test results</p>
+                                    <p className="text-sm font-bold text-amber-900">{pendingLabs.length} lab results still in progress</p>
+                                    <p className="text-xs text-amber-700 mt-0.5">Tests being processed by the laboratory</p>
                                 </div>
                             </div>
                         )}
@@ -488,23 +678,104 @@ export default function DoctorDashboard() {
                                         const patient = patients.find(p => p.id === l.patient_id);
                                         const name    = patient?.user?.full_name || patient?.full_name || `Patient #${l.patient_id}`;
                                         return (
-                                            <div key={l.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 transition-colors">
-                                                <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
-                                                    <FlaskConical className="w-4 h-4 text-amber-600" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-sm text-gray-900">{l.test_name || "Lab Test"}</p>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <p className="text-[10px] text-gray-500 truncate">{name}</p>
-                                                        {l.result && <p className="text-[10px] text-gray-400 truncate max-w-[140px]">Result: {l.result}</p>}
+                                            <div key={l.id} className="border-b border-gray-50 last:border-0">
+                                                <div 
+                                                    onClick={() => setExpandedLab(expandedLab === l.id ? null : l.id)}
+                                                    className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50/60 cursor-pointer transition-colors group"
+                                                >
+                                                    <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-amber-100 transition-colors relative">
+                                                        <FlaskConical className="w-4 h-4 text-amber-600" />
+                                                        {l.status === 'validated' && <div className="absolute -top-1 -right-1 w-3 h-3 bg-violet-500 rounded-full border-2 border-white" />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-bold text-sm text-gray-900 group-hover:text-blue-600 transition-colors">{l.test_name || "Lab Test"}</p>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <p className="text-[10px] text-gray-500 truncate">{name}</p>
+                                                            {l.result && !expandedLab && <p className="text-[10px] text-gray-400 truncate max-w-[140px]">Result: {l.result}</p>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <div className="hidden sm:block text-[10px] font-bold text-gray-400 w-24">
+                                                            {l.validated_at ? new Date(l.validated_at).toLocaleDateString() : 
+                                                             l.recorded_at ? new Date(l.recorded_at).toLocaleDateString() : "—"}
+                                                        </div>
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${STATUS_COLOR[l.status] || "bg-gray-100 text-gray-500"}`}>
+                                                            {l.status}
+                                                        </span>
+                                                        <span className={`text-[10px] text-gray-400 transition-transform duration-300 ${expandedLab === l.id ? 'rotate-90 text-blue-500' : ''}`}>
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        </span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 shrink-0">
-                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${STATUS_COLOR[l.status] || "bg-gray-100 text-gray-500"}`}>
-                                                        {l.status}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400">{fmt(l.recorded_at || l.created_at)}</span>
-                                                </div>
+
+                                                <AnimatePresence>
+                                                    {expandedLab === l.id && (l.result_data || l.result) && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: "auto", opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            className="px-5 pb-5"
+                                                        >
+                                                            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mt-1">
+                                                                {l.result_data ? (
+                                                                    <table className="w-full text-left text-[11px]">
+                                                                        <thead className="bg-slate-50 border-b border-slate-100">
+                                                                            <tr>
+                                                                                <th className="px-3 py-2 font-black text-slate-400 uppercase">Parameter</th>
+                                                                                <th className="px-3 py-2 font-black text-slate-400 uppercase text-center">Result</th>
+                                                                                <th className="px-3 py-2 font-black text-slate-400 uppercase text-center">Unit</th>
+                                                                                <th className="px-3 py-2 font-black text-slate-400 uppercase text-right">Range</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-slate-50">
+                                                                            {(l.result_data && l.result_data.startsWith('[') ? JSON.parse(l.result_data) : []).map((r: any, idx: number) => (
+                                                                                <tr key={idx} className="hover:bg-blue-50/30 transition-colors">
+                                                                                    <td className="px-3 py-2 font-bold text-slate-700">{r.parameter}</td>
+                                                                                    <td className="px-3 py-2 font-black text-blue-600 text-center">{r.result}</td>
+                                                                                    <td className="px-3 py-2 text-center text-slate-500">{r.unit || '-'}</td>
+                                                                                    <td className="px-3 py-2 text-right text-slate-400 font-medium">{r.reference || '-'}</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                ) : (
+                                                                    <div className="p-4 bg-blue-50/30">
+                                                                        <p className="text-[10px] font-black text-blue-400 uppercase mb-1">Single Result</p>
+                                                                        <p className="text-sm font-bold text-blue-900">{l.result}</p>
+                                                                    </div>
+                                                                )}
+                                                                {l.notes && (
+                                                                    <div className="p-3 bg-slate-50 border-t border-slate-100">
+                                                                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Lab Interpretation</p>
+                                                                        <p className="text-[10px] text-slate-600 italic">"{l.notes}"</p>
+                                                                    </div>
+                                                                )}
+                                                                <div className="p-3 border-t border-slate-50 bg-slate-50/20 flex justify-between items-center">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <Link 
+                                                                            href={`/dashboard/Doctor/patients/${l.patient_id}`}
+                                                                            className="text-[10px] font-black text-blue-600 hover:underline uppercase tracking-widest"
+                                                                        >
+                                                                            Full Patient Profile →
+                                                                        </Link>
+                                                                        {l.status === 'validated' && (
+                                                                            <button
+                                                                                onClick={() => handlePrint(l)}
+                                                                                className="flex items-center gap-1.5 text-[10px] font-black text-violet-600 hover:text-violet-700 uppercase tracking-widest"
+                                                                            >
+                                                                                <Printer className="w-3.5 h-3.5" />
+                                                                                Print Report
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    {l.validator && (
+                                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Validated by {l.validator.full_name}</p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
                                             </div>
                                         );
                                     })}

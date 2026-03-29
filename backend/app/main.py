@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from datetime import datetime
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.session import init_db
@@ -21,11 +24,24 @@ app = FastAPI(
 # Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    error_log_path = "validation_errors.log"
+    with open(error_log_path, "a") as f:
+        f.write(f"\n--- {datetime.utcnow()} ---\n")
+        f.write(f"Body: {exc.body}\n")
+        f.write(f"Errors: {exc.errors()}\n")
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
 
 @app.get("/")
 def root():

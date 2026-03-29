@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { ArrowDownLeft, ArrowUpRight, Copy, Receipt, Building2, History, ChevronRight, Wallet, X, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { billing, auth, appointments, vitals, labs, prescriptions, users } from "@/services/api";
 import api from "@/services/api";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,15 +37,15 @@ export default function WalletPage() {
     try {
       setLoading(true);
       const [walletRes, invoicesRes, historyRes, userRes] = await Promise.all([
-        api.get("/billing/wallet").catch(() => ({ data: null })),
-        api.get("/billing/invoices").catch(() => ({ data: [] })),
-        api.get("/billing/transactions").catch(() => ({ data: [] })),
-        api.get("/users/me").catch(() => ({ data: null }))
+        billing.getWallet().catch(() => null),
+        billing.getInvoices().catch(() => []),
+        api.get("billing/transactions").catch(() => ({ data: [] })),
+        auth.getMe().catch(() => null)
       ]);
-      setWallet(walletRes.data);
-      setPatient(userRes.data);
+      setWallet(walletRes);
+      setPatient(userRes);
       const unified: FeedItem[] = [
-        ...(invoicesRes.data || []).filter((i: any) => i.status !== 'paid').map((inv: any) => ({
+        ...(invoicesRes || []).filter((i: any) => i.status !== 'paid').map((inv: any) => ({
           id: `inv-${inv.id}`, type: 'invoice' as const, title: 'Medical Invoice',
           subtitle: inv.invoice_number, amount: inv.amount, date: inv.created_at, status: 'pending' as const
         })),
@@ -75,8 +76,8 @@ export default function WalletPage() {
     if (!selectedInvoiceId || walletPin.length < 4) return;
     try {
       setIsSubmitting(true);
-      const cleanId = selectedInvoiceId.replace('inv-', '');
-      await api.put(`/billing/invoices/${cleanId}/pay?payment_method=wallet&wallet_pin=${walletPin}`);
+      const cleanId = parseInt(selectedInvoiceId.replace('inv-', ''));
+      await billing.payInvoice(cleanId, 'wallet', walletPin);
       fetchData();
       setShowPinModal(false);
       alert("Invoice paid successfully!");

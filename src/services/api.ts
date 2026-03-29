@@ -104,6 +104,11 @@ export const users = {
     delete: async (id: number) => {
         const response = await api.delete(`users/${id}`);
         return response.data;
+    },
+    getMeSync: () => {
+        if (typeof window === 'undefined') return null;
+        const userData = localStorage.getItem('user');
+        return userData ? JSON.parse(userData) : null;
     }
 };
 
@@ -189,7 +194,7 @@ export const prescriptions = {
         return response.data;
     },
     getById: async (id: number) => {
-        const response = await api.get(`prescriptions/${id}/`);
+        const response = await api.get(`prescriptions/${id}`);
         return response.data;
     },
     create: async (data: any) => {
@@ -197,7 +202,11 @@ export const prescriptions = {
         return response.data;
     },
     update: async (id: number, data: any) => {
-        const response = await api.put(`prescriptions/${id}/`, data);
+        const response = await api.patch(`prescriptions/${id}`, data);
+        return response.data;
+    },
+    delete: async (id: number) => {
+        const response = await api.delete(`prescriptions/${id}`);
         return response.data;
     }
 }
@@ -357,8 +366,16 @@ export const labs = {
         const response = await api.post('labs/', data);
         return response.data;
     },
+    update: async (id: number, data: any) => {
+        const response = await api.put(`labs/${id}/`, data);
+        return response.data;
+    },
     updateStatus: async (id: number, status: string, results?: any) => {
         const response = await api.put(`labs/${id}/`, { status, results });
+        return response.data;
+    },
+    getResultsByPatient: async (patientId: number) => {
+        const response = await api.get(`labs/?patient_id=${patientId}`);
         return response.data;
     }
 }
@@ -426,7 +443,7 @@ export const patients = {
 
 export const billing = {
     getInvoices: async () => {
-        const response = await api.get('billing/invoices/');
+        const response = await api.get('billing/invoices');
         return response.data;
     },
     createInvoice: async (data: any) => {
@@ -434,15 +451,16 @@ export const billing = {
         return response.data;
     },
     payInvoice: async (id: number, method: string, wallet_pin?: string) => {
-        let url = `billing/invoices/${id}/pay/?payment_method=${method}`;
+        let url = `billing/invoices/${id}/pay?payment_method=${method}`;
         if (wallet_pin) {
             url += `&wallet_pin=${wallet_pin}`;
         }
         const response = await api.put(url);
         return response.data;
     },
-    getWallet: async () => {
-        const response = await api.get('billing/wallet/');
+    getWallet: async (patientId?: number) => {
+        const url = patientId ? `billing/wallet/?patient_id=${patientId}` : 'billing/wallet/';
+        const response = await api.get(url);
         return response.data;
     },
     topupWallet: async (amount: number) => {
@@ -456,7 +474,7 @@ export const billing = {
         return response.data;
     },
     getBanks: async () => {
-        const response = await api.get('billing/banks/');
+        const response = await api.get('billing/banks');
         return response.data;
     },
     addBank: async (bankData: any) => {
@@ -464,7 +482,7 @@ export const billing = {
         return response.data;
     },
     deleteBank: async (id: number) => {
-        const response = await api.delete(`billing/banks/${id}/`);
+        const response = await api.delete(`billing/banks/${id}`);
         return response.data;
     },
     requestOverdraft: async (patientId: number) => {
@@ -490,12 +508,36 @@ export const billing = {
 }
 
 export const pharmacy = {
-    getAllOrders: async () => {
-        const response = await api.get('pharmacy/orders/all/');
+    getInventory: async () => {
+        const response = await api.get('pharmacy/inventory');
         return response.data;
     },
-    updateOrderStatus: async (id: number, status: string) => {
-        const response = await api.put(`pharmacy/orders/${id}/status/?status=${status}`);
+    addItem: async (data: any) => {
+        const response = await api.post('pharmacy/inventory', data);
+        return response.data;
+    },
+    updateItem: async (id: number, data: any) => {
+        const response = await api.put(`pharmacy/inventory/${id}`, data);
+        return response.data;
+    },
+    deleteItem: async (id: number) => {
+        const response = await api.delete(`pharmacy/inventory/${id}`);
+        return response.data;
+    },
+    getQueue: async () => {
+        const response = await api.get('prescriptions/pharmacy/queue');
+        return response.data;
+    },
+    getHistory: async () => {
+        const response = await api.get('prescriptions/pharmacy/history');
+        return response.data;
+    },
+    updateItemStatus: async (itemId: number, status: string) => {
+        const response = await api.patch(`prescriptions/items/${itemId}/status?status=${status}`);
+        return response.data;
+    },
+    cancelPrescription: async (id: number) => {
+        const response = await api.patch(`prescriptions/${id}`, { status: 'cancelled' });
         return response.data;
     }
 }

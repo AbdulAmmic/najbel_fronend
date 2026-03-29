@@ -24,12 +24,12 @@ interface InventoryItem {
     name: string;
     description: string;
     quantity: number;
-    unit: string;
     reorder_level: number;
     batch_number: string;
     expiry_date: string;
-    manufacturer: string;
-    price: number;
+    supplier: string;
+    unit_price: number;
+    category: string;
 }
 
 export default function InventoryPage() {
@@ -45,12 +45,12 @@ export default function InventoryPage() {
         name: '',
         description: '',
         quantity: 0,
-        unit: 'tablets',
         reorder_level: 10,
         batch_number: '',
         expiry_date: '',
-        manufacturer: '',
-        price: 0
+        supplier: '',
+        unit_price: 0,
+        category: 'General'
     });
 
     const fetchInventory = async () => {
@@ -82,12 +82,12 @@ export default function InventoryPage() {
                 name: item.name,
                 description: item.description || '',
                 quantity: item.quantity,
-                unit: item.unit,
                 reorder_level: item.reorder_level,
                 batch_number: item.batch_number,
                 expiry_date: item.expiry_date ? new Date(item.expiry_date).toISOString().split('T')[0] : '',
-                manufacturer: item.manufacturer || '',
-                price: item.price
+                supplier: item.supplier || '',
+                unit_price: item.unit_price,
+                category: item.category || 'General'
             });
         } else {
             setEditingItem(null);
@@ -95,12 +95,12 @@ export default function InventoryPage() {
                 name: '',
                 description: '',
                 quantity: 0,
-                unit: 'tablets',
                 reorder_level: 10,
                 batch_number: '',
                 expiry_date: '',
-                manufacturer: '',
-                price: 0
+                supplier: '',
+                unit_price: 0,
+                category: 'General'
             });
         }
         setAppModalOpen(true);
@@ -111,7 +111,11 @@ export default function InventoryPage() {
         try {
             const payload = {
                 ...formData,
-                expiry_date: formData.expiry_date ? new Date(formData.expiry_date).toISOString() : null
+                quantity: Number(formData.quantity) || 0,
+                unit_price: Number(formData.unit_price) || 0,
+                reorder_level: Number(formData.reorder_level) || 0,
+                expiry_date: formData.expiry_date || null,
+                batch_number: formData.batch_number || "BATCH-GEN-" + Date.now().toString().slice(-6)
             };
 
             if (editingItem) {
@@ -141,7 +145,7 @@ export default function InventoryPage() {
     // Derived Stats
     const lowStockCount = inventory.filter(i => i.quantity <= i.reorder_level).length;
     const totalItems = inventory.length;
-    const totalValue = inventory.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+    const totalValue = inventory.reduce((acc, curr) => acc + (curr.unit_price * curr.quantity), 0);
 
     const filteredItems = inventory.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -199,7 +203,7 @@ export default function InventoryPage() {
                     </div>
                     <div className="relative z-10">
                         <p className="text-sm font-medium text-gray-500">Total Valuation</p>
-                        <p className="text-2xl font-bold text-gray-900">${totalValue.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">₦{totalValue.toLocaleString()}</p>
                     </div>
                 </div>
             </div>
@@ -271,7 +275,7 @@ export default function InventoryPage() {
                                                     </div>
                                                     <div>
                                                         <div className="font-semibold text-gray-900">{item.name}</div>
-                                                        <div className="text-xs text-gray-500">{item.manufacturer}</div>
+                                                        <div className="text-xs text-gray-500">{item.supplier}</div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -280,7 +284,6 @@ export default function InventoryPage() {
                                                     <span className={`font-semibold ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
                                                         {item.quantity}
                                                     </span>
-                                                    <span className="text-xs text-gray-500">{item.unit}</span>
                                                 </div>
                                                 {isLowStock && (
                                                     <div className="text-[10px] font-medium text-red-600 bg-red-50 inline-block px-1.5 py-0.5 rounded mt-1">
@@ -298,7 +301,7 @@ export default function InventoryPage() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="font-medium text-gray-900">${(item.price || 0).toFixed(2)}</div>
+                                                <div className="font-medium text-gray-900">₦{(item.unit_price || 0).toFixed(2)}</div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${item.quantity === 0 ? 'bg-gray-100 text-gray-800' :
@@ -367,11 +370,11 @@ export default function InventoryPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Supplier / Manufacturer</label>
                                         <input
                                             type="text"
-                                            value={formData.manufacturer}
-                                            onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                                            value={formData.supplier}
+                                            onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                                             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                                             placeholder="e.g. PharmaCorp"
                                         />
@@ -379,6 +382,7 @@ export default function InventoryPage() {
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
                                         <input
+                                            required
                                             type="text"
                                             value={formData.batch_number}
                                             onChange={(e) => setFormData({ ...formData, batch_number: e.target.value })}
@@ -394,22 +398,23 @@ export default function InventoryPage() {
                                             type="number"
                                             min="0"
                                             value={formData.quantity}
-                                            onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                                            onChange={(e) => setFormData({ ...formData, quantity: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                                             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                                         <select
-                                            value={formData.unit}
-                                            onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                                            value={formData.category}
+                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                                         >
-                                            <option value="tablets">Tablets</option>
-                                            <option value="ml">ml</option>
-                                            <option value="ampules">Ampules</option>
-                                            <option value="boxes">Boxes</option>
-                                            <option value="pieces">Pieces</option>
+                                            <option value="General">General</option>
+                                            <option value="Antibiotics">Antibiotics</option>
+                                            <option value="Analgesics">Analgesics</option>
+                                            <option value="Antimalarials">Antimalarials</option>
+                                            <option value="Vitamins">Vitamins</option>
+                                            <option value="Consumables">Consumables</option>
                                         </select>
                                     </div>
 
@@ -419,18 +424,18 @@ export default function InventoryPage() {
                                             type="number"
                                             min="0"
                                             value={formData.reorder_level}
-                                            onChange={(e) => setFormData({ ...formData, reorder_level: parseInt(e.target.value) })}
+                                            onChange={(e) => setFormData({ ...formData, reorder_level: e.target.value === '' ? 10 : parseInt(e.target.value) })}
                                             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit ($)</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₦)</label>
                                         <input
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            value={formData.price}
-                                            onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+                                            value={formData.unit_price}
+                                            onChange={(e) => setFormData({ ...formData, unit_price: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                                         />
                                     </div>

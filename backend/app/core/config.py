@@ -14,7 +14,11 @@ class Settings(BaseSettings):
     # DEEPSEEK_API_KEY: str = "sk-d96513e88e9148c1a52f596ce74c6c36" 
     GEMINI_API_KEY: str = "AIzaSyBuIgcUs-dyvQscKKjMGAjAehEMUjnUdEc"
 
-    BACKEND_CORS_ORIGINS: List[str] = ["*"]
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000"
+    ]
 
     class Config:
         case_sensitive = True

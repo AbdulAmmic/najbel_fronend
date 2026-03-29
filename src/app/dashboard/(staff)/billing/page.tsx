@@ -11,7 +11,7 @@ import {
   Search,
   Filter,
   CreditCard,
-  DollarSign,
+  Banknote,
   TrendingUp,
   TrendingDown,
   Activity,
@@ -40,6 +40,8 @@ export default function BillingOverviewPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showFundModal, setShowFundModal] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [patientBalance, setPatientBalance] = useState<number | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   // Create Invoice State
   const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
@@ -158,10 +160,30 @@ export default function BillingOverviewPage() {
       setFeedback({ type: 'success', message: 'Invoice paid successfully via wallet' });
       fetchBillingData();
       setSelectedInvoice(null);
+      setPatientBalance(null);
     } catch (e) {
       setFeedback({ type: 'error', message: 'Payment failed' });
     }
   };
+
+  const fetchPatientBalance = async (patientId: number) => {
+    try {
+      setLoadingBalance(true);
+      const response = await billing.getWallet(patientId);
+      setPatientBalance(response.balance);
+    } catch (e) {
+      console.error("Failed to fetch balance", e);
+      setPatientBalance(null);
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedInvoice && selectedInvoice.status === 'pending') {
+      fetchPatientBalance(selectedInvoice.patient_id);
+    }
+  }, [selectedInvoice]);
 
   const handleFundWallet = async () => {
     if (!selectedPatient || !fundAmount) return;
@@ -286,7 +308,7 @@ export default function BillingOverviewPage() {
       {/* Financial Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { title: "Total Revenue", value: `₦${(stats.total_revenue || 0).toLocaleString()}`, change: "+14%", trend: "up", icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
+          { title: "Total Revenue", value: `₦${(stats.total_revenue || 0).toLocaleString()}`, change: "+14%", trend: "up", icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
           { title: "Pending Collection", value: `₦${(stats.pending_amount || 0).toLocaleString()}`, change: "-3%", trend: "up", icon: Clock, color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
           { title: "Paid Drafts", value: stats.paid_count, change: "Stable", trend: "neutral", icon: CheckCircle2, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
           { title: "Aging Invoices", value: stats.pending_count, change: "+8%", trend: "down", icon: History, color: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" }
@@ -368,7 +390,7 @@ export default function BillingOverviewPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-black text-gray-900 text-sm tracking-tighter">₦{(inv.total_amount || 0).toLocaleString()}</td>
+                    <td className="px-6 py-4 font-black text-gray-900 text-sm tracking-tighter">₦{(inv.amount || 0).toLocaleString()}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border shadow-sm ${inv.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100/50' : 'bg-rose-50 text-rose-600 border-rose-100/50'
                         }`}>
@@ -519,29 +541,32 @@ export default function BillingOverviewPage() {
                   </div>
                   <div className="pt-4 border-t border-gray-200/50 flex justify-between items-center">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aggregate Valuation</span>
-                    <span className="text-2xl font-black text-indigo-600 tracking-tighter">₦{(selectedInvoice.total_amount || 0).toLocaleString()}</span>
+                    <span className="text-2xl font-black text-indigo-600 tracking-tighter">₦{(selectedInvoice.amount || 0).toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className={`p-5 rounded-2xl space-y-3 border shadow-sm ${selectedInvoice.status === 'paid' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                    <div className={`p-2 rounded-lg bg-white inline-block shadow-sm ${selectedInvoice.status === 'paid' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      <Activity className="w-4 h-4" />
+                <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100 shadow-sm">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-white inline-block shadow-sm text-blue-600">
+                                <Wallet className="w-4 h-4" />
+                            </div>
+                            <div className="space-y-0.5">
+                                <p className="text-[9px] font-bold text-blue-800 uppercase tracking-widest">Available Balance</p>
+                                <p className="text-xs font-black text-blue-900 uppercase">
+                                    {loadingBalance ? 'Checking...' : patientBalance !== null ? `₦${patientBalance.toLocaleString()}` : '—'}
+                                </p>
+                            </div>
+                        </div>
+                        {patientBalance !== null && (
+                            <div className="text-right">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase">Post-Payment</p>
+                                <p className={`text-xs font-black ${(patientBalance - selectedInvoice.amount >= 0) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    ₦{(patientBalance - selectedInvoice.amount).toLocaleString()}
+                                </p>
+                            </div>
+                        )}
                     </div>
-                    <div className="space-y-0.5">
-                      <p className={`text-[9px] font-bold uppercase tracking-widest ${selectedInvoice.status === 'paid' ? 'text-emerald-800' : 'text-rose-800'}`}>Lifecycle State</p>
-                      <p className={`text-xs font-black uppercase ${selectedInvoice.status === 'paid' ? 'text-emerald-900' : 'text-rose-900'}`}>{selectedInvoice.status}</p>
-                    </div>
-                  </div>
-                  <div className="p-5 bg-blue-50/50 rounded-2xl space-y-3 border border-blue-100 shadow-sm">
-                    <div className="p-2 rounded-lg bg-white inline-block shadow-sm text-blue-600">
-                      <Wallet className="w-4 h-4" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[9px] font-bold text-blue-800 uppercase tracking-widest">Ledger Source</p>
-                      <p className="text-xs font-black text-blue-900 uppercase">Najbel Wallet</p>
-                    </div>
-                  </div>
                 </div>
 
                 {selectedInvoice.status === 'pending' && (
@@ -675,7 +700,7 @@ export default function BillingOverviewPage() {
                       <div className="space-y-2">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em] mb-1 opacity-60">Value Amount (₦)</p>
                         <div className="relative">
-                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                          <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                           <input
                             type="number"
                             value={fundAmount}

@@ -12,7 +12,7 @@ export default function StaffLayout({
 }) {
     return (
         <WebSocketProvider>
-            <RouteGuard allowedRoles={["admin", "doctor", "nurse", "receptionist", "laboratory", "pharmacy"]}>
+            <RouteGuard allowedRoles={["admin", "super_admin", "doctor", "nurse", "receptionist", "lab_tech", "pharmacist", "radiologist", "accountant", "store_officer"]}>
                 <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
                     <Header />
                     {/* flex row: sidebar always visible on md+, children fill remaining space */}

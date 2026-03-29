@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     is_active: Optional[bool] = True
     full_name: Optional[str] = None
     profile_picture: Optional[str] = None
+    phone_number: Optional[str] = None
     role: UserRole = "patient"
 
 class UserCreate(UserBase):
@@ -43,6 +44,7 @@ class User(UserInDBBase):
 class UserInfo(BaseModel):
     full_name: str
     email: str
+    phone_number: Optional[str] = None
     class Config:
         orm_mode = True
 
@@ -61,6 +63,9 @@ class PatientInfo(BaseModel):
     blood_group: Optional[str] = None
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
+    is_admitted: bool = False
     
     class Config:
         orm_mode = True
+
+User.update_forward_refs()

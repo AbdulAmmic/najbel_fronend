@@ -178,7 +178,11 @@ def get_my_patients(
                 "gender": p.gender,
                 # "age": calculated from dob
                 "status": "Active", # Mock
-                "phone": user_info.phone_number or "N/A"
+                "phone": user_info.phone_number or "N/A",
+                "is_admitted": p.is_admitted,
+                "ward_name": p.bed.ward_name if p.is_admitted and p.bed else None,
+                "bed_number": p.bed.bed_number if p.is_admitted and p.bed else None,
+                "room_number": p.bed.room_number if p.is_admitted and p.bed else None,
             })
     return result
 

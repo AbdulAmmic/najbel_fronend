@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlmodel import Session, select
 from app.api import deps
 from app.models.user import User, UserRole
-from app.models.inventory import InventoryItem
+from app.models.inventory import InventoryItem, InventoryItemCreate, InventoryItemUpdate
 from app.core.websockets import manager
 from app.core.permissions import RoleChecker
 from datetime import datetime, date
@@ -33,12 +33,10 @@ def get_inventory(
 
 @router.post("/inventory", response_model=InventoryItem)
 def create_item(
-    item_in: InventoryItem,
+    item_in: InventoryItemCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-    # Strict: Pharmacist or Store Officer
-    _ = Depends(RoleChecker([UserRole.PHARMACIST, UserRole.STORE_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+    current_user: User = Depends(RoleChecker([UserRole.PHARMACIST, UserRole.STORE_OFFICER, UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
     Add new medicine/item to inventory.
@@ -55,7 +53,7 @@ def create_item(
 @router.put("/inventory/{item_id}", response_model=InventoryItem)
 def update_item(
     item_id: int,
-    item_in: dict,
+    item_in: InventoryItemUpdate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
@@ -69,7 +67,8 @@ def update_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    for key, value in item_in.items():
+    update_data = item_in.dict(exclude_unset=True)
+    for key, value in update_data.items():
         if hasattr(item, key):
             setattr(item, key, value)
             
@@ -389,8 +388,11 @@ async def process_prescription(
         
         db.commit()
     
-    # Mark prescription as processed/dispensed
-    rx.status = "dispensed" if available_items else "unavailable"
+    # Mark prescription as processed/pending payment
+    if available_items:
+        rx.status = "pending_payment"
+    else:
+        rx.status = "unavailable"
     db.add(rx)
     db.commit()
     

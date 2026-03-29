@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { FaUser, FaLock, FaEye, FaEyeSlash, FaArrowLeft, FaHospital, FaSchool } from "react-icons/fa";
 import { motion } from "framer-motion";
+import { auth } from "@/services/api";
 
 export default function NajbelLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,12 +24,15 @@ export default function NajbelLoginPage() {
     const password = (formData.get("password") as string).trim();
 
     try {
-      const { auth } = await import("@/services/api");
       const data = await auth.login(email, password);
       localStorage.setItem("token", data.access_token);
 
-      // Fetch user profile to determine role-based redirection
-      const user = await auth.getMe();
+      // Use user info from login response if available, otherwise fallback to getMe
+      let user = data.user;
+      if (!user) {
+        user = await auth.getMe();
+      }
+      
       localStorage.setItem("user", JSON.stringify(user));
 
       if (user.role === "patient") {
@@ -37,10 +41,20 @@ export default function NajbelLoginPage() {
         router.push("/dashboard/Doctor");
       } else if (user.role === "receptionist" || user.role === "reception") {
         router.push("/dashboard/reception");
+      } else if (user.role === "lab_tech") {
+        router.push("/dashboard/laboratory");
+      } else if (user.role === "nurse") {
+        router.push("/dashboard/nurse");
+      } else if (user.role === "pharmacist") {
+        router.push("/dashboard/pharmacy");
+      } else if (user.role === "radiologist") {
+        router.push("/dashboard/radiology");
+      } else if (user.role === "accountant") {
+        router.push("/dashboard/billing");
       } else if (user.role === "admin" || user.role === "super_admin") {
         router.push("/dashboard/admin");
       } else {
-        router.push("/dashboard");
+        router.push("/dashboard/overview");
       }
     } catch (err: any) {
       console.error("Login failed", err);

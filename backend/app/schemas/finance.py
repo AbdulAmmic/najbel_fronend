@@ -36,6 +36,11 @@ class Invoice(InvoiceBase):
     status: InvoiceStatus
     created_at: datetime
     items: List[InvoiceItem]
+    patient_name: Optional[str] = None
+    
+    @property
+    def total_amount(self) -> float:
+        return self.amount
 
     class Config:
         from_attributes = True

@@ -31,11 +31,14 @@ def send_email_sync(to_email: str, subject: str, body_html: str):
     except Exception as e:
         print(f"Failed to send email to {to_email}: {e}")
 
-def send_email_background(to_email: str, subject: str, body_html: str):
-    """Sends an email in a background thread to avoid blocking the API request."""
-    thread = threading.Thread(target=send_email_sync, args=(to_email, subject, body_html))
-    thread.daemon = True
-    thread.start()
+def send_email_background(to_email: str, subject: str, body_html: str, background_tasks: Optional[any] = None):
+    """Sends an email in a background thread or using FastAPI BackgroundTasks."""
+    if background_tasks:
+        background_tasks.add_task(send_email_sync, to_email, subject, body_html)
+    else:
+        thread = threading.Thread(target=send_email_sync, args=(to_email, subject, body_html))
+        thread.daemon = True
+        thread.start()
 
 # Helper Templates
 def generate_appointment_email(patient_name: str, doctor_name: str, action: str, note: str, doctor_phone: str, new_date: Optional[str] = None):
@@ -133,6 +136,49 @@ def generate_welcome_email(full_name: str, email: str, password: str, role: str)
                 
                 <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 40px 0;">
                 <p style="font-size: 12px; color: #94a3b8; text-align: center;">This is an automated message. Please do not reply to this email.</p>
+            </div>
+        </body>
+    </html>
+    """
+def generate_lab_tech_notification_email(tech_name: str, patient_name: str, test_name: str, short_id: str, priority: str):
+    color = "#ef4444" if priority == "urgent" else "#2563eb"
+    return f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: {color};">New Lab Request - {short_id}</h2>
+                <p>Hello <strong>{tech_name}</strong>,</p>
+                <p>A new lab request has been assigned to the laboratory department.</p>
+                <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>Patient:</strong> {patient_name}</p>
+                    <p><strong>Test:</strong> {test_name}</p>
+                    <p><strong>Lab ID:</strong> <span style="font-family: monospace; font-weight: bold; font-size: 1.1em;">{short_id}</span></p>
+                    <p><strong>Priority:</strong> <span style="color: {color}; font-weight: bold; text-transform: uppercase;">{priority}</span></p>
+                </div>
+                <p>Please log in to the laboratory dashboard to process this request once payment is confirmed.</p>
+                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
+                <p style="font-size: 12px; color: #888; text-align: center;">Najbel Clinic LIS - Automated Notification</p>
+            </div>
+        </body>
+    </html>
+    """
+
+def generate_lab_payment_request_email(patient_name: str, test_name: str, short_id: str, amount: float):
+    return f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <h2 style="color: #2563eb;">Lab Test Payment Required</h2>
+                <p>Hello <strong>{patient_name}</strong>,</p>
+                <p>A lab test request (<strong>{short_id}</strong>) has been made for you. Please settle the diagnostic fees to proceed with sample collection.</p>
+                <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #dbeafe;">
+                    <p><strong>Test:</strong> {test_name}</p>
+                    <p><strong>Amount Due:</strong> <span style="font-size: 1.25em; font-weight: bold; color: #1e40af;">₦{amount:,.2f}</span></p>
+                </div>
+                <p>You can pay this invoice directly from your **Najbel Clinic Wallet** by logging into your patient dashboard.</p>
+                <p style="font-size: 14px; color: #64748b;">The laboratory will only be able to accept your samples after payment has been verified.</p>
+                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
+                <p style="font-size: 12px; color: #888; text-align: center;">Thank you for choosing Najbel Clinic.</p>
             </div>
         </body>
     </html>

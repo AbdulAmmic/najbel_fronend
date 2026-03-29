@@ -22,6 +22,6 @@ class Bed(BedBase, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    patient: Optional["Patient"] = Relationship()
+    patient: Optional["Patient"] = Relationship(back_populates="bed")
 
 from .user import Patient

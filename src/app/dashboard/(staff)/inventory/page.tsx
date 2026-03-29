@@ -31,7 +31,7 @@ export default function InventoryDashboard() {
     }, []);
 
     const lowStockItems = items.filter((i: any) => i.quantity <= (i.reorder_level || 10));
-    const totalValue = items.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0);
+    const totalValue = items.reduce((sum: number, i: any) => sum + (i.unit_price * i.quantity), 0);
 
     if (loading) return <div className="p-8">Loading Inventory...</div>;
 
@@ -67,7 +67,7 @@ export default function InventoryDashboard() {
                 />
                 <StatsCard
                     title="Stock Value"
-                    value={`$${totalValue.toLocaleString()}`}
+                    value={`₦${totalValue.toLocaleString()}`}
                     icon={ShoppingCart}
                     color="green"
                 />

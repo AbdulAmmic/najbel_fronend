@@ -1,263 +1,405 @@
+// app/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  Hospital, UserRound, HeartPulse, Phone, Mail, MapPin,
-  GraduationCap, ShieldCheck, FlaskConical, Briefcase,
-  Ambulance, Landmark, Monitor, ChevronRight, Star,
-  HandHelping, Microscope, Building2, TrendingUp, Menu, X
+  Hospital,
+  HeartPulse,
+  Monitor,
+  Ambulance,
+  GraduationCap,
+  FlaskConical,
+  Briefcase,
+  ArrowRight,
+  ChevronRight,
+  Phone,
+  Mail,
+  ShieldCheck,
+  Zap,
+  Globe,
+  Quote,
+  MapPin,
+  Play,
+  Menu,
+  X,
 } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-type Color = "blue" | "green" | "purple" | "red" | "cyan" | "orange";
+type ServiceColor = "indigo" | "sky" | "rose" | "teal" | "violet" | "amber";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-const SERVICES = [
-  { icon: Hospital, title: "Healthcare Services", description: "Hospitals, clinics, and specialised medical centres providing comprehensive care.", color: "blue" as Color },
-  { icon: Landmark, title: "Education", description: "Schools, colleges, and training institutes fostering academic excellence.", color: "green" as Color },
-  { icon: FlaskConical, title: "Research & Innovation", description: "Medical research facilities and innovation hubs driving healthcare advancement.", color: "purple" as Color },
-  { icon: Ambulance, title: "Emergency Services", description: "24/7 emergency response and ambulance services across regions.", color: "red" as Color },
-  { icon: Monitor, title: "Digital Health", description: "Telemedicine, health records, and digital healthcare solutions.", color: "cyan" as Color },
-  { icon: Briefcase, title: "Medical Training", description: "Professional development and continuous medical education programmes.", color: "orange" as Color },
+interface Service {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  color: ServiceColor;
+}
+
+interface Stat {
+  value: string;
+  label: string;
+}
+
+const SERVICES: Service[] = [
+  {
+    icon: Hospital,
+    title: "Long-term Care",
+    description: "Personalized support and medical oversight for residents who require ongoing assistance.",
+    color: "rose",
+  },
+  {
+    icon: HeartPulse,
+    title: "Skilled Nursing",
+    description: "24/7 medical care by professional nurses for complex health needs.",
+    color: "sky",
+  },
+  {
+    icon: Zap,
+    title: "Memory Care",
+    description: "Specially designed programs for individuals living with Alzheimer's or dementia.",
+    color: "amber",
+  },
+  {
+    icon: HeartPulse,
+    title: "Rehabilitation",
+    description: "Comprehensive physical therapy to help residents regain strength and independence.",
+    color: "teal",
+  },
+  {
+    icon: FlaskConical,
+    title: "Dietary Services",
+    description: "Chef-prepared, nutritious meals tailored to individual dietary requirements.",
+    color: "violet",
+  },
+  {
+    icon: MapPin,
+    title: "Social Community",
+    description: "Engaging social activities and events to foster a sense of belonging.",
+    color: "indigo",
+  },
 ];
 
-const VALUE_PROPS = [
-  { icon: HandHelping, title: "Integrated Ecosystem", description: "Seamless coordination between healthcare, education, and research divisions." },
-  { icon: ShieldCheck, title: "Quality Assurance", description: "Highest standards of medical care and educational excellence." },
-  { icon: Microscope, title: "Innovation Driven", description: "Continuous adoption of cutting-edge technologies and methodologies." },
+const STATS: Stat[] = [
+  { value: "10+", label: "Years of Care" },
+  { value: "100%", label: "Caregiver Presence" },
+  { value: "50+", label: "Comfortable Suites" },
+  { value: "24/7", label: "Professional Support" },
 ];
 
-const CONTACT_INFO = [
-  { icon: Phone, text: "+234 7087 577 535", sub: "General Inquiries" },
-  { icon: Mail, text: "info@najbelgroups.com", sub: "Email Support" },
-  { icon: MapPin, text: "Headquarters: Kano", sub: "Multiple Locations" },
-];
-
-const NAV_ITEMS = ["Services", "About", "Partners", "Careers", "Contact"];
-
-const COLOR_MAP: Record<Color, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-50", text: "text-blue-600" },
-  green: { bg: "bg-green-50", text: "text-green-600" },
-  purple: { bg: "bg-purple-50", text: "text-purple-600" },
-  red: { bg: "bg-red-50", text: "text-red-600" },
-  cyan: { bg: "bg-cyan-50", text: "text-cyan-600" },
-  orange: { bg: "bg-orange-50", text: "text-orange-600" },
+const COLOR_MAP: Record<ServiceColor, string> = {
+  indigo: "bg-indigo-50 text-indigo-600",
+  sky: "bg-sky-50 text-sky-600",
+  rose: "bg-rose-50 text-rose-500",
+  teal: "bg-teal-50 text-teal-600",
+  violet: "bg-violet-50 text-violet-600",
+  amber: "bg-amber-50 text-amber-600",
 };
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-export default function NajbelLandingPage() {
-  const router = useRouter();
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+export default function HomePage() {
+  const [scrolled, setScrolled] = useState<boolean>(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 30);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToSection = useCallback((sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+      setMobileMenuOpen(false);
+    }
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-gray-700 overflow-x-hidden antialiased" style={{ fontFamily: "Inter, system-ui, -apple-system, sans-serif" }}>
-
-      {/* ── Header ────────────────────────────────── */}
-      <header className={`fixed top-3 left-3 right-3 md:top-4 md:left-6 md:right-6 max-w-7xl mx-auto z-50 transition-all duration-300 rounded-2xl md:rounded-full px-5 py-2 ${scrolled || menuOpen ? "bg-white/90 backdrop-blur-lg border border-gray-100 shadow-md" : "bg-white/80 backdrop-blur-sm border border-gray-50/50 shadow-sm"
-        }`}>
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-sky-500 rounded-full flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-sm">N</span>
+    <main className="relative overflow-x-hidden bg-[#FCFCFD]">
+      {/* Navigation */}
+      <nav
+        className={`fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-6xl transition-all duration-300 ${scrolled ? "shadow-md" : ""
+          }`}
+      >
+        <div
+          className={`bg-white/80 backdrop-blur-md rounded-2xl border px-5 py-3 md:px-7 md:py-4 flex items-center justify-between transition-all ${scrolled ? "border-slate-200/80 shadow-sm" : "border-white/40 shadow-sm"
+            }`}
+        >
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex items-center gap-2.5 group cursor-pointer"
+          >
+            <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-indigo-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-indigo-200">
+              <HeartPulse size={16} strokeWidth={1.5} />
             </div>
-            <div className="text-left">
-              <p className="text-base font-semibold tracking-tight text-gray-800 leading-tight">NAJBEL</p>
-              <p className="text-[9px] text-gray-400 -mt-0.5 tracking-wide">GROUP</p>
-            </div>
+            <span className="font-semibold text-xl tracking-tight text-slate-800">
+              Najbel<span className="font-light text-indigo-500"> Nursing Home</span>
+            </span>
           </button>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex gap-6">
-            {NAV_ITEMS.map(item => (
-              <a key={item} href="#" className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors relative group py-1">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-8">
+            {["services", "insights", "contact"].map((item) => (
+              <button
+                key={item}
+                onClick={() => scrollToSection(item)}
+                className="text-sm font-medium text-slate-500 hover:text-indigo-600 transition-colors capitalize"
+              >
                 {item}
-                <span className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-blue-500 group-hover:w-full transition-all duration-300" />
-              </a>
+              </button>
             ))}
-          </nav>
-
-          {/* Desktop Actions */}
-          <div className="hidden md:flex gap-2">
-            <button onClick={() => router.push("/login")} className="px-5 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50 rounded-full transition-all">Sign In</button>
-            <button onClick={() => router.push("/register")} className="px-5 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-sm transition-all flex items-center gap-1">
-              Get Started <ChevronRight className="w-3 h-3" />
+            <button className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition">
+              Login
+            </button>
+            <button className="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-medium shadow-md hover:bg-indigo-600 transition-all duration-200 active:scale-95">
+              Join Now
             </button>
           </div>
 
-          {/* Mobile toggle */}
-          <button onClick={() => setMenuOpen(v => !v)} className="md:hidden p-1.5 text-gray-600 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors">
-            {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-1.5 text-slate-600"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
+      </nav>
 
-        {/* Mobile menu */}
-        {menuOpen && (
-          <div className="md:hidden overflow-hidden mt-3">
-            <div className="flex flex-col space-y-2 py-3 border-t border-gray-100">
-              {NAV_ITEMS.map(item => (
-                <a key={item} href="#" onClick={() => setMenuOpen(false)} className="text-gray-700 py-1.5 text-sm font-medium hover:text-blue-600 transition-colors">{item}</a>
-              ))}
-              <div className="flex flex-col gap-2 pt-2">
-                <button onClick={() => { router.push("/login"); setMenuOpen(false); }} className="w-full py-2 text-center border border-gray-200 rounded-xl text-blue-700 font-medium text-sm">Sign In</button>
-                <button onClick={() => { router.push("/register"); setMenuOpen(false); }} className="w-full py-2 text-center bg-blue-600 text-white rounded-xl font-medium text-sm shadow-sm">Get Started</button>
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-white/95 backdrop-blur-xl pt-28 px-8 transition-all md:hidden">
+          <div className="flex flex-col gap-7 text-lg">
+            {["services", "insights", "contact"].map((item) => (
+              <button
+                key={item}
+                onClick={() => scrollToSection(item)}
+                className="border-b border-slate-100 py-2 text-slate-700 font-medium text-left capitalize"
+              >
+                {item}
+              </button>
+            ))}
+            <div className="pt-4 flex flex-col gap-4">
+              <button className="text-slate-600 font-medium text-left">Login</button>
+              <button className="bg-slate-900 text-white py-3 rounded-full font-medium text-center">
+                Join Now →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hero Section */}
+      <section className="relative pt-44 pb-32 md:pt-56 md:pb-40 overflow-hidden">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-100/30 rounded-full blur-[140px] -z-10" />
+        <div className="absolute top-[10%] right-[-10%] w-[50%] h-[50%] bg-sky-100/20 rounded-full blur-[140px] -z-10" />
+        <div className="absolute bottom-[10%] left-[20%] w-[30%] h-[30%] bg-indigo-50/40 rounded-full blur-[120px] -z-10" />
+
+        <div className="max-w-6xl mx-auto px-6 text-center">
+
+
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-slate-900 leading-[1.1] mb-6 max-w-4xl mx-auto">
+            Dignity, comfort &{" "}
+            <span className="bg-gradient-to-r from-indigo-600 to-sky-500 bg-clip-text text-transparent">
+              exceptional care
+            </span>
+          </h1>
+
+          <p className="text-lg md:text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed font-light mb-10">
+            Providing a sanctuary of professional medical support and compassionate community 
+            for the ones you love most. Your peace of mind starts at Najbel.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-5 justify-center items-center">
+            <button className="group w-full sm:w-auto bg-indigo-600 text-white px-8 py-4 rounded-2xl font-medium text-lg flex items-center justify-center gap-2 transition-all hover:bg-indigo-700 hover:shadow-xl shadow-lg hover:-translate-y-1">
+              Schedule a Visit <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <button className="w-full sm:w-auto bg-white border border-slate-200 px-8 py-4 rounded-2xl font-medium text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 hover:shadow-md">
+              <Play size={18} /> Explore Our Community
+            </button>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-8 mt-16 text-slate-400 text-xs font-medium uppercase tracking-wider">
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-slate-100 shadow-sm">
+              <ShieldCheck size={14} className="text-indigo-400" /> Trust & Safety Verified
+            </span>
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-slate-100 shadow-sm">
+              <Zap size={14} className="text-amber-400" /> 24/7 Rapid Care
+            </span>
+            <span className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-slate-100 shadow-sm">
+              <Globe size={14} className="text-sky-400" /> Standard Excellence
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="max-w-6xl mx-auto px-6 mb-24">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-y border-slate-100 py-12">
+          {STATS.map((stat, idx) => (
+            <div key={idx} className="text-center">
+              <div className="text-4xl md:text-5xl font-light text-slate-800 mb-2 tracking-tight">
+                {stat.value}
+              </div>
+              <div className="text-[11px] font-semibold text-indigo-400 uppercase tracking-wider">
+                {stat.label}
               </div>
             </div>
-          </div>
-        )}
-      </header>
+          ))}
+        </div>
+      </section>
 
-      {/* ── Main ──────────────────────────────────── */}
-      <main className="pt-24 pb-16 px-5">
-        <div className="max-w-6xl mx-auto">
-
-          {/* Hero */}
-          <div className="text-center mb-14">
-            <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium tracking-wide mb-4">Trusted Nationwide</span>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-gray-900 leading-[1.2]">
-              Unified Excellence in<br />
-              <span className="bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Healthcare &amp; Education</span>
-            </h1>
-            <p className="text-gray-500 max-w-2xl mx-auto mt-4 text-base">
-              A complete ecosystem of medical services, academic institutions, and breakthrough innovation.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-3 mt-6">
-              <button onClick={() => router.push("/register")} className="px-6 py-2.5 bg-blue-600 text-white rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 flex items-center justify-center gap-1.5">
-                Start Free Trial <ChevronRight className="w-3 h-3" />
-              </button>
-              <button onClick={() => router.push("/login")} className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-full text-sm font-medium hover:border-blue-300 hover:text-blue-600 transition-all">
-                Book a Demo
-              </button>
+      {/* Services Section */}
+      <section id="services" className="py-20 md:py-28 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+            <div className="max-w-xl">
+              <span className="text-indigo-500 text-sm font-semibold tracking-wider uppercase">
+                Our Services
+              </span>
+              <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-slate-900 mt-2">
+                Dedicated care for every resident
+              </h2>
             </div>
+            <button className="text-indigo-600 font-medium text-sm flex items-center gap-1 border-b border-indigo-200 pb-1 hover:border-indigo-600 transition-all">
+              Explore all <ChevronRight size={14} />
+            </button>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-16">
-            {[
-              { icon: UserRound, value: "500+", label: "Medical Professionals" },
-              { icon: GraduationCap, value: "10+", label: "Institutions" },
-              { icon: HeartPulse, value: "50K+", label: "Patients Served" },
-              { icon: ShieldCheck, value: "100%", label: "Accredited" },
-            ].map((s, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 text-center shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                <s.icon className="w-5 h-5 text-blue-500 mx-auto mb-3" />
-                <div className="text-2xl font-semibold text-gray-800">{s.value}</div>
-                <div className="text-xs text-gray-500 mt-1 font-medium tracking-wide">{s.label}</div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {SERVICES.map((service, idx) => (
+              <div
+                key={idx}
+                className="group bg-white rounded-3xl border border-slate-100 p-7 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+              >
+                <div
+                  className={`w-12 h-12 rounded-xl ${COLOR_MAP[service.color]} flex items-center justify-center mb-6 group-hover:scale-105 transition-transform`}
+                >
+                  <service.icon size={24} strokeWidth={1.5} />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-800 mb-3">{service.title}</h3>
+                <p className="text-slate-500 leading-relaxed text-sm">{service.description}</p>
               </div>
             ))}
           </div>
-
-          {/* Services */}
-          <div className="mb-16">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-gray-800">Our <span className="text-blue-600">Divisions</span></h2>
-              <p className="text-gray-500 text-sm mt-1">Comprehensive solutions across sectors</p>
-            </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {SERVICES.map((s, i) => {
-                const cc = COLOR_MAP[s.color];
-                return (
-                  <div key={i} className="group bg-white rounded-xl p-6 border border-gray-100 hover:border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1.5 flex flex-col">
-                    <div className={`w-12 h-12 rounded-xl ${cc.bg} ${cc.text} flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-300`}>
-                      <s.icon className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2 group-hover:text-blue-600 transition-colors">{s.title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed flex-1">{s.description}</p>
-                    <div className="mt-5 flex items-center text-sm font-medium text-blue-600 gap-0.5 group-hover:gap-1.5 transition-all">
-                      <span>Learn more</span>
-                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Value Props */}
-          <div className="mb-16">
-            <div className="bg-gray-50/60 rounded-2xl p-8 border border-gray-100 shadow-sm">
-              <div className="text-center mb-7">
-                <h3 className="text-xl md:text-2xl font-semibold text-gray-800">Why <span className="text-blue-600">Najbel</span>?</h3>
-                <p className="text-gray-500 text-sm mt-1">Excellence meets compassion, innovation meets reliability</p>
-              </div>
-              <div className="grid sm:grid-cols-3 gap-5">
-                {VALUE_PROPS.map((v, i) => (
-                  <div key={i} className="text-center p-5 rounded-xl hover:bg-white transition-all duration-300 hover:-translate-y-1">
-                    <div className="inline-flex items-center justify-center w-11 h-11 bg-blue-50 text-blue-600 rounded-xl mb-4">
-                      <v.icon className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-semibold text-gray-800 mb-2">{v.title}</h4>
-                    <p className="text-xs text-gray-500 leading-relaxed">{v.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-            <div className="text-center mb-6">
-              <h3 className="text-xl md:text-2xl font-semibold text-gray-800">Connect With <span className="text-blue-600">Us</span></h3>
-              <p className="text-gray-500 text-sm mt-1">Reach out to learn more about our services</p>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4 mb-6">
-              {CONTACT_INFO.map((c, i) => (
-                <div key={i} className="flex flex-col items-center p-4 min-w-[180px] hover:-translate-y-0.5 transition-transform">
-                  <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
-                    <c.icon className="w-4 h-4" />
-                  </div>
-                  <span className="font-medium text-gray-800 text-sm text-center">{c.text}</span>
-                  <span className="text-xs text-gray-400 mt-1 text-center">{c.sub}</span>
-                </div>
-              ))}
-            </div>
-            <div className="text-center">
-              <button className="px-6 py-2.5 bg-blue-600 text-white rounded-full text-sm font-medium shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 inline-flex items-center gap-1.5">
-                Schedule a Consultation <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
         </div>
-      </main>
+      </section>
 
-      {/* ── Footer ────────────────────────────────── */}
-      <footer className="bg-gray-900 text-white py-10 px-5">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="text-center md:text-left">
-              <div className="flex items-center gap-3 mb-3 justify-center md:justify-start">
-                <div className="h-9 w-9 bg-gradient-to-br from-blue-400 to-sky-400 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">N</span>
+      {/* Insights / Testimonial Section */}
+      <section id="insights" className="py-24 bg-gradient-to-b from-white to-slate-50/40">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-14 items-center">
+            <div>
+              <span className="text-indigo-500 text-sm font-semibold tracking-wide">
+                Trusted by healthcare leaders
+              </span>
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mt-4 mb-6">
+                Founded on love, dedication & professionalism
+              </h2>
+              <p className="text-slate-500 leading-relaxed mb-8">
+                Najbel Nursing Home provides a unified workspace for caregivers, staff, and administrators, 
+                ensuring a high standard of resident well-being.
+              </p>
+              <div className="flex items-center gap-3 text-sm">
+                <div className="flex -space-x-2">
+                  {["JD", "MK", "RT"].map((initials, idx) => (
+                    <div
+                      key={idx}
+                      className="w-8 h-8 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-indigo-700 text-xs font-bold"
+                    >
+                      {initials}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-slate-500 font-light">Join 200+ forward-thinking clinics</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 shadow-md border border-slate-100 relative">
+              <Quote size={32} className="text-indigo-200 absolute top-6 right-6" />
+              <p className="text-lg italic font-light text-slate-600 leading-relaxed">
+                "The experience at Najbel was seamless. The staff is attentive, and the 
+                environment is truly professional and caring. It's not just a nursing home, it's a home."
+              </p>
+              <div className="mt-6 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-semibold text-indigo-700">
+                  DM
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold">NAJBEL GROUP</h3>
-                  <p className="text-gray-400 text-xs">Healthcare • Education • Innovation</p>
+                  <p className="font-semibold text-slate-800">Dr. Meera Lopez</p>
+                  <p className="text-xs text-slate-400">Chief Medical Officer, Nova Health</p>
                 </div>
               </div>
-              <p className="text-gray-400 text-sm max-w-xs">Transforming lives through integrated healthcare and education solutions.</p>
             </div>
-            <div className="text-center md:text-right">
-              <div className="flex items-center gap-1 justify-center md:justify-end mb-2">
-                {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />)}
-                <span className="text-gray-400 text-xs ml-2">Rated 4.9/5</span>
-              </div>
-              <p className="text-gray-400 text-xs">© {new Date().getFullYear()} Najbel Group</p>
-              <p className="text-gray-500 text-[10px] mt-1">Powered by Electron Co. Ltd</p>
-            </div>
-          </div>
-          <div className="mt-6 pt-5 border-t border-gray-800 text-center text-gray-500 text-xs">
-            All rights reserved. Committed to excellence in service delivery.
           </div>
         </div>
+      </section>
+
+      {/* CTA Section */}
+      <section id="contact" className="py-24 px-6">
+        <div className="max-w-6xl mx-auto relative overflow-hidden rounded-3xl bg-slate-900 shadow-2xl">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-sky-500/10 rounded-full blur-3xl" />
+
+          <div className="relative py-20 md:py-28 px-8 text-center">
+            <span className="inline-block text-indigo-300 text-sm font-semibold tracking-wider mb-4 border border-indigo-400/30 rounded-full px-4 py-1 bg-indigo-500/10 backdrop-blur-sm">
+              Your home away from home
+            </span>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tight text-white mb-6">
+              Ready to experience <br /> better care?
+            </h2>
+            <p className="text-slate-300 text-lg max-w-2xl mx-auto mb-12 font-light">
+              Join the community at Najbel Nursing Home and discover a higher standard 
+              of luxury care and compassion.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-5 justify-center">
+              <button className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-50 transition shadow-lg">
+                Request demo <ArrowRight size={18} />
+              </button>
+              <button className="border border-slate-600 text-white px-8 py-4 rounded-2xl font-medium hover:bg-white/5 transition">
+                Contact sales
+              </button>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-8 mt-16 text-slate-400 text-sm">
+              <div className="flex items-center gap-2">
+                <Phone size={16} /> +234 708 757 7535
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail size={16} /> info@najbelgroups.com
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin size={16} /> Global · Remote-first
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-100 py-16">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-gradient-to-br from-indigo-600 to-indigo-400 rounded-lg flex items-center justify-center text-white">
+              <HeartPulse size={14} />
+            </div>
+            <span className="font-semibold text-slate-800 text-lg tracking-tight">
+              Najbel<span className="font-light text-indigo-500"> Nursing Home</span>
+            </span>
+            <span className="text-xs text-slate-400 ml-2 hidden sm:inline">© 2026</span>
+          </div>
+
+          <div className="flex gap-8 text-sm text-slate-400">
+            <button className="hover:text-indigo-500 transition">Privacy</button>
+            <button className="hover:text-indigo-500 transition">Security</button>
+            <button className="hover:text-indigo-500 transition">Status</button>
+            <button className="hover:text-indigo-500 transition">LinkedIn</button>
+          </div>
+
+          <div className="text-xs text-slate-400 font-light">Designed for human-centric healthcare</div>
+        </div>
       </footer>
-    </div>
+    </main>
   );
 }

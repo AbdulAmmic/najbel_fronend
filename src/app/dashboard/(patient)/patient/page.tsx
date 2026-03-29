@@ -22,7 +22,8 @@ import {
   Plus,
   Shield,
   CheckCircle2,
-  X
+  X,
+  Bed
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, appointments, medicalRecords, billing, vitals, labs, prescriptions } from "@/services/api";
@@ -149,6 +150,31 @@ export default function PatientDashboardPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4 pb-8 -mx-1">
+
+      {/* ──── ADMISSION ALERT ──── */}
+      {user?.patient_profile?.is_admitted && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mx-1 bg-rose-600 rounded-2xl p-5 text-white shadow-xl shadow-rose-200 relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Bed className="w-24 h-24 rotate-12" />
+          </div>
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+              <Bed className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-100">Inpatient Status</p>
+              <h2 className="text-xl font-black tracking-tight leading-none mt-1">Active Admission</h2>
+              <p className="text-xs font-semibold text-rose-100/80 mt-2 leading-relaxed">
+                You are currently admitted. Please consult the ward nurse for medication and daily vitals schedule.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ──── GREETING ──── */}
       {/* <div className="px-1 pt-1">

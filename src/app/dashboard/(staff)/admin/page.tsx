@@ -18,7 +18,8 @@ import {
   MoreVertical,
   Zap,
   BarChart3,
-  Search
+  Search,
+  Pill
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { dashboard, appointments as appointmentsApi } from "@/services/api";
@@ -116,6 +117,7 @@ export default function AdminDashboard() {
     { name: "User Control", icon: Users, href: "/dashboard/admin/users", color: "bg-indigo-600" },
     { name: "Financials", icon: Wallet, href: "/dashboard/billing", color: "bg-emerald-600" },
     { name: "Order Logic", icon: ShoppingBag, href: "/dashboard/pharmacy/orders", color: "bg-amber-600" },
+    { name: "Drugs Control", icon: Pill, href: "/dashboard/pharmacy/inventory", color: "bg-violet-600" },
   ];
 
   return (

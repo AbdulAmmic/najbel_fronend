@@ -64,6 +64,11 @@ def admit_patient(
 
     bed.patient_id = patient_id
     bed.status = BedStatus.OCCUPIED
+    
+    # NEW: Update patient status
+    patient.is_admitted = True
+    db.add(patient)
+    
     db.add(bed)
     db.commit()
     db.refresh(bed)
@@ -88,6 +93,12 @@ def discharge_patient(
     if not bed:
         raise HTTPException(status_code=404, detail="Bed not found")
         
+    if bed.patient_id:
+        patient = db.get(PatientModel, bed.patient_id)
+        if patient:
+            patient.is_admitted = False
+            db.add(patient)
+
     bed.patient_id = None
     bed.status = BedStatus.AVAILABLE
     db.add(bed)
@@ -118,7 +129,11 @@ def update_bed_status(
     # Validation logic can be added here (e.g. can't set occupied if empty)
     bed.status = status
     if status == BedStatus.AVAILABLE and bed.patient_id:
-        # Implicit discharge? Or block? Let's clear patient if becoming avail/maintenance
+        # Implicit discharge
+        patient = db.get(PatientModel, bed.patient_id)
+        if patient:
+            patient.is_admitted = False
+            db.add(patient)
         bed.patient_id = None
         
     db.add(bed)

@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from datetime import datetime
@@ -51,6 +51,7 @@ class Doctor(SQLModel, table=True):
     
     user: User = Relationship(back_populates="doctor_profile")
     appointments: List["Appointment"] = Relationship(back_populates="doctor", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    lab_results: List["LabResult"] = Relationship(back_populates="doctor", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Patient(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -66,6 +67,9 @@ class Patient(SQLModel, table=True):
     genotype: Optional[str] = None
     allergies: Optional[str] = None # Comma separated or Text
     medical_history_summary: Optional[str] = None
+    is_admitted: bool = Field(default=False)
+    
+    bed: Optional["Bed"] = Relationship(back_populates="patient")
 
     # Next of Kin
     next_of_kin_name: Optional[str] = None
@@ -88,21 +92,22 @@ class Patient(SQLModel, table=True):
     medical_records: List["MedicalRecord"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     referrals: List["Referral"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
-# Forward references for relationships
-from .attendance import AttendanceLog
-from .appointment import Appointment
-from .vitals import Vitals
-from .lab_result import LabResult
-from .wallet import Wallet
-from .invoice import Invoice
-from .transaction import Transaction
-from .shift import Shift
-from .radiology import RadiologyScan
-from .notification import Notification
-from .drug_order import DrugOrder
-from .prescription import Prescription
-from .medical_record import MedicalRecord
-from .referral import Referral
+if TYPE_CHECKING:
+    from .attendance import AttendanceLog
+    from .appointment import Appointment
+    from .vitals import Vitals
+    from .lab_result import LabResult
+    from .wallet import Wallet
+    from .invoice import Invoice
+    from .transaction import Transaction
+    from .bed import Bed
+    from .shift import Shift
+    from .radiology import RadiologyScan
+    from .notification import Notification
+    from .drug_order import DrugOrder
+    from .prescription import Prescription
+    from .medical_record import MedicalRecord
+    from .referral import Referral
 
 class PasswordReset(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

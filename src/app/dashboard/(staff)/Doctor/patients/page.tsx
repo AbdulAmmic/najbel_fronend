@@ -132,10 +132,16 @@ export default function MyPatientsPage() {
                                 <div
                                     key={patient.id}
                                     onClick={() => router.push(`/dashboard/Doctor/patients/${patient.id}`)}
-                                    className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99] group"
+                                    className={`bg-white rounded-2xl border p-4 flex items-center gap-4 hover:shadow-sm transition-all cursor-pointer active:scale-[0.99] group ${
+                                        patient.is_admitted 
+                                            ? "bg-rose-50/30 border-rose-100 hover:border-rose-200" 
+                                            : "border-gray-100 hover:border-blue-200"
+                                    }`}
                                 >
                                     {/* Avatar */}
-                                    <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-bold shrink-0 ${
+                                        patient.is_admitted ? "bg-rose-500 text-white" : "bg-blue-600 text-white"
+                                    }`}>
                                         {initials}
                                     </div>
 
@@ -148,6 +154,12 @@ export default function MyPatientsPage() {
                                             }`}>
                                                 {status}
                                             </span>
+                                            {patient.is_admitted && (
+                                                <div className="px-1.5 py-0.5 bg-rose-100 text-[8px] font-black text-rose-600 border border-rose-200 rounded-md flex items-center gap-1 shrink-0 animate-pulse">
+                                                    <Clock className="w-2 h-2" />
+                                                    ADMITTED
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                                             <span className="flex items-center gap-1 text-xs text-gray-400">
@@ -164,6 +176,11 @@ export default function MyPatientsPage() {
                                             <span className="text-[11px] text-red-500 bg-red-50 px-2 py-0.5 rounded-lg font-semibold">
                                                 {getBloodGroup(patient)}
                                             </span>
+                                            {patient.is_admitted && (
+                                                <span className="text-[11px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg font-bold border border-rose-100 flex items-center gap-1">
+                                                    Ward: {patient.ward_name || 'N/A'} | Room: {patient.room_number || 'N/A'} | Bed: {patient.bed_number || 'N/A'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 

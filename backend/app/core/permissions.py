@@ -1,18 +1,17 @@
 from typing import List, Callable
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
 from app.models.user import User, UserRole
+from app.api import deps
 
-class RoleChecker:
-    def __init__(self, allowed_roles: List[UserRole]):
-        self.allowed_roles = allowed_roles
-
-    def __call__(self, user: User) -> User:
-        if user.role not in self.allowed_roles and user.role != UserRole.SUPER_ADMIN:
+def RoleChecker(allowed_roles: List[UserRole]):
+    def verifier(user: User = Depends(deps.get_current_user)) -> User:
+        if user.role not in allowed_roles and user.role != UserRole.SUPER_ADMIN:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Operation not permitted"
             )
         return user
+    return verifier
 
 def check_role(roles: List[UserRole]) -> Callable:
     """Dependency to check if user has one of the required roles."""
