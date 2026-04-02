@@ -11,8 +11,8 @@ def migrate():
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    print("Rebuilding chat_messages table...")
-    
+    print("Rebuilding jnlkjkonp chat_messages table...")
+  
     # 1. Drop existing table
     cursor.execute("DROP TABLE IF EXISTS chat_messages")
     
