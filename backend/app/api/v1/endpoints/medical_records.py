@@ -21,13 +21,25 @@ def get_medical_records(
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
         if not patient:
             return []
-        records = db.exec(select(MedicalRecord).where(MedicalRecord.patient_id == patient.id)).all()
+        records = db.exec(
+            select(MedicalRecord, User.full_name)
+            .join(User, MedicalRecord.doctor_id == User.id)
+            .where(MedicalRecord.patient_id == patient.id)
+        ).all()
     elif current_user.role in [UserRole.DOCTOR, UserRole.ADMIN]:
-        records = db.exec(select(MedicalRecord)).all()
+        records = db.exec(
+            select(MedicalRecord, User.full_name)
+            .join(User, MedicalRecord.doctor_id == User.id)
+        ).all()
     else:
-        # Nurse/Receptionist/etc might need specific access, but for now restrict default "ALL" view
-        records = []
-    return records
+        return []
+        
+    result = []
+    for rec, name in records:
+        rec_dict = rec.dict()
+        rec_dict["doctor_name"] = f"Dr. {name}"
+        result.append(rec_dict)
+    return result
 
 @router.post("/", response_model=MedicalRecordSchema)
 async def create_medical_record(

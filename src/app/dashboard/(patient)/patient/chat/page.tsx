@@ -17,10 +17,11 @@ import {
     Trash2,
     Play,
     Pause,
-    Image as ImageIcon
+    Image as ImageIcon,
+    Activity
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import api from "@/services/api";
+import api, { consultations } from "@/services/api";
 
 interface Message {
     id: number | string;
@@ -31,6 +32,7 @@ interface Message {
     time: string;
     isMe: boolean;
     status?: 'sent' | 'delivered' | 'read';
+    isAI?: boolean;
 }
 
 const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
@@ -149,8 +151,21 @@ export default function ChatPage() {
     const audioChunksRef = useRef<BlobPart[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Using a default consultation ID for patient support for now
-    const consultationId = 1;
+    const [consultationId, setConsultationId] = useState<number | null>(null);
+
+    // Dynamic Discovery of Active Chat Session
+    useEffect(() => {
+        const discoverSession = async () => {
+            try {
+                const activeId = await consultations.getActiveChatId();
+                setConsultationId(activeId);
+            } catch (err) {
+                console.error("Failed to discover active chat session", err);
+                setConsultationId(1); // Default fallback for dev/singleton
+            }
+        };
+        discoverSession();
+    }, []);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -188,18 +203,21 @@ export default function ChatPage() {
     };
 
     useEffect(() => {
+        if (!consultationId) return;
+
         // 1. Fetch History from the database
         const fetchHistory = async () => {
             try {
-                const res = await api.get(`/chats/history/${consultationId}`);
+                const res = await api.get(`chats/history/${consultationId}`);
                 const history = res.data.map((msg: any) => ({
                     id: msg.id,
                     sender: msg.sender_name,
                     text: msg.message,
                     audioUrl: msg.audio_url || undefined,
                     imageUrl: msg.image_url || undefined,
-                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     isMe: msg.sender_role === 'patient',
+                    isAI: msg.is_ai || msg.is_ai_assisted,
                     status: 'read' as const
                 }));
 
@@ -220,6 +238,7 @@ export default function ChatPage() {
         // 2. Connect WebSocket
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/ws/consultations/${consultationId}?role=patient`;
+        console.log(`[WS] Connecting to: ${wsUrl}`);
 
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
@@ -256,17 +275,17 @@ export default function ChatPage() {
                     setTyping(false);
                     // All messages received here are from OTHER participants
                     // (sender's own messages are handled via optimistic update + ack)
-                    const incomingMsg: Message = {
+                    setMessages(prev => [...prev, {
                         id: data.id || Date.now(),
                         sender: data.senderName,
                         text: data.text || "",
                         audioUrl: data.audioUrl,
                         imageUrl: data.imageUrl,
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-                        isMe: false,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        isMe: data.senderRole === 'patient',
+                        isAI: data.isAI || data.isAiAssisted || data.senderRole === 'doctor',
                         status: 'read'
-                    };
-                    setMessages(prev => [...prev, incomingMsg]);
+                    }]);
                 }
             } catch (e) {
                 console.error("WS Message Error", e);
@@ -275,17 +294,27 @@ export default function ChatPage() {
 
         socket.onclose = () => console.log("WS Disconnected");
 
-        return () => {
-            socket.close();
-        };
-    }, []);
+        return () => socket.close();
+    }, [consultationId]);
 
     // Save state to local storage to persist voice notes across page reload
     useEffect(() => {
-        if (!loading && messages.length > 0) {
+        if (consultationId && !loading && messages.length > 0) {
             localStorage.setItem(`patient_chat_${consultationId}`, JSON.stringify(messages));
         }
-    }, [messages, loading]);
+    }, [messages, loading, consultationId]);
+
+    // Handle initial loading
+    if (consultationId === null) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-slate-50">
+                <div className="text-center space-y-4">
+                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+                    <p className="text-slate-500 font-medium animate-pulse">Synchronizing clinical channel with your care team...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleSendMessage = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -445,7 +474,13 @@ export default function ChatPage() {
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-lg border-2 border-white" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none">Najbel Support</h1>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-lg font-black text-gray-900 tracking-tight leading-none">Najbel Support</h1>
+                                <span className="text-[10px] font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
+                                    <Activity className="w-2.5 h-2.5" />
+                                    SYNC: #{consultationId}
+                                </span>
+                            </div>
                             <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest mt-1.5 flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                                 Live AI Concierge
@@ -491,6 +526,19 @@ export default function ChatPage() {
                                             ? "bg-blue-600 text-white rounded-tr-none shadow-blue-200"
                                             : "bg-white text-gray-800 rounded-tl-none border border-gray-50 shadow-sm"
                                             }`}>
+                                            {msg.isAI && (
+                                                <div className={`px-2.5 py-1 mb-2 flex items-center gap-1.5 w-fit rounded-full shadow-sm animate-in fade-in zoom-in duration-500 ${
+                                                    msg.isMe 
+                                                    ? 'bg-blue-500/20 backdrop-blur-md text-white border border-white/30' 
+                                                    : 'bg-blue-50/80 backdrop-blur-sm text-blue-600 border border-blue-100'
+                                                }`}>
+                                                    <div className="relative flex items-center justify-center text-blue-500">
+                                                        <Zap className="w-3 h-3 fill-current" />
+                                                        <span className="absolute inset-0 animate-ping opacity-20"><Zap className="w-3 h-3 fill-current" /></span>
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">Doctor · AI Assisted</span>
+                                                </div>
+                                            )}
 
                                             {msg.imageUrl && (
                                                 <div className="mb-2 relative rounded-xl overflow-hidden group shadow-sm bg-black/5">

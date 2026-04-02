@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -8,8 +9,8 @@ class Settings(BaseSettings):
     # In production, use: SECRET_KEY = os.getenv("SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
     
-    # SQLite for now
-    DATABASE_URL: str = "sqlite:///./najbel.db"
+    # SQLite - Ensure it always points to backend/najbel.db regardless of start directory
+    DATABASE_URL: str = f"sqlite:///{os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'najbel.db')}"
 
     # DEEPSEEK_API_KEY: str = "sk-d96513e88e9148c1a52f596ce74c6c36" 
     GEMINI_API_KEY: str = "AIzaSyBuIgcUs-dyvQscKKjMGAjAehEMUjnUdEc"

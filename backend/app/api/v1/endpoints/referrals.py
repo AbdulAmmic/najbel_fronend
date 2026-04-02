@@ -34,11 +34,13 @@ async def create_referral(
     db.commit()
     db.refresh(referral_in)
     
-    # Broadcast notification to the receiving doctor (optimize to target specific user later)
-    # Ideally we should send to specific user ID of the to_doctor
+    # Broadcast notification (Broadcast requires room_id, global_broadcast does not)
     to_doctor = db.get(Doctor, referral_in.to_doctor_id)
     if to_doctor:
-        await manager.broadcast(f"REFERRAL:{to_doctor.user_id}:New referral from Dr. {current_user.full_name}")
+        try:
+            await manager.global_broadcast(f"REFERRAL:{to_doctor.user_id}:New referral from Dr. {current_user.full_name}")
+        except Exception:
+            pass # Don't crash if WebSocket fails
     
     return referral_in
 

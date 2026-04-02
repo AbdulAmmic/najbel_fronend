@@ -4,6 +4,7 @@ from datetime import datetime
 
 class VitalsBase(BaseModel):
     patient_id: Optional[int] = None
+    recorded_by_id: Optional[int] = None
     weight: Optional[float] = None
     height: Optional[float] = None
     blood_pressure: Optional[str] = None
@@ -16,6 +17,7 @@ class VitalsCreate(VitalsBase):
 
 class Vitals(VitalsBase):
     id: int
+    recorded_by_name: Optional[str] = None
     recorded_at: datetime
     is_verified: bool
 

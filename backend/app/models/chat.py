@@ -13,4 +13,5 @@ class ChatMessage(SQLModel, table=True):
     audio_url: Optional[str] = Field(default=None)
     image_url: Optional[str] = Field(default=None)
     is_ai: bool = Field(default=False)
+    is_ai_assisted: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)

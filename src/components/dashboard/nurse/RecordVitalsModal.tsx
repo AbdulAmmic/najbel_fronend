@@ -36,18 +36,42 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
         return '--';
     };
 
+    const isAbnormal = (type: string, value: string) => {
+        const val = parseFloat(value);
+        if (isNaN(val)) return false;
+        switch (type) {
+            case 'temp': return val > 38 || val < 35.5;
+            case 'systolic': return val > 140 || val < 90;
+            case 'diastolic': return val > 90 || val < 60;
+            case 'hr': return val > 100 || val < 60;
+            case 'spo2': return val < 95;
+            default: return false;
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
             // Create vital record
+            // Handle both legacy (appointment based) and new (patient based) data structures
+            const patientId = patient.patient_id || patient.id;
+            
             await vitals.create({
-                patient_id: patient.patient_id,
-                ...formData
+                patient_id: patientId,
+                weight: parseFloat(formData.weight),
+                height: parseFloat(formData.height),
+                blood_pressure: `${formData.systolic_bp}/${formData.diastolic_bp}`,
+                heart_rate: parseInt(formData.heart_rate),
+                temperature: parseFloat(formData.temperature),
+                oxygen_saturation: parseInt(formData.oxygen_saturation),
+                notes: formData.notes
             });
 
-            // Update appointment status
-            await appointments.updateStatus(patient.id, 'ready-for-doctor');
+            // If it's an appointment-based record, update status
+            if (patient.id && patient.status) {
+                await appointments.updateStatus(patient.id, 'ready-for-doctor');
+            }
 
             onSuccess();
             onClose();
@@ -84,9 +108,9 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                     Record Vitals
                                 </h2>
                                 <p className="text-sm text-gray-500 mt-1">
-                                    Patient: <span className="font-semibold text-gray-900">{patient?.patient?.user?.full_name}</span>
+                                    Patient: <span className="font-semibold text-gray-900">{patient?.patient?.user?.full_name || patient?.full_name}</span>
                                     <span className="mx-2">•</span>
-                                    ID: {patient?.patient_id}
+                                    ID: {patient?.patient_id || patient?.unique_id || patient?.id}
                                 </p>
                             </div>
                             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
@@ -109,7 +133,11 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.systolic_bp}
                                                     onChange={e => setFormData({ ...formData, systolic_bp: e.target.value })}
-                                                    className="w-full pl-3 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className={`w-full pl-3 pr-10 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                                        isAbnormal('systolic', formData.systolic_bp) 
+                                                        ? 'border-rose-300 bg-rose-50 focus:ring-rose-500/20 focus:border-rose-500' 
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
+                                                    }`}
                                                     placeholder="120"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">mmHg</span>
@@ -123,7 +151,11 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.diastolic_bp}
                                                     onChange={e => setFormData({ ...formData, diastolic_bp: e.target.value })}
-                                                    className="w-full pl-3 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className={`w-full pl-3 pr-10 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                                        isAbnormal('diastolic', formData.diastolic_bp) 
+                                                        ? 'border-rose-300 bg-rose-50 focus:ring-rose-500/20 focus:border-rose-500' 
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
+                                                    }`}
                                                     placeholder="80"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">mmHg</span>
@@ -138,7 +170,11 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.heart_rate}
                                                     onChange={e => setFormData({ ...formData, heart_rate: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className={`w-full pl-9 pr-10 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                                        isAbnormal('hr', formData.heart_rate) 
+                                                        ? 'border-rose-300 bg-rose-50 focus:ring-rose-500/20 focus:border-rose-500' 
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
+                                                    }`}
                                                     placeholder="72"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">bpm</span>
@@ -161,7 +197,11 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.temperature}
                                                     onChange={e => setFormData({ ...formData, temperature: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className={`w-full pl-9 pr-10 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                                        isAbnormal('temp', formData.temperature) 
+                                                        ? 'border-rose-300 bg-rose-50 focus:ring-rose-500/20 focus:border-rose-500' 
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
+                                                    }`}
                                                     placeholder="36.5"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">°C</span>
@@ -175,7 +215,7 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.respiratory_rate}
                                                     onChange={e => setFormData({ ...formData, respiratory_rate: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                                     placeholder="16"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">/min</span>
@@ -189,7 +229,11 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.oxygen_saturation}
                                                     onChange={e => setFormData({ ...formData, oxygen_saturation: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className={`w-full pl-9 pr-10 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                                                        isAbnormal('spo2', formData.oxygen_saturation) 
+                                                        ? 'border-rose-300 bg-rose-50 focus:ring-rose-500/20 focus:border-rose-500' 
+                                                        : 'border-gray-200 focus:ring-blue-500/20 focus:border-blue-500'
+                                                    }`}
                                                     placeholder="98"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">%</span>
@@ -212,7 +256,7 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.weight}
                                                     onChange={e => setFormData({ ...formData, weight: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                                     placeholder="70.5"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">kg</span>
@@ -228,7 +272,7 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                                     type="number"
                                                     value={formData.height}
                                                     onChange={e => setFormData({ ...formData, height: e.target.value })}
-                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
+                                                    className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                                                     placeholder="1.75"
                                                 />
                                                 <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-medium select-none">m</span>
@@ -248,7 +292,7 @@ export default function RecordVitalsModal({ isOpen, onClose, patient, onSuccess 
                                     <textarea
                                         value={formData.notes}
                                         onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all min-h-[80px] resize-none"
+                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all min-h-[80px] resize-none"
                                         placeholder="Any observations, symptoms, or complaints..."
                                     />
                                 </div>

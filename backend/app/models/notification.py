@@ -8,6 +8,8 @@ class NotificationType(str, Enum):
     BILLING = "billing"
     MEDICAL = "medical"
     SYSTEM = "system"
+    ALARM = "alarm"
+    CHAT = "chat"
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"

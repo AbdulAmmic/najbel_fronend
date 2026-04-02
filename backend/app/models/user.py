@@ -90,6 +90,9 @@ class Patient(SQLModel, table=True):
     scans: List["RadiologyScan"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     prescriptions: List["Prescription"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     medical_records: List["MedicalRecord"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    nursing_notes: List["NursingNote"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    medication_administrations: List["MedicationAdministration"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    nurse_activity_logs: List["NurseActivityLog"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     referrals: List["Referral"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 if TYPE_CHECKING:
@@ -107,6 +110,9 @@ if TYPE_CHECKING:
     from .drug_order import DrugOrder
     from .prescription import Prescription
     from .medical_record import MedicalRecord
+    from .nursing_note import NursingNote
+    from .medication_administration import MedicationAdministration
+    from .nurse_activity_log import NurseActivityLog
     from .referral import Referral
 
 class PasswordReset(SQLModel, table=True):

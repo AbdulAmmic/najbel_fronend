@@ -59,6 +59,10 @@ export const auth = {
         const response = await api.get('users/me');
         return response.data;
     },
+    getDoctors: async () => {
+        const response = await api.get('users/doctors');
+        return response.data;
+    },
     forgotPassword: async (email: string) => {
         const response = await api.post('auth/forgot-password', { email });
         return response.data;
@@ -80,6 +84,10 @@ export const patientService = {
     },
     getById: async (id: number) => {
         const response = await api.get(`patients/${id}`);
+        return response.data;
+    },
+    getActiveChatId: async (id: number) => {
+        const response = await api.get(`patients/${id}/active-chat-id`);
         return response.data;
     }
 };
@@ -227,6 +235,10 @@ export const consultations = {
     create: async (data: any) => {
         const response = await api.post('consultations/', data);
         return response.data;
+    },
+    getActiveChatId: async () => {
+        const response = await api.get('consultations/active-chat-id');
+        return response.data;
     }
 }
 
@@ -267,6 +279,14 @@ export const referrals = {
     },
     create: async (data: any) => {
         const response = await api.post('referrals/', data);
+        return response.data;
+    },
+    accept: async (id: number) => {
+        const response = await api.post(`referrals/${id}/accept`);
+        return response.data;
+    },
+    reject: async (id: number) => {
+        const response = await api.post(`referrals/${id}/reject`);
         return response.data;
     }
 }
@@ -585,6 +605,53 @@ export const labCatalog = {
         const response = await api.delete(`lab-catalog/${id}`);
         return response.data;
     },
+};
+
+export const getDoctors = async () => {
+    const response = await api.get('users/doctors');
+    return response.data;
+};
+
+export const nurseService = {
+    getPatients: async (params?: { search?: string, admitted_only?: boolean }) => {
+        const response = await api.get('nurses/patients', { params });
+        return response.data;
+    },
+    createNote: async (data: { patient_id: number, content: string, category: string }) => {
+        const response = await api.post('nurses/notes', data);
+        return response.data;
+    },
+    createMedicationLog: async (data: { prescription_item_id: number, patient_id: number, status: string, remarks?: string }) => {
+        const response = await api.post('nurses/medication-logs', data);
+        return response.data;
+    },
+    escalate: async (patientId: number, reason: string) => {
+        const response = await api.post(`nurses/escalate?patient_id=${patientId}&reason=${reason}`);
+        return response.data;
+    },
+    getActivityLogs: async (patientId: number) => {
+        const response = await api.get(`nurses/activity-logs/${patientId}`);
+        return response.data;
+    },
+    getConsultations: async (patientId: number) => {
+        const response = await api.get(`nurses/consultations/${patientId}`);
+        return response.data;
+    }
+};
+
+export const directiveService = {
+    getAllByPatient: async (patientId: number) => {
+        const response = await api.get(`directives/patient/${patientId}`);
+        return response.data;
+    },
+    create: async (data: { patient_id: number, instruction: string, urgency: string, doctor_notes?: string }) => {
+        const response = await api.post('directives/', data);
+        return response.data;
+    },
+    updateStatus: async (id: number, data: { status: string, nurse_comment?: string }) => {
+        const response = await api.patch(`directives/${id}`, data);
+        return response.data;
+    }
 };
 
 export default api;

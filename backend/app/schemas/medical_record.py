@@ -22,6 +22,7 @@ class MedicalRecordUpdate(BaseModel):
 
 class MedicalRecord(MedicalRecordBase):
     id: int
+    doctor_name: Optional[str] = None
     created_at: datetime
 
     class Config:

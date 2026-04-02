@@ -46,6 +46,7 @@ def create_vitals(
              raise HTTPException(status_code=400, detail="Patients can only record vitals for themselves")
     
     db_obj = Vitals.from_orm(vitals_in)
+    db_obj.recorded_by_id = current_user.id
 
     # Set verification status
     if current_user.role in [UserRole.DOCTOR, UserRole.NURSE]:
@@ -53,9 +54,6 @@ def create_vitals(
     elif current_user.role == UserRole.PATIENT:
         db_obj.is_verified = False
     else:
-        # Default for receptionist/others? Usually receptionists don't take vitals, 
-        # but if they do, maybe we trust them or keep it unverified until doctor sees.
-        # Let's say any staff is verified for now, or just doctor/nurse.
         db_obj.is_verified = True
 
     db.add(db_obj)

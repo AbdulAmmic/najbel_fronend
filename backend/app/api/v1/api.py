@@ -4,7 +4,7 @@ from app.api.v1.endpoints import (
     users, auth, appointments, attendance, dashboard, dashboard_patients,
     prescriptions, medical_records, vitals, labs, billing, websockets,
     consultations, beds, referrals, chat, pharmacy, departments, patients, alerts,
-    radiology, shifts, notifications, rooms, wards, lab_catalog
+    radiology, shifts, notifications, rooms, wards, lab_catalog, nurses, directives
 )
 
 api_router = APIRouter()
@@ -34,3 +34,5 @@ api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(radiology.router, prefix="/radiology", tags=["radiology"])
 api_router.include_router(shifts.router, prefix="/shifts", tags=["shifts"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(nurses.router, prefix="/nurses", tags=["nurses"])
+api_router.include_router(directives.router, prefix="/directives", tags=["directives"])

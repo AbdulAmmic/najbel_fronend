@@ -1,9 +1,10 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from datetime import datetime
 
 class VitalsBase(SQLModel):
     patient_id: int = Field(foreign_key="patient.id")
+    recorded_by_id: Optional[int] = Field(default=None, foreign_key="user.id")
     weight: Optional[float] = None
     height: Optional[float] = None
     blood_pressure: Optional[str] = None # e.g. "120/80"
@@ -18,4 +19,5 @@ class Vitals(VitalsBase, table=True):
     
     patient: "Patient" = Relationship(back_populates="vitals")
 
-from .user import Patient
+if TYPE_CHECKING:
+    from .user import Patient

@@ -183,3 +183,33 @@ def generate_lab_payment_request_email(patient_name: str, test_name: str, short_
         </body>
     </html>
     """
+
+def generate_chat_notification_email(recipient_name: str, sender_name: str, message_preview: str, chat_url: str):
+    return f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f8fafc; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background-color: #2563eb; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">
+                        {sender_name[0].upper() if sender_name else 'N'}
+                    </div>
+                    <h2 style="color: #1e293b; margin: 0; font-size: 20px;">New Message from {sender_name}</h2>
+                </div>
+                
+                <p style="font-size: 16px;">Hello <strong>{recipient_name}</strong>,</p>
+                <p style="color: #64748b; font-size: 15px;">You received a new message in your clinical coordination channel while you were offline.</p>
+                
+                <div style="background-color: #f1f5f9; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #3b82f6;">
+                    <p style="margin: 0; font-style: italic; color: #334155; font-size: 15px;">"{message_preview}"</p>
+                </div>
+                
+                <div style="text-align: center; margin-top: 30px; margin-bottom: 30px;">
+                    <a href="{chat_url}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reply to Message</a>
+                </div>
+                
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">This is a secure automated notification from Najbel Clinic. For your privacy, do not reply directly to this email with medical information.</p>
+            </div>
+        </body>
+    </html>
+    """

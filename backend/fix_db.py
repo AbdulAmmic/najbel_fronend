@@ -1,16 +1,22 @@
-from sqlmodel import create_engine, text
+from sqlmodel import SQLModel, create_engine
 from app.core.config import settings
+from app.models.chat import ChatMessage
+import sqlite3
 
-engine = create_engine(settings.DATABASE_URL)
-
-def add_column():
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE labresult ADD COLUMN doctor_comments VARCHAR"))
-            conn.commit()
-            print("Successfully added doctor_comments column to labresult table.")
-        except Exception as e:
-            print(f"Error adding doctor_comments: {e}")
+def fix_db():
+    print("Connecting to sqlite...")
+    conn = sqlite3.connect('najbel.db')
+    try:
+        conn.execute("DROP TABLE chat_messages")
+        conn.commit()
+        print("Dropped old chat_messages table")
+    except Exception as e:
+        print("Error dropping:", e)
+        
+    print("Re-creating tables...")
+    engine = create_engine(settings.DATABASE_URL)
+    SQLModel.metadata.create_all(engine)
+    print("Done!")
 
 if __name__ == "__main__":
-    add_column()
+    fix_db()

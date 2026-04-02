@@ -1,0 +1,24 @@
+
+--- 2026-04-02 11:42:32.557808 ---
+Body: None
+Errors: [{'type': 'int_parsing', 'loc': ('path', 'id'), 'msg': 'Input should be a valid integer, unable to parse string as an integer', 'input': 'active-chat-id'}]
+
+--- 2026-04-02 11:42:32.576600 ---
+Body: None
+Errors: [{'type': 'int_parsing', 'loc': ('path', 'id'), 'msg': 'Input should be a valid integer, unable to parse string as an integer', 'input': 'active-chat-id'}]
+
+--- 2026-04-02 13:53:50.990082 ---
+Body: None
+Errors: [{'type': 'missing', 'loc': ('body',), 'msg': 'Field required', 'input': None}]
+
+--- 2026-04-02 13:53:58.116629 ---
+Body: None
+Errors: [{'type': 'missing', 'loc': ('body',), 'msg': 'Field required', 'input': None}]
+
+--- 2026-04-02 13:54:00.082955 ---
+Body: None
+Errors: [{'type': 'missing', 'loc': ('body',), 'msg': 'Field required', 'input': None}]
+
+--- 2026-04-02 13:57:27.085513 ---
+Body: None
+Errors: [{'type': 'missing', 'loc': ('body',), 'msg': 'Field required', 'input': None}]

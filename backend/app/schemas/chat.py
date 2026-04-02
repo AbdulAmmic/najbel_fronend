@@ -10,6 +10,7 @@ class ChatMessageBase(BaseModel):
     audio_url: Optional[str] = None
     image_url: Optional[str] = None
     is_ai: bool = False
+    is_ai_assisted: bool = False
 
 class ChatMessageCreate(ChatMessageBase):
     pass

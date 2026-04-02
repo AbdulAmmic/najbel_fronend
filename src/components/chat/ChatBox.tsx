@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Send, Phone, Video, Info, Mic, Trash2, StopCircle, Play, Pause, Image as ImageIcon, Check, CheckCheck } from "lucide-react";
+import { Send, Phone, Video, Info, Mic, Trash2, StopCircle, Play, Pause, Image as ImageIcon, Check, CheckCheck, Zap, Activity } from "lucide-react";
+import api from "@/services/api";
 
 interface Message {
     id: number;
@@ -12,12 +13,14 @@ interface Message {
     time: string;
     isMe: boolean;
     status?: 'sending' | 'sent' | 'delivered' | 'read';
+    isAI?: boolean;
 }
 
 interface ChatBoxProps {
     currentUser: string;
     recipientName: string;
     recipientAvatar?: string;
+    consultationId: number | string;
 }
 
 const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
@@ -120,38 +123,86 @@ const CustomAudioPlayer = ({ url, isMe }: { url: string, isMe: boolean }) => {
     );
 };
 
-export default function ChatBox({ currentUser, recipientName, recipientAvatar }: ChatBoxProps) {
+export default function ChatBox({ currentUser, recipientName, recipientAvatar, consultationId }: ChatBoxProps) {
     const [messages, setMessages] = useState<Message[]>([]);
-    const [isLoaded, setIsLoaded] = useState(false);
-    
-    // Load persisted state on mount
-    useEffect(() => {
-        const saved = localStorage.getItem(`chat_history_${recipientName}`);
-        if (saved) {
-            try {
-                setMessages(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to parse chat memory", e);
-            }
-        } else {
-            setMessages([
-                { id: 1, sender: recipientName, text: "Hello! How can I help you today?", time: "09:00 AM", isMe: false, status: 'read' },
-                { id: 2, sender: currentUser, text: "I have some questions about my prescription.", time: "09:05 AM", isMe: true, status: 'read' },
-            ]);
-        }
-        setIsLoaded(true);
-    }, [recipientName, currentUser]);
-
-    // Save to local storage on update
-    useEffect(() => {
-        if (isLoaded) {
-            localStorage.setItem(`chat_history_${recipientName}`, JSON.stringify(messages));
-        }
-    }, [messages, recipientName, isLoaded]);
-
-    const [newMessage, setNewMessage] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [typing, setTyping] = useState(false);
+    const socketRef = useRef<WebSocket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load History & Connect WebSocket
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const res = await api.get(`chats/history/${consultationId}`);
+                const history = res.data.map((msg: any) => ({
+                    id: msg.id,
+                    sender: msg.sender_name,
+                    text: msg.message,
+                    audioUrl: msg.audio_url || undefined,
+                    imageUrl: msg.image_url || undefined,
+                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    isMe: msg.sender_role === 'doctor' || msg.sender_role === 'admin',
+                    isAI: msg.is_ai || msg.is_ai_assisted,
+                    status: 'read' as const
+                }));
+                setMessages(history);
+            } catch (err) {
+                console.error("Failed to fetch history", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchHistory();
+
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/ws/consultations/${consultationId}?role=doctor`;
+        console.log(`[WS] Connecting to: ${wsUrl}`);
+        
+        const socket = new WebSocket(wsUrl);
+        socketRef.current = socket;
+
+        socket.onopen = () => {
+            console.log(`[WS] Connected to Room ${consultationId} as doctor`);
+        };
+
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === "typing") {
+                    setTyping(true);
+                    setTimeout(() => setTyping(false), 3000);
+                    return;
+                }
+
+                if (data.type === "ack") {
+                    if (data.id) {
+                        setMessages(prev => prev.map((m, i) => i === prev.length - 1 && m.isMe ? { ...m, id: data.id, status: 'delivered' } : m));
+                    }
+                    return;
+                }
+
+                if (data.text || data.audioUrl || data.imageUrl) {
+                    setMessages(prev => [...prev, {
+                        id: data.id || Date.now(),
+                        sender: data.senderName,
+                        text: data.text || "",
+                        audioUrl: data.audioUrl,
+                        imageUrl: data.imageUrl,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        isMe: data.senderRole === 'doctor' || data.senderRole === 'admin',
+                        isAI: data.isAI || data.isAiAssisted,
+                        status: 'read'
+                    }]);
+                }
+            } catch (e) { console.error("WS Message Error", e); }
+        };
+
+        return () => socket.close();
+    }, [consultationId]);
+
+    const [newMessage, setNewMessage] = useState("");
     
     // Voice notes state
     const [isRecording, setIsRecording] = useState(false);
@@ -193,31 +244,30 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
         if (e) e.preventDefault();
         if (!newMessage.trim()) return;
 
-        const msgId = Date.now();
+        const isAiAssisted = true; 
+        const payload = {
+            text: newMessage,
+            senderName: currentUser,
+            isAiAssisted: isAiAssisted,
+            type: "message"
+        };
+
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify(payload));
+        }
+
         const msg: Message = {
-            id: msgId,
+            id: Date.now(),
             sender: currentUser,
             text: newMessage,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isMe: true,
+            isAI: isAiAssisted,
             status: 'sent'
         };
 
         setMessages(prev => [...prev, msg]);
         setNewMessage("");
-        simulateDeliveryAndRead(msgId);
-
-        // Simulate reply
-        setTimeout(() => {
-            const replyId = Date.now() + 1;
-            setMessages(prev => [...prev, {
-                id: replyId,
-                sender: recipientName,
-                text: "Thank you for reaching out. The doctor is reviewing your message.",
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                isMe: false
-            }]);
-        }, 3000);
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,6 +284,7 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
                 sender: currentUser,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isMe: true,
+                isAI: true,
                 imageUrl: base64Image,
                 status: 'sent'
             };
@@ -269,6 +320,7 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
                         sender: currentUser,
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isMe: true,
+                        isAI: true,
                         audioUrl: base64Audio,
                         status: 'sent'
                     };
@@ -316,7 +368,12 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    if (!isLoaded) return <div className="flex flex-col h-[600px] bg-gray-50 rounded-2xl animate-pulse"></div>;
+    if (loading) return (
+        <div className="flex flex-col h-[600px] bg-white rounded-[32px] border border-slate-100 items-center justify-center gap-4">
+            <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Secure Channel...</p>
+        </div>
+    );
 
     return (
         <div className="flex flex-col h-[600px] bg-gradient-to-br from-white to-sky-50 rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative">
@@ -327,7 +384,13 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
                         {recipientAvatar ? <img src={recipientAvatar} alt="" className="w-full h-full rounded-full object-cover" /> : recipientName[0]}
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-900 text-lg tracking-tight">{recipientName}</h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-gray-900 text-lg tracking-tight">{recipientName}</h3>
+                            <span className="text-[10px] font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 flex items-center gap-1">
+                                <Activity className="w-2.5 h-2.5" />
+                                SYNC: #{consultationId}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-1.5">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -355,6 +418,19 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar }:
                                         ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-br-sm shadow-md"
                                         : "bg-white text-gray-800 rounded-bl-sm border border-gray-100 shadow-sm"
                                     }`}>
+                                    {msg.isAI && (
+                                        <div className={`px-2.5 py-1 mb-2 flex items-center gap-1.5 w-fit rounded-full shadow-sm animate-in fade-in zoom-in duration-500 ${
+                                            msg.isMe 
+                                            ? 'bg-white/20 backdrop-blur-md text-white border border-white/30' 
+                                            : 'bg-indigo-50/80 backdrop-blur-sm text-indigo-600 border border-indigo-100'
+                                        }`}>
+                                            <div className="relative flex items-center justify-center">
+                                                <Zap className="w-3 h-3 fill-current" />
+                                                <span className="absolute inset-0 animate-ping opacity-20"><Zap className="w-3 h-3 fill-current" /></span>
+                                            </div>
+                                            <span className="text-[10px] font-black uppercase tracking-widest leading-none">AI Assisted</span>
+                                        </div>
+                                    )}
                                     {(msg.text || msg.imageUrl) && (
                                         <div className="px-3 pt-2 pb-2">
                                             {msg.imageUrl && (
