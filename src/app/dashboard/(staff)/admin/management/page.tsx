@@ -525,21 +525,41 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     );
 }
 
-function Input({ onChange, ...props }: any) {
+function Input({ onChange, value, type, required, placeholder, step, min, max }: {
+    onChange?: (v: string) => void;
+    value?: string | number;
+    type?: string;
+    required?: boolean;
+    placeholder?: string;
+    step?: string | number;
+    min?: string | number;
+    max?: string | number;
+}) {
     return (
         <input
-            {...props}
-            onChange={(e: any) => onChange?.(e.target.value)}
+            type={type}
+            value={value ?? ""}
+            required={required}
+            placeholder={placeholder}
+            step={step}
+            min={min}
+            max={max}
+            onChange={(e) => onChange?.(e.target.value)}
             className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all font-medium"
         />
     );
 }
 
-function Select({ onChange, options, labelMap, ...props }: any) {
+function Select({ onChange, options, labelMap, value }: {
+    onChange?: (v: string) => void;
+    options: string[];
+    labelMap?: Record<string, string>;
+    value?: string;
+}) {
     return (
         <select
-            {...props}
-            onChange={(e: any) => onChange?.(e.target.value)}
+            value={value ?? ""}
+            onChange={(e) => onChange?.(e.target.value)}
             className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all font-medium capitalize appearance-none"
         >
             {options.map((opt: string) => (
@@ -549,12 +569,17 @@ function Select({ onChange, options, labelMap, ...props }: any) {
     );
 }
 
-function Textarea({ onChange, ...props }: any) {
+function Textarea({ onChange, value, placeholder }: {
+    onChange?: (v: string) => void;
+    value?: string;
+    placeholder?: string;
+}) {
     return (
         <textarea
-            {...props}
+            value={value ?? ""}
+            placeholder={placeholder}
             rows={3}
-            onChange={(e: any) => onChange?.(e.target.value)}
+            onChange={(e) => onChange?.(e.target.value)}
             className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder:text-gray-400 outline-none focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all font-medium resize-none"
         />
     );

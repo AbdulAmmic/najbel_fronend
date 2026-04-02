@@ -1,0 +1,3 @@
+﻿ Γ£ô Compiled successfully in 51s
+Failed to compile.
+Type error: Property 'getMyPatients' does not exist on type '{ getAll: () => Promise<any>; getById: (id: number) => Promise<any>; getDashboard: () => Promise<any>; }'.

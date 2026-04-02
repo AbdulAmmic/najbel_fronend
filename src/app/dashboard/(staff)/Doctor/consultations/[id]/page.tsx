@@ -147,10 +147,10 @@ export default function ConsultationPage({ params }: { params: Promise<{ id: str
                     }
                     setPatient(patientData);
 
-                    // 3. Get Patient History
-                    // Using getMedicalRecords or similar
+                    // 3. Get Patient History from patient detail record
                     try {
-                        const historyData = await patients.getMedicalRecords(apptData.patient_id);
+                        const fullPatient = await patients.getById(apptData.patient_id);
+                        const historyData = fullPatient?.consultations || fullPatient?.history || [];
                         setHistory(Array.isArray(historyData) ? historyData : []);
                     } catch (e) {
                         console.warn("Failed to load history", e);

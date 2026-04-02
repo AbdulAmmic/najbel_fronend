@@ -106,7 +106,7 @@ export default function PatientsPage() {
           setUserRole(user.role); // e.g., "nurse", "doctor"
         }
 
-        const data = await patientsApi.getMyPatients();
+        const data = await patientsApi.getAll();
         setPatients(data.map((p: any) => ({
           ...p,
           id: p.id,
@@ -539,7 +539,7 @@ export default function PatientsPage() {
           isOpen={!!selectedPatient && !showVitalsModal} // simplistic toggling
           onClose={() => setSelectedPatient(null)}
           patient={selectedPatient}
-          onSave={async (data) => {
+          onSave={async (data: Record<string, any>) => {
             try {
               await patientsApi.update(selectedPatient.id, data);
               // Refresh list

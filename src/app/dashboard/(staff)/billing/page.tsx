@@ -22,7 +22,8 @@ import {
   BarChart3,
   ArrowRight,
   Shield,
-  Lock
+  Lock,
+  DollarSign
 } from "lucide-react";
 import { billing, patients as patientsApi } from "@/services/api";
 import { motion, AnimatePresence } from "framer-motion";

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import {
     Pill, Search, CheckCircle2, XCircle, DollarSign, AlertCircle,
     Clock, User2, ChevronRight, X, Send, RefreshCw, Stethoscope,
-    Calendar, Package, User, Check, History, Layers, Bed
+    Calendar, Package, User, Check, History, Layers, Bed, FileText
 } from "lucide-react";
 import { pharmacy as pharmacyService } from "@/services/api";
 import { motion, AnimatePresence } from "framer-motion";

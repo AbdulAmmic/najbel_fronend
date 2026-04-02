@@ -82,7 +82,9 @@ export default function WalletPage() {
       setShowPinModal(false);
       alert("Invoice paid successfully!");
     } catch (err: any) {
-      alert(err.response?.data?.detail || "Payment failed. Please check your PIN and balance.");
+      console.error("Payment Error:", err);
+      const msg = err.response?.data?.detail || err.message || "An unexpected error occurred";
+      alert(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setIsSubmitting(false);
     }

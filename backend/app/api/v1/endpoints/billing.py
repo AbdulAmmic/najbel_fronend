@@ -167,12 +167,12 @@ def pay_invoice(
              wallet = Wallet(patient_id=invoice.patient_id, balance=0)
              db.add(wallet)
              
+        print(f"DIAGNOSTIC: Patient={invoice.patient_id}, Wallet Bal={wallet.balance} (type: {type(wallet.balance)}), Inv Amt={invoice.amount} (type: {type(invoice.amount)})")
         if wallet.balance < invoice.amount and not wallet.allow_overdraft:
-            raise HTTPException(status_code=400, detail="Insufficient wallet balance")
+            raise HTTPException(status_code=400, detail=f"Insufficient wallet balance. Have: {wallet.balance}, Need: {invoice.amount}")
             
         # Deduct
         wallet.balance -= invoice.amount
-        wallet.updated_at = datetime.utcnow()
         db.add(wallet)
         
         # Record Transaction (Debit)
@@ -192,46 +192,52 @@ def pay_invoice(
         invoice.payment_method = payment_method or "wallet"
         db.add(invoice)
 
-        # Update linked Prescription if any
-        prescription = db.exec(select(Prescription).where(Prescription.invoice_id == invoice.id)).first()
-        if prescription:
-            prescription.status = "sent_to_pharmacy"
-            prescription.updated_at = datetime.utcnow()
-            db.add(prescription)
-            
-        # Update linked LabResult if any
-        from app.models.lab_result import LabResult
-        lab_result = db.exec(select(LabResult).where(LabResult.invoice_id == invoice.id)).first()
-        if lab_result:
-            # Move from 'requested' to 'paid' (or similar state that signals techs)
-            if lab_result.status == "requested":
+        # Commit the core payment first — this MUST succeed
+        db.commit()
+        
+        # Post-payment side-effects (non-critical — wrapped so they never break payment)
+        try:
+            # Update linked Prescription if any
+            prescription = db.exec(select(Prescription).where(Prescription.invoice_id == invoice.id)).first()
+            if prescription:
+                prescription.status = "sent_to_pharmacy"
+                db.add(prescription)
+                
+            # Update linked LabResult status to 'paid' so lab techs know it's cleared
+            from app.models.lab_result import LabResult
+            lab_result = db.exec(select(LabResult).where(LabResult.invoice_id == invoice.id)).first()
+            if lab_result and lab_result.status == "requested":
                 lab_result.status = "paid"
-                lab_result.updated_at = datetime.utcnow()
                 db.add(lab_result)
 
-        # E-mail notification for debit
-        patient_record = db.get(Patient, invoice.patient_id)
-        if patient_record:
-            user_record = db.get(User, patient_record.user_id)
-            if user_record and user_record.email:
-                item_desc = invoice.items[0].description if invoice.items else "Service Payment"
-                email_html = generate_wallet_alert_email(
-                    user_record.full_name, 
-                    "debit", 
-                    invoice.amount, 
-                    wallet.balance,
-                    description=f"Invoice {invoice.invoice_number} - {item_desc}"
-                )
-                send_email_background(user_record.email, "Najbel Clinic Wallet Debit", email_html, background_tasks)
+            db.commit()
+        except Exception as side_effect_err:
+            db.rollback()
+            print(f"Warning: post-payment side effect failed (payment still succeeded): {side_effect_err}")
+
+        # E-mail notification for debit (non-critical)
+        try:
+            patient_record = db.get(Patient, invoice.patient_id)
+            if patient_record:
+                user_record = db.get(User, patient_record.user_id)
+                if user_record and user_record.email:
+                    item_desc = invoice.items[0].description if invoice.items else "Service Payment"
+                    email_html = generate_wallet_alert_email(
+                        user_record.full_name, 
+                        "debit", 
+                        invoice.amount, 
+                        wallet.balance,
+                        description=f"Invoice {invoice.invoice_number} - {item_desc}"
+                    )
+                    send_email_background(user_record.email, "Najbel Clinic Wallet Debit", email_html, background_tasks)
+        except Exception as email_err:
+            print(f"Warning: payment email failed (payment still succeeded): {email_err}")
 
     elif payment_method == "insurance":
         invoice.status = "pending_insurance"
         invoice.payment_method = "insurance"
-
-    db.add(invoice)
-    db.commit()
-    
-    background_tasks.add_task(manager.global_broadcast, f"billing_update: invoice {invoice.id} updated")
+        db.add(invoice)
+        db.commit()
     
     return {"message": "Payment processed successfully", "status": invoice.status}
 

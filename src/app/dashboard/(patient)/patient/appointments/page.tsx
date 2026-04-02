@@ -266,7 +266,9 @@ export default function PatientAppointmentsPage() {
                   setWalletPin("");
                   fetchAppointments();
                 } catch (err: any) {
-                  alert(err?.response?.data?.detail || "Payment auth failed. Check your PIN and Wallet Balance.");
+                  console.error("Appointment Error:", err);
+                  const msg = err.response?.data?.detail || err.message || "An unexpected error occurred";
+                  alert(typeof msg === 'string' ? msg : JSON.stringify(msg));
                 } finally {
                   setIsSubmitting(false);
                 }

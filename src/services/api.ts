@@ -3,7 +3,6 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 const getBaseUrl = () => {
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        // Connect directly to the backend port 8000 to avoid common proxy/rewrite header stripping issues in dev
         return `http://${hostname}:8000/api/v1`;
     }
     return 'http://localhost:8000/api/v1';
@@ -265,6 +264,22 @@ export const radiology = {
     getById: async (id: number) => {
         const response = await api.get(`radiology/${id}/`);
         return response.data;
+    },
+    create: async (data: Record<string, any>) => {
+        const response = await api.post('radiology/', data);
+        return response.data;
+    },
+    uploadImage: async (id: number, file: File) => {
+        const formData = new FormData();
+        formData.append('image', file);
+        const response = await api.post(`radiology/${id}/upload/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
+    updateStatus: async (id: number, status: string) => {
+        const response = await api.patch(`radiology/${id}/`, { status });
+        return response.data;
     }
 }
 
@@ -458,6 +473,10 @@ export const patients = {
     getDashboard: async () => {
         const response = await api.get('dashboard-patients/stats');
         return response.data;
+    },
+    update: async (id: number, data: Record<string, any>) => {
+        const response = await api.patch(`patients/${id}/`, data);
+        return response.data;
     }
 }
 
@@ -475,6 +494,8 @@ export const billing = {
         if (wallet_pin) {
             url += `&wallet_pin=${wallet_pin}`;
         }
+        const fullUrl = `${api.defaults.baseURL}/${url}`;
+        console.log("PAYING INVOICE URL:", fullUrl);
         const response = await api.put(url);
         return response.data;
     },
@@ -558,6 +579,14 @@ export const pharmacy = {
     },
     cancelPrescription: async (id: number) => {
         const response = await api.patch(`prescriptions/${id}`, { status: 'cancelled' });
+        return response.data;
+    },
+    getAllOrders: async () => {
+        const response = await api.get('prescriptions/pharmacy/queue');
+        return response.data;
+    },
+    updateOrderStatus: async (orderId: number, status: string) => {
+        const response = await api.patch(`prescriptions/${orderId}`, { status });
         return response.data;
     }
 }

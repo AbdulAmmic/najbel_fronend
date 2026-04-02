@@ -71,8 +71,10 @@ async def create_appointment(
              raise HTTPException(status_code=400, detail="Invalid Wallet PIN")
              
         wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient_id)).first()
+        print(f"DIAGNOSTIC APPT: Patient={patient_id}, Wallet={wallet}, Fee={fee}")
+        if wallet: print(f"DIAGNOSTIC APPT BAL: {wallet.balance} < {fee} == {wallet.balance < fee}")
         if not wallet or (wallet.balance < fee and not wallet.allow_overdraft):
-             raise HTTPException(status_code=400, detail="Insufficient wallet balance for consultation fee")
+             raise HTTPException(status_code=400, detail=f"Insufficient wallet balance. Have: {wallet.balance if wallet else '0'}, Need: {fee}")
              
         # Deduct wallet
         wallet.balance -= fee

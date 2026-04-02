@@ -1,0 +1,2 @@
+﻿./src/app/dashboard/(staff)/Doctor/consultations/[id]/page.tsx:153:60
+Type error: Property 'getMedicalRecords' does not exist on type '{ getAll: () => Promise<any>; getById: (id: number) => Promise<any>; getDashboard: () => Promise<any>; }'.
