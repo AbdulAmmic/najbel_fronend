@@ -77,8 +77,10 @@ export default function LiveChat({ consultationId, userName, userRole }: LiveCha
     }, [consultationId, userRole]);
 
     useEffect(() => {
-        const hostname = window.location.hostname;
-        const wsUrl = `ws://${hostname}:8000/api/v1/ws/consultations/${consultationId}?role=${effectiveRole}`;
+        let wsUrl = `wss://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/ws/consultations/${consultationId}?role=${effectiveRole}`;
+        
+        // Ensure proper URI encoding for the ID
+        wsUrl = wsUrl.replace(consultationId.toString(), encodeURIComponent(consultationId.toString()));
         const ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 

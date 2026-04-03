@@ -28,9 +28,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (ws.current?.readyState === WebSocket.OPEN) return;
 
         // Use standard WebSocket
-        // Using relative path or env var would be better but hardcoded based on api.ts
-        const hostname = window.location.hostname;
-        const socket = new WebSocket(`ws://${hostname}:8000/api/v1/ws`);
+        // Using relative path or env var would be better        console.log('Initializing WebSocket Context...');
+        
+        // Connect securely to the deployed backend WebSocket
+        const socket = new WebSocket('wss://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/ws');
 
         socket.onopen = () => {
             console.log('WebSocket Connected');
