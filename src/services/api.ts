@@ -1,6 +1,12 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 
 const getBaseUrl = () => {
+    // In production, point to the live backend URL
+    if (process.env.NODE_ENV === 'production') {
+        return 'https://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1';
+    }
+    
+    // For local development
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
         return `http://${hostname}:8000/api/v1`;
@@ -593,9 +599,15 @@ export const pharmacy = {
 
 export const subscribeToNotifications = (onMessage: (data: any) => void) => {
     if (typeof window === 'undefined') return null;
-    const hostname = window.location.hostname;
-    // Use the explicit backend port 8000 for WebSockets, as Next.js rewrites don't handle WS proxies by default
-    const wsUrl = `ws://${hostname}:8000/api/v1/ws`;
+    
+    let wsUrl;
+    if (process.env.NODE_ENV === 'production') {
+        wsUrl = 'wss://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/ws';
+    } else {
+        const hostname = window.location.hostname;
+        // Use the explicit backend port 8000 for WebSockets locally
+        wsUrl = `ws://${hostname}:8000/api/v1/ws`;
+    }
 
     console.log(`Connecting to notification WebSocket: ${wsUrl}`);
     const socket = new WebSocket(wsUrl);
