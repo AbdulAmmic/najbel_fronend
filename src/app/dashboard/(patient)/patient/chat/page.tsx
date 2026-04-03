@@ -152,16 +152,23 @@ export default function ChatPage() {
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const [consultationId, setConsultationId] = useState<number | null>(null);
+    const [notAllowed, setNotAllowed] = useState(false);
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
         const discoverSession = async () => {
             try {
                 const activeId = await consultations.getActiveChatId();
+                if (!activeId) {
+                  setNotAllowed(true);
+                  setLoading(false);
+                  return;
+                }
                 setConsultationId(activeId);
             } catch (err) {
-                console.error("Failed to discover active chat session", err);
-                setConsultationId(1); // Default fallback for dev/singleton
+                console.warn("No active chat session found:", err);
+                setNotAllowed(true);
+                setLoading(false);
             }
         };
         discoverSession();
@@ -305,6 +312,27 @@ export default function ChatPage() {
     }, [messages, loading, consultationId]);
 
     // Handle initial loading
+    if (notAllowed) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] bg-[#f8fafc] text-center p-6">
+                <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6 shadow-sm border border-blue-100">
+                    <Zap className="w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Access Denied</h2>
+                <p className="text-sm text-gray-500 max-w-sm mb-8 leading-relaxed font-medium">
+                    You cannot chat with a doctor before consultation. Book a consultation first, after booked then continue.
+                </p>
+                <button 
+                    onClick={() => router.push('/dashboard/patient/consultations/book')} 
+                    className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-2"
+                >
+                    <Clock className="w-4 h-4" />
+                    Book Consultation Now
+                </button>
+            </div>
+        );
+    }
+
     if (consultationId === null) {
         return (
             <div className="flex items-center justify-center h-screen bg-slate-50">

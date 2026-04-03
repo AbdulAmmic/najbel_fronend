@@ -30,6 +30,7 @@ export default function WalletPage() {
   const [walletPin, setWalletPin] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatingAcct, setGeneratingAcct] = useState(false);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -58,6 +59,19 @@ export default function WalletPage() {
       setFeed(unified);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
+  };
+
+  const handleGenerateAccount = async () => {
+    setGeneratingAcct(true);
+    try {
+      const updatedWallet = await billing.generateVirtualAccount();
+      setWallet(updatedWallet);
+      alert("Virtual account generated securely");
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Failed to generate account');
+    } finally {
+      setGeneratingAcct(false);
+    }
   };
 
   const handleCopy = (text: string) => {
@@ -114,30 +128,51 @@ export default function WalletPage() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Building2 className="w-3.5 h-3.5 text-blue-200" />
-              <span className="text-[10px] text-blue-200 font-medium">Najbel Virtual Bank</span>
+              <span className="text-[10px] text-blue-200 font-medium">
+                {wallet?.virtual_bank_name || "Najbel Virtual Bank"}
+              </span>
             </div>
-            <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded text-white font-semibold">ACTIVE</span>
+            {wallet?.virtual_account_number && (
+              <span className="text-[9px] bg-emerald-500/80 px-1.5 py-0.5 rounded text-white font-semibold uppercase tracking-widest">Active</span>
+            )}
           </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] text-blue-300 mb-0.5">Account Number</p>
-              <p className="text-sm font-mono font-bold tracking-wider">
-                {patient?.patient_profile?.unique_id?.replace(/\D/g, '') || "0123456789"}
-              </p>
-            </div>
-            <button
-              onClick={() => handleCopy(patient?.patient_profile?.unique_id?.replace(/\D/g, '') || "0123456789")}
-              className={`w-7 h-7 rounded-md flex items-center justify-center transition ${copied ? 'bg-emerald-400' : 'bg-white/20 hover:bg-white/30'}`}
+          
+          {wallet?.virtual_account_number ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] text-blue-300 uppercase tracking-widest font-semibold mb-0.5">Account Number</p>
+                  <p className="text-sm font-mono font-bold tracking-wider">
+                    {wallet.virtual_account_number}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleCopy(wallet.virtual_account_number)}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center transition ${copied ? 'bg-emerald-400' : 'bg-white/20 hover:bg-white/30'}`}
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="mt-2 pt-2 border-t border-white/10">
+                <p className="text-[10px] text-blue-300">Account Name</p>
+                <p className="text-[11px] font-semibold">{patient?.full_name || "Patient"} / NAJBEL</p>
+              </div>
+              <p className="text-[10px] text-blue-200 text-center mt-3">Transfer to the account above to fund wallet</p>
+            </>
+          ) : (
+            <button 
+              onClick={handleGenerateAccount}
+              disabled={generatingAcct}
+              className="w-full py-2.5 mt-1 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-lg text-[10px] font-bold uppercase tracking-[0.1em] text-white flex items-center justify-center gap-2"
             >
-              <Copy className="w-3 h-3" />
+              {generatingAcct ? (
+                <span className="animate-pulse">Generating...</span>
+              ) : (
+                <>Generate Virtual Account</>
+              )}
             </button>
-          </div>
-          <div className="mt-2 pt-2 border-t border-white/10">
-            <p className="text-[10px] text-blue-300">Account Name</p>
-            <p className="text-[11px] font-semibold">{patient?.full_name || "Patient"} / NAJBEL</p>
-          </div>
+          )}
         </div>
-        <p className="text-[10px] text-blue-200 text-center mt-2">Transfer to the account above to fund wallet</p>
       </div>
 
       {/* Activity Feed */}

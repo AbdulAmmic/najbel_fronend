@@ -324,7 +324,7 @@ def generate_wallet_account(
         db.refresh(wallet)
     
     if wallet.virtual_account_number:
-        return {"message": "Account already generated", "wallet": wallet}
+        return wallet
         
     reference = f"VAGEN-{patient.id}-{int(datetime.utcnow().timestamp())}"
     res = generate_virtual_account(current_user.email, current_user.full_name, reference)
