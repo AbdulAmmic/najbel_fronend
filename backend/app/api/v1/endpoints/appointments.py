@@ -60,7 +60,7 @@ async def create_appointment(
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
         
-    fee = doctor.consultation_fee if doctor.consultation_fee and doctor.consultation_fee > 0 else 5000.0
+    fee = doctor.consultation_fee if doctor.consultation_fee and doctor.consultation_fee > 0 else 20000.0
     
     # Financial Logic
     if current_user.role == UserRole.PATIENT:
