@@ -330,8 +330,8 @@ def generate_wallet_account(
     res = generate_virtual_account(current_user.email, current_user.full_name, reference)
     
     data = res.get("data", {})
-    acct_num = data.get("account_number") or data.get("virtual_account")
-    bank_name = data.get("bank_name") or "Najbel Virtual Bank"
+    acct_num = data.get("accountNumber") or data.get("account_number") or data.get("virtual_account")
+    bank_name = data.get("bankName") or data.get("bank_name") or "Najbel Virtual Bank"
     
     if acct_num:
         wallet.virtual_account_number = acct_num
@@ -428,13 +428,17 @@ async def gafiapay_webhook(
             
             # Scenario 2: Direct Virtual Account transfer 
             if not patient_id_target and account_number:
-                # The UI uses patient.unique_id digits as the virtual account
-                patients = db.exec(select(Patient)).all()
-                for p in patients:
-                    numeric_id = ''.join(filter(str.isdigit, p.unique_id)) if p.unique_id else ""
-                    if numeric_id and numeric_id == str(account_number):
-                        patient_id_target = p.id
-                        break
+                wallet_match = db.exec(select(Wallet).where(Wallet.virtual_account_number == str(account_number))).first()
+                if wallet_match:
+                    patient_id_target = wallet_match.patient_id
+                else:    
+                    # Fallback: The UI formerly used patient.unique_id digits as the virtual account
+                    patients = db.exec(select(Patient)).all()
+                    for p in patients:
+                        numeric_id = ''.join(filter(str.isdigit, p.unique_id)) if p.unique_id else ""
+                        if numeric_id and numeric_id == str(account_number):
+                            patient_id_target = p.id
+                            break
                         
                 if patient_id_target:
                     # Create the transaction record retroactively
