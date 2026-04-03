@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 sqlmodel
 alembic
-pydantic
+pydantic[email]
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
@@ -11,3 +11,6 @@ emails
 python-dotenv
 openai
 google-genai
+psycopg2-binary
+httpx
+email-validator

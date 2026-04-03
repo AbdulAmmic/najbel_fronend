@@ -496,6 +496,10 @@ export const billing = {
         const response = await api.put(url);
         return response.data;
     },
+    revokeInvoice: async (id: number) => {
+        const response = await api.put(`billing/invoices/${id}/revoke`);
+        return response.data;
+    },
     getWallet: async (patientId?: number) => {
         const url = patientId ? `billing/wallet/?patient_id=${patientId}` : 'billing/wallet/';
         const response = await api.get(url);

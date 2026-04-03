@@ -155,15 +155,27 @@ export default function BillingOverviewPage() {
     }
   };
 
-  const handlePayInvoice = async (id: number) => {
+  const handlePayInvoice = async (id: number, method: string = 'wallet') => {
     try {
-      await billing.payInvoice(id, 'wallet');
-      setFeedback({ type: 'success', message: 'Invoice paid successfully via wallet' });
+      await billing.payInvoice(id, method);
+      setFeedback({ type: 'success', message: `Invoice paid successfully via ${method}` });
       fetchBillingData();
       setSelectedInvoice(null);
       setPatientBalance(null);
-    } catch (e) {
-      setFeedback({ type: 'error', message: 'Payment failed' });
+    } catch (e: any) {
+      setFeedback({ type: 'error', message: e.response?.data?.detail || 'Payment failed' });
+    }
+  };
+
+  const handleRevokeInvoice = async (id: number) => {
+    if (!confirm("Are you sure you want to revoke this invoice?")) return;
+    try {
+      await billing.revokeInvoice(id);
+      setFeedback({ type: 'success', message: 'Invoice revoked successfully' });
+      fetchBillingData();
+      setSelectedInvoice(null);
+    } catch (e: any) {
+      setFeedback({ type: 'error', message: e.response?.data?.detail || 'Failed to revoke invoice' });
     }
   };
 
@@ -571,12 +583,32 @@ export default function BillingOverviewPage() {
                 </div>
 
                 {selectedInvoice.status === 'pending' && (
-                  <button
-                    onClick={() => handlePayInvoice(selectedInvoice.id)}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group"
-                  >
-                    Authorize Settlement <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handlePayInvoice(selectedInvoice.id, 'wallet')}
+                      className="py-3 bg-indigo-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all flex justify-center items-center"
+                    >
+                      Pay (Wallet)
+                    </button>
+                    <button
+                      onClick={() => handlePayInvoice(selectedInvoice.id, 'cash')}
+                      className="py-3 bg-emerald-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg hover:bg-emerald-700 active:scale-[0.98] transition-all flex justify-center items-center"
+                    >
+                      Pay (Cash)
+                    </button>
+                    <button
+                      onClick={() => handlePayInvoice(selectedInvoice.id, 'transfer')}
+                      className="py-3 bg-sky-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] shadow-lg hover:bg-sky-700 active:scale-[0.98] transition-all flex justify-center items-center col-span-2"
+                    >
+                      Pay (Transfer)
+                    </button>
+                    <button
+                      onClick={() => handleRevokeInvoice(selectedInvoice.id)}
+                      className="py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] shadow-sm hover:bg-rose-100 active:scale-[0.98] transition-all flex justify-center items-center col-span-2"
+                    >
+                      Revoke Invoice
+                    </button>
+                  </div>
                 )}
 
                 <button

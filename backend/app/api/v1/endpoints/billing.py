@@ -241,6 +241,35 @@ def pay_invoice(
     
     return {"message": "Payment processed successfully", "status": invoice.status}
 
+@router.put("/invoices/{id}/revoke")
+def revoke_invoice(
+    id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Cancel/Revoke an an invoice manually (Admin/Accountant only)
+    """
+    if current_user.role not in [UserRole.ADMIN, UserRole.ACCOUNTANT]:
+        raise HTTPException(status_code=403, detail="Not permitted")
+        
+    invoice = db.get(Invoice, id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    if invoice.status == InvoiceStatus.PAID:
+        raise HTTPException(status_code=400, detail="Cannot revoke a paid invoice. Process a refund first.")
+        
+    invoice.status = InvoiceStatus.CANCELLED
+    db.add(invoice)
+    db.commit()
+    
+    background_tasks.add_task(manager.global_broadcast, f"billing_update: invoice {invoice.invoice_number} revoked")
+    
+    return {"message": "Invoice revoked successfully", "status": invoice.status}
+
+
 @router.get("/wallet")
 def get_user_wallet(
     patient_id: Optional[int] = Query(None),
