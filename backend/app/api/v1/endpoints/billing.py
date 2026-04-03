@@ -404,6 +404,11 @@ async def gafiapay_webhook(
         
     try:
         data = json.loads(payload_bytes)
+        
+        # Handle array payloads securely
+        if isinstance(data, list):
+            data = data[0] if len(data) > 0 else {}
+            
         event = data.get("event", "payment.success")
         
         if event in ["payment.success", "transfer.success", "charge.success"]:
@@ -411,14 +416,19 @@ async def gafiapay_webhook(
             tx_data = data.get("data", data)
             
             reference = tx_data.get("reference")
-            amount_paid = float(tx_data.get("amount", tx_data.get("settled_amount", 0)))
+            
+            raw_amount = tx_data.get("amount")
+            if raw_amount is None:
+                raw_amount = tx_data.get("settled_amount", 0)
+            amount_paid = float(raw_amount) if raw_amount is not None else 0.0
+            
             account_number = tx_data.get("account_number") or tx_data.get("virtual_account")
             
             patient_id_target = None
             
             # Scenario 1: Reference-based payment
             if reference:
-                txn = db.exec(select(Transaction).where(Transaction.reference == reference)).first()
+                txn = db.exec(select(Transaction).where(Transaction.reference == str(reference))).first()
                 if txn:
                     if txn.status == TransactionStatus.COMPLETED:
                         return {"status": "ignored", "reason": "already_processed"}
@@ -455,7 +465,7 @@ async def gafiapay_webhook(
             
             if not patient_id_target:
                 print(f"Webhook WARNING: Could not map payment to any patient. Payload: {data}")
-                return {"status": "error", "reason": "patient_unmapped"}
+                return {"status": "error", "reason": "patient_unmapped", "payload": data}
                 
             # Perform Wallet Credit
             wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient_id_target)).first()
@@ -483,9 +493,12 @@ async def gafiapay_webhook(
                     
         return {"status": "success"}
     except Exception as e:
-        print(f"Webhook Error: {e}")
+        import traceback
+        trace = traceback.format_exc()
+        print(f"Webhook Error DUMP: {e}\n{trace}")
         db.rollback()
-        raise HTTPException(status_code=400, detail="Webhook processing error")
+        # Return 200 so Gafiapay stops retrying, but we can see the trace in our API response
+        return {"status": "internal_error", "message": str(e), "trace": trace}
 
 @router.get("/banks", response_model=List[Bank])
 def get_banks(
