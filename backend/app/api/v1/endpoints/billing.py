@@ -21,7 +21,7 @@ router = APIRouter()
 from sqlalchemy.orm import selectinload
 from app.models.prescription import Prescription
 from fastapi import Request
-from app.core.gafiapay import initialize_payment, verify_webhook_signature
+from app.core.gafiapay import initialize_payment, verify_webhook_signature, generate_virtual_account
 import json
 
 @router.get("/invoices", response_model=List[finance_schemas.Invoice])
@@ -302,6 +302,44 @@ def get_user_wallet(
         db.commit()
         db.refresh(wallet)
         
+    return wallet
+
+@router.post("/wallet/generate-account")
+def generate_wallet_account(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Calls Gafiapay securely to generate a dedicated virtual account and stores it.
+    """
+    patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient record not found")
+        
+    wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient.id)).first()
+    if not wallet:
+        wallet = Wallet(patient_id=patient.id, balance=0.0)
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+    
+    if wallet.virtual_account_number:
+        return {"message": "Account already generated", "wallet": wallet}
+        
+    reference = f"VAGEN-{patient.id}-{int(datetime.utcnow().timestamp())}"
+    res = generate_virtual_account(current_user.email, current_user.full_name, reference)
+    
+    data = res.get("data", {})
+    acct_num = data.get("account_number") or data.get("virtual_account")
+    bank_name = data.get("bank_name") or "Najbel Virtual Bank"
+    
+    if acct_num:
+        wallet.virtual_account_number = acct_num
+        wallet.virtual_bank_name = bank_name
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+    
     return wallet
 
 @router.post("/wallet/topup/initiate")

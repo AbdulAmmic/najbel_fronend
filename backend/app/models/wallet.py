@@ -8,6 +8,8 @@ class Wallet(SQLModel, table=True):
     balance: float = Field(default=0.0)
     allow_overdraft: bool = Field(default=False)
     overdraft_limit: float = Field(default=0.0)
+    virtual_account_number: Optional[str] = Field(default=None)
+    virtual_bank_name: Optional[str] = Field(default="Najbel Virtual Bank")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

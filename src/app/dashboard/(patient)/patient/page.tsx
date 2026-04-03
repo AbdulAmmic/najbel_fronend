@@ -43,6 +43,7 @@ export default function PatientDashboardPage() {
   const [vitalsData, setVitalsData] = useState<any[]>([]);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordLoading, setRecordLoading] = useState(false);
+  const [generatingAcct, setGeneratingAcct] = useState(false);
   const [vitalsForm, setVitalsForm] = useState({
     weight: "",
     height: "",
@@ -117,6 +118,23 @@ export default function PatientDashboardPage() {
       setFeedback({ type: 'error', msg: 'Failed to record vitals' });
     } finally {
       setRecordLoading(false);
+    }
+  };
+
+  const handleGenerateAccount = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    setGeneratingAcct(true);
+    setFeedback(null);
+    try {
+      const updatedWallet = await billing.generateVirtualAccount();
+      setWallet(updatedWallet);
+      setFeedback({ type: 'success', msg: 'Virtual account generated securely' });
+      setTimeout(() => setFeedback(null), 2000);
+    } catch (err: any) {
+      setFeedback({ type: 'error', msg: err?.response?.data?.detail || 'Failed to generate account' });
+      setTimeout(() => setFeedback(null), 2000);
+    } finally {
+      setGeneratingAcct(false);
     }
   };
 
@@ -203,30 +221,49 @@ export default function PatientDashboardPage() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Building2 className="w-3.5 h-3.5 text-blue-200" />
-              <span className="text-[10px] text-blue-200 font-medium">Najbel Virtual Bank</span>
+              <span className="text-[10px] text-blue-200 font-medium">
+                {wallet?.virtual_bank_name || "Najbel Virtual Bank"}
+              </span>
             </div>
-            <span className="text-[9px] bg-emerald-500/80 px-1.5 py-0.5 rounded text-white font-semibold uppercase tracking-widest">Active</span>
+            {wallet?.virtual_account_number && (
+              <span className="text-[9px] bg-emerald-500/80 px-1.5 py-0.5 rounded text-white font-semibold uppercase tracking-widest">Active</span>
+            )}
           </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[9px] text-blue-300 uppercase tracking-widest font-semibold mb-0.5">Account Number</p>
-              <p className="text-sm font-mono font-bold tracking-wider">
-                {user?.patient_profile?.unique_id?.replace(/\D/g, '') || "0123456789"}
-              </p>
+          
+          {wallet?.virtual_account_number ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[9px] text-blue-300 uppercase tracking-widest font-semibold mb-0.5">Account Number</p>
+                <p className="text-sm font-mono font-bold tracking-wider">
+                  {wallet.virtual_account_number}
+                </p>
+              </div>
+              <button
+                 onClick={(e) => {
+                   e.preventDefault();
+                   navigator.clipboard.writeText(wallet.virtual_account_number);
+                   setFeedback({ type: 'success', msg: 'Account number copied!'});
+                   setTimeout(() => setFeedback(null), 2000);
+                 }}
+                 title="Copy Account Number"
+                className="w-7 h-7 rounded-md bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+              >
+                <Copy className="w-3 h-3" />
+              </button>
             </div>
-            <button
-               onClick={(e) => {
-                 e.preventDefault();
-                 navigator.clipboard.writeText(user?.patient_profile?.unique_id?.replace(/\D/g, '') || "0123456789");
-                 setFeedback({ type: 'success', msg: 'Account number copied!'});
-                 setTimeout(() => setFeedback(null), 2000);
-               }}
-               title="Copy Account Number"
-              className="w-7 h-7 rounded-md bg-white/20 hover:bg-white/30 flex items-center justify-center transition"
+          ) : (
+            <button 
+              onClick={handleGenerateAccount}
+              disabled={generatingAcct}
+              className="w-full py-2.5 mt-1 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-lg text-[10px] font-bold uppercase tracking-[0.1em] text-white flex items-center justify-center gap-2"
             >
-              <Copy className="w-3 h-3" />
+              {generatingAcct ? (
+                <span className="animate-pulse">Generating...</span>
+              ) : (
+                <>Generate Virtual Account</>
+              )}
             </button>
-          </div>
+          )}
         </div>
 
         <div className="flex gap-2 mt-3 block">

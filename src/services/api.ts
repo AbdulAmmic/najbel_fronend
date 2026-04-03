@@ -509,6 +509,10 @@ export const billing = {
         const response = await api.post(`billing/wallet/topup/initiate?amount=${amount}`);
         return response.data;
     },
+    generateVirtualAccount: async () => {
+        const response = await api.post('billing/wallet/generate-account');
+        return response.data;
+    },
     fundWallet: async (patientId: number, amount: number, method: string = 'cash', bankId?: number) => {
         let url = `billing/wallet/${patientId}/fund/?amount=${amount}&payment_method=${method}`;
         if (bankId) url += `&bank_id=${bankId}`;
