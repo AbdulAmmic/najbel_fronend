@@ -42,9 +42,16 @@ export default function MeetingPage() {
 
                 // 2. Get Appointment
                 const apptRes = await api.get(`/appointments/${params.id}`);
-
                 setAppointment(apptRes.data);
-
+                
+                // 3. Auto-mark as completed if a Doctor joins the meeting
+                if (user.role === 'doctor' && apptRes.data.status !== 'completed') {
+                    try {
+                        await api.put(`/appointments/${params.id}`, { status: 'completed' });
+                    } catch (statusErr) {
+                        console.error('Failed to auto-complete appointment:', statusErr);
+                    }
+                }
             } catch (err: any) {
                 console.error(err);
                 if (err.response?.status === 401) {
