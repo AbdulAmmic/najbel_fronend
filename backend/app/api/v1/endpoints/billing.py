@@ -20,6 +20,9 @@ router = APIRouter()
 
 from sqlalchemy.orm import selectinload
 from app.models.prescription import Prescription
+from fastapi import Request
+from app.core.gafiapay import initialize_payment, verify_webhook_signature
+import json
 
 @router.get("/invoices", response_model=List[finance_schemas.Invoice])
 def get_invoices(
@@ -301,60 +304,146 @@ def get_user_wallet(
         
     return wallet
 
-@router.post("/wallet/topup")
-def topup_wallet(
+@router.post("/wallet/topup/initiate")
+def topup_wallet_initiate(
     amount: float,
     background_tasks: BackgroundTasks,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Top up wallet balance (Mock implementation).
+    Initializes a real Gafiapay payment gateway transaction for wallet top-up.
     """
     patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
     if not patient:
          raise HTTPException(status_code=404, detail="Patient record not found")
          
-    wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient.id)).first()
-    if not wallet:
-        wallet = Wallet(patient_id=patient.id, balance=0.0)
+    if amount < 100:
+         raise HTTPException(status_code=400, detail="Minimum top-up amount is 100 NGN.")
     
-    if amount <= 60:
-         raise HTTPException(status_code=400, detail="Top up amount must be greater than 60 NGN charge.")
-         
-    actual_credit = amount - 60
-    wallet.balance += actual_credit
-    wallet.updated_at = datetime.utcnow()
-    db.add(wallet)
+    # Generate unique transaction reference
+    reference = f"GAFIA-{patient.id}-{int(datetime.utcnow().timestamp())}"
     
+    # Call Gafiapay via our integration module
+    gafia_res = initialize_payment(amount, current_user.email, reference)
+    
+    # Store a PENDING transaction locally so the webhook can confirm it
     txn = Transaction(
-            patient_id=patient.id,
-            amount=amount,
-            type=TransactionType.TOPUP,
-            payment_method=PaymentMethod.CARD, # Mocking card topup
-            status=TransactionStatus.COMPLETED,
-            reference=f"TOPUP-{int(datetime.utcnow().timestamp())}",
-            cashier_name="Self"
+        patient_id=patient.id,
+        amount=amount,
+        type=TransactionType.TOPUP,
+        payment_method=PaymentMethod.CARD, # Represents external gateway
+        status=TransactionStatus.PENDING,
+        reference=reference,
+        cashier_name="Self - Gafiapay"
     )
     db.add(txn)
-    
     db.commit()
     
-    background_tasks.add_task(manager.global_broadcast, f"billing_update: wallet topup for patient {patient.id}")
+    return {
+        "message": "Payment initialization triggered",
+        "reference": reference,
+        "payment_data": gafia_res
+    }
+
+@router.post("/gafiapay/webhook")
+async def gafiapay_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """
+    Gafiapay Webhook Listener for real-time wallet funding.
+    """
+    payload_bytes = await request.body()
+    signature = request.headers.get("x-signature")
     
-    # E-mail notification
-    user_record = db.get(User, patient.user_id)
-    if user_record and user_record.email:
-        email_html = generate_wallet_alert_email(
-            user_record.full_name, 
-            "credit", 
-            amount, 
-            wallet.balance,
-            description="Online Wallet Top-up"
-        )
-        send_email_background(user_record.email, "Najbel Clinic Wallet Credit", email_html)
-    
-    return {"message": "Top up successful (60 NGN fee applied)", "new_balance": wallet.balance}
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing Gafiapay signature")
+        
+    if not verify_webhook_signature(payload_bytes, signature):
+        raise HTTPException(status_code=400, detail="Invalid HMAC signature")
+        
+    try:
+        data = json.loads(payload_bytes)
+        event = data.get("event", "payment.success")
+        
+        if event in ["payment.success", "transfer.success", "charge.success"]:
+            # Depending on Gafiapay payload, data could be nested
+            tx_data = data.get("data", data)
+            
+            reference = tx_data.get("reference")
+            amount_paid = float(tx_data.get("amount", tx_data.get("settled_amount", 0)))
+            account_number = tx_data.get("account_number") or tx_data.get("virtual_account")
+            
+            patient_id_target = None
+            
+            # Scenario 1: Reference-based payment
+            if reference:
+                txn = db.exec(select(Transaction).where(Transaction.reference == reference)).first()
+                if txn:
+                    if txn.status == TransactionStatus.COMPLETED:
+                        return {"status": "ignored", "reason": "already_processed"}
+                    patient_id_target = txn.patient_id
+                    txn.status = TransactionStatus.COMPLETED
+                    db.add(txn)
+            
+            # Scenario 2: Direct Virtual Account transfer 
+            if not patient_id_target and account_number:
+                # The UI uses patient.unique_id digits as the virtual account
+                patients = db.exec(select(Patient)).all()
+                for p in patients:
+                    numeric_id = ''.join(filter(str.isdigit, p.unique_id)) if p.unique_id else ""
+                    if numeric_id and numeric_id == str(account_number):
+                        patient_id_target = p.id
+                        break
+                        
+                if patient_id_target:
+                    # Create the transaction record retroactively
+                    txn_vt = Transaction(
+                        patient_id=patient_id_target,
+                        amount=amount_paid,
+                        type=TransactionType.TOPUP,
+                        payment_method=PaymentMethod.TRANSFER,
+                        status=TransactionStatus.COMPLETED,
+                        reference=f"GAF-VT-{int(datetime.utcnow().timestamp())}",
+                        cashier_name="Gafiapay System"
+                    )
+                    db.add(txn_vt)
+            
+            if not patient_id_target:
+                print(f"Webhook WARNING: Could not map payment to any patient. Payload: {data}")
+                return {"status": "error", "reason": "patient_unmapped"}
+                
+            # Perform Wallet Credit
+            wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient_id_target)).first()
+            if not wallet:
+                wallet = Wallet(patient_id=patient_id_target, balance=0.0)
+                db.add(wallet)
+                
+            wallet.balance += amount_paid
+            wallet.updated_at = datetime.utcnow()
+            db.add(wallet)
+            db.commit()
+            
+            # Trigger real-time UI updates
+            background_tasks.add_task(manager.global_broadcast, f"billing_update: wallet auto-funded {wallet.patient_id}")
+            
+            # Send Notification
+            patient = db.get(Patient, patient_id_target)
+            if patient:
+                user_record = db.get(User, patient.user_id)
+                if user_record and user_record.email:
+                    email_html = generate_wallet_alert_email(
+                        user_record.full_name, "credit", amount_paid, wallet.balance, "Gafiapay Auto Top-up"
+                    )
+                    send_email_background(user_record.email, "Najbel Clinic Wallet Credit", email_html, background_tasks)
+                    
+        return {"status": "success"}
+    except Exception as e:
+        print(f"Webhook Error: {e}")
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Webhook processing error")
 
 @router.get("/banks", response_model=List[Bank])
 def get_banks(

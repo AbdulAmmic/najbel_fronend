@@ -505,8 +505,8 @@ export const billing = {
         const response = await api.get(url);
         return response.data;
     },
-    topupWallet: async (amount: number) => {
-        const response = await api.post(`billing/wallet/topup/?amount=${amount}`);
+    topupWalletInitate: async (amount: number) => {
+        const response = await api.post(`billing/wallet/topup/initiate?amount=${amount}`);
         return response.data;
     },
     fundWallet: async (patientId: number, amount: number, method: string = 'cash', bankId?: number) => {
