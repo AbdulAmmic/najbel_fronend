@@ -32,7 +32,7 @@ export default function NajbelLoginPage() {
       if (!user) {
         user = await auth.getMe();
       }
-      
+
       localStorage.setItem("user", JSON.stringify(user));
 
       if (user.role === "patient") {
@@ -66,16 +66,16 @@ export default function NajbelLoginPage() {
 
   return (
     <div className="flex min-h-screen bg-white">
-      
+
       {/* ================= LEFT VISUAL PANE (Hidden on Mobile) ================= */}
       <div className="hidden lg:flex w-[45%] relative bg-gradient-to-br from-blue-900 via-blue-700 to-indigo-900 overflow-hidden items-center justify-center p-12">
         {/* Abstract Glass Shapes */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400 rounded-full mix-blend-screen filter blur-[100px] opacity-30 animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400 rounded-full mix-blend-screen filter blur-[100px] opacity-30"></div>
-        
+
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8 }}
@@ -87,7 +87,7 @@ export default function NajbelLoginPage() {
             </div>
           </div>
           <h1 className="text-5xl font-black text-white leading-tight tracking-tight mb-6">
-            Pioneering the future of <br/>
+            Pioneering the future of <br />
             <span className="text-cyan-300">healthcare systems.</span>
           </h1>
           <p className="text-lg text-blue-100/80 leading-relaxed font-light mb-10">
@@ -171,7 +171,7 @@ export default function NajbelLoginPage() {
             {/* Username / Email */}
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                Identifier ID
+                Email
               </label>
               <div className="relative group">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
@@ -182,7 +182,7 @@ export default function NajbelLoginPage() {
                   name="email"
                   required
                   className="w-full pl-11 pr-4 py-3.5 bg-gray-50 hover:bg-gray-100/50 border border-gray-200 focus:bg-white rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900 placeholder:font-normal"
-                  placeholder="Enter your system identifier"
+                  placeholder="Enter your  Email"
                 />
               </div>
             </div>
@@ -191,14 +191,14 @@ export default function NajbelLoginPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Access Key
+                  Password
                 </label>
                 <button
                   type="button"
                   onClick={() => router.push("/forgot-password")}
                   className="text-xs text-blue-600 hover:text-blue-700 font-bold transition-colors"
                 >
-                  Forgot Key?
+                  Forgot Password?
                 </button>
               </div>
               <div className="relative group">
@@ -254,8 +254,18 @@ export default function NajbelLoginPage() {
             </motion.button>
           </form>
 
-          <p className="mt-8 text-center text-xs text-gray-400 font-medium">
-            Secured and Encrypted Pipeline via <span className="text-gray-900">AmmicX Systems</span>
+          <div className="mt-6 text-center text-[13px] text-gray-600 font-medium">
+            Don't have an account?{" "}
+            <button
+              onClick={() => router.push("/register")}
+              className="text-blue-600 hover:text-blue-700 font-bold transition-colors underline decoration-blue-600/30 underline-offset-2"
+            >
+              Sign up here
+            </button>
+          </div>
+
+          <p className="mt-8 text-center text-[11px] text-gray-400 font-medium tracking-wide">
+            Secured and Encrypted Pipeline via <span className="text-gray-900 font-bold">AmmicX Systems</span>
           </p>
         </motion.div>
       </div>
