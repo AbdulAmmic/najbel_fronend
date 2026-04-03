@@ -65,220 +65,201 @@ export default function NajbelLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-gray-50 to-gray-100">
-      {/* ================= BACK BUTTON ================= */}
-      <div className="absolute top-5 left-5 z-10">
-        <button
-          onClick={() => router.push("/")}
-          className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-gray-900 transition-colors"
+    <div className="flex min-h-screen bg-white">
+      
+      {/* ================= LEFT VISUAL PANE (Hidden on Mobile) ================= */}
+      <div className="hidden lg:flex w-[45%] relative bg-gradient-to-br from-blue-900 via-blue-700 to-indigo-900 overflow-hidden items-center justify-center p-12">
+        {/* Abstract Glass Shapes */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400 rounded-full mix-blend-screen filter blur-[100px] opacity-30 animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-400 rounded-full mix-blend-screen filter blur-[100px] opacity-30"></div>
+        
+        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
+
+        <motion.div 
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.8 }}
+          className="relative z-10 w-full max-w-md"
         >
-          <FaArrowLeft size={14} />
-          <span className="text-sm font-medium">Back</span>
-        </button>
-      </div>
-
-      {/* ================= MAIN CONTENT ================= */}
-      <div className="min-h-screen flex items-center justify-center px-5 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
-        >
-          {/* ================= LOGO ================= */}
-          <div className="text-center mb-10">
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <div className="h-14 w-14 bg-gradient-to-br from-blue-600 via-blue-500 to-cyan-400 rounded-2xl shadow-lg flex items-center justify-center">
-                  <div className="h-10 w-10 bg-white rounded-lg"></div>
-                </div>
-                <div className="absolute -inset-2 bg-gradient-to-br from-blue-600 to-cyan-400 rounded-2xl opacity-20 blur-sm" />
-              </div>
+          <div className="mb-8 inline-block">
+            <div className="p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl">
+              <FaHospital className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
-              NAJBEL Platform
-            </h1>
-            <p className="text-gray-500 text-sm">Select platform and sign in</p>
           </div>
+          <h1 className="text-5xl font-black text-white leading-tight tracking-tight mb-6">
+            Pioneering the future of <br/>
+            <span className="text-cyan-300">healthcare systems.</span>
+          </h1>
+          <p className="text-lg text-blue-100/80 leading-relaxed font-light mb-10">
+            Secure, rapid, and intelligent infrastructure powering the operations of Najbel Clinical divisions.
+          </p>
 
-          {/* ================= PLATFORM SELECTOR ================= */}
-          <div className="flex gap-2 p-1 bg-gray-100 rounded-xl mb-8">
-            <button
-              onClick={() => setSelectedPlatform("clinic")}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all duration-300 ${selectedPlatform === "clinic"
-                ? "bg-white shadow-sm text-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              <FaHospital className={`${selectedPlatform === "clinic" ? "text-blue-600" : "text-gray-400"}`} />
-              <span className="font-medium text-sm">Healthcare</span>
-            </button>
-            <button
-              onClick={() => setSelectedPlatform("school")}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg transition-all duration-300 ${selectedPlatform === "school"
-                ? "bg-white shadow-sm text-emerald-600"
-                : "text-gray-500 hover:text-gray-700"
-                }`}
-            >
-              <FaSchool className={`${selectedPlatform === "school" ? "text-emerald-600" : "text-gray-400"}`} />
-              <span className="font-medium text-sm">Education</span>
-            </button>
-          </div>
-
-          {/* ================= LOGIN FORM ================= */}
-          <div className="bg-white rounded-2xl border border-gray-200/50 shadow-sm p-8">
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                {selectedPlatform === "clinic" ? "Medical Portal" : "Education Portal"}
-              </h2>
-              <p className="text-sm text-gray-500">
-                {selectedPlatform === "clinic"
-                  ? "Access patient records and medical systems"
-                  : "Access learning materials and academic tools"}
-              </p>
-            </div>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm text-center">
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* USERNAME FIELD */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username or Email
-                </label>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
-                    <FaUser size={16} />
+          {/* Testimonial / Features Glass Card */}
+          <div className="p-6 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+            <div className="flex items-center gap-4">
+              <div className="flex -space-x-3">
+                {[1, 2, 3].map((_, i) => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-blue-900 bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                    <FaUser className="w-4 h-4 text-white/70" />
                   </div>
-                  <input
-                    type="text"
-                    name="email"
-                    required
-                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Enter your username"
-                  />
-                </div>
+                ))}
               </div>
-
-              {/* PASSWORD FIELD */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                    onClick={() => router.push("/forgot-password")}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
-                    <FaLock size={16} />
-                  </div>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    required
-                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* REMEMBER ME */}
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="remember"
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="remember" className="ml-3 text-sm text-gray-600">
-                  Remember me on this device
-                </label>
-              </div>
-
-              {/* SUBMIT BUTTON */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={loading}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-white shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-center gap-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''} ${selectedPlatform === "clinic"
-                  ? "bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
-                  : "bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600"
-                  }`}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Signing In...</span>
-                  </>
-                ) : (
-                  "Sign In"
-                )}
-              </motion.button>
-            </form>
-
-            {/* DIVIDER */}
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-white text-gray-500">Or continue with</span>
+              <div className="text-sm font-medium text-white/90">
+                Join <span className="font-bold text-white">400+</span> healthcare professionals
               </div>
             </div>
-
-            {/* SSO BUTTON */}
-            <button
-              onClick={() => {/* Add SSO logic */ }}
-              className="w-full py-3.5 px-6 bg-gray-50 border border-gray-200 rounded-xl font-medium text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-all duration-300 flex items-center justify-center gap-3"
-            >
-              <div className="h-5 w-5 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-sm"></div>
-              <span>Single Sign-On (SSO)</span>
-            </button>
-
-            <div className="mt-6 text-center text-sm text-gray-600">
-              Don't have an account?{" "}
-              <button
-                onClick={() => router.push("/register")}
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                Sign Up
-              </button>
-            </div>
-          </div>
-
-          {/* ================= FOOTER NOTE ================= */}
-          <div className="text-center mt-8">
-            <p className="text-sm text-gray-500">
-              Need help?{" "}
-              <button className="text-blue-600 hover:text-blue-700 font-medium">
-                Contact support
-              </button>
-            </p>
-            <p className="text-xs text-gray-400 mt-2">
-              Secure login powered by{" "}
-              <span className="font-semibold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-                AmmicX Systems
-              </span>
-            </p>
           </div>
         </motion.div>
       </div>
+
+      {/* ================= RIGHT FORM PANE ================= */}
+      <div className="w-full flex-1 flex flex-col justify-center relative px-6 py-12 lg:px-24 xl:px-32">
+        {/* Back Button */}
+        <button
+          onClick={() => router.push("/")}
+          className="absolute top-8 left-6 lg:left-12 flex items-center gap-2 px-4 py-2 rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-all font-medium text-sm"
+        >
+          <FaArrowLeft size={12} /> Back to Origin
+        </button>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="w-full max-w-md mx-auto"
+        >
+          {/* Form Header */}
+          <div className="mb-10">
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Welcome back</h2>
+            <p className="text-gray-500 mt-2 text-sm font-medium">Please enter your credentials to securely access your portal.</p>
+          </div>
+
+          {/* Platform Selector Pill */}
+          <div className="flex p-1 bg-gray-100/80 backdrop-blur-sm rounded-xl mb-10">
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("clinic")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg transition-all duration-300 font-semibold text-sm ${selectedPlatform === "clinic"
+                ? "bg-white shadow-sm text-blue-600 ring-1 ring-gray-200/50"
+                : "text-gray-500 hover:text-gray-900"
+                }`}
+            >
+              <FaHospital size={14} className={selectedPlatform === "clinic" ? "text-blue-600" : ""} />
+              Healthcare
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedPlatform("school")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg transition-all duration-300 font-semibold text-sm ${selectedPlatform === "school"
+                ? "bg-white shadow-sm text-emerald-600 ring-1 ring-gray-200/50"
+                : "text-gray-500 hover:text-gray-900"
+                }`}
+            >
+              <FaSchool size={14} className={selectedPlatform === "school" ? "text-emerald-600" : ""} />
+              Education
+            </button>
+          </div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50/50 border border-red-100 text-red-600 rounded-xl text-sm font-medium flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Username / Email */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                Identifier ID
+              </label>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                  <FaUser size={14} />
+                </div>
+                <input
+                  type="text"
+                  name="email"
+                  required
+                  className="w-full pl-11 pr-4 py-3.5 bg-gray-50 hover:bg-gray-100/50 border border-gray-200 focus:bg-white rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900 placeholder:font-normal"
+                  placeholder="Enter your system identifier"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Access Key
+                </label>
+                <button
+                  type="button"
+                  onClick={() => router.push("/forgot-password")}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-bold transition-colors"
+                >
+                  Forgot Key?
+                </button>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                  <FaLock size={14} />
+                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  required
+                  className="w-full pl-11 pr-12 py-3.5 bg-gray-50 hover:bg-gray-100/50 border border-gray-200 focus:bg-white rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900 placeholder:font-normal"
+                  placeholder="••••••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative flex items-center justify-center w-5 h-5 rounded border border-gray-300 bg-gray-50 group-hover:border-blue-500 transition-colors">
+                  <input type="checkbox" className="peer absolute opacity-0 w-full h-full cursor-pointer" />
+                  <div className="peer-checked:bg-blue-600 rounded-sm w-3 h-3 transition-colors absolute scale-0 peer-checked:scale-100"></div>
+                </div>
+                <span className="text-sm text-gray-600 font-medium select-none group-hover:text-gray-900 transition-colors">Remember device</span>
+              </label>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              type="submit"
+              disabled={loading}
+              className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-blue-500/20 transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden relative group ${loading ? 'opacity-80 cursor-not-allowed' : ''} ${selectedPlatform === "clinic"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20"
+                }`}
+            >
+              <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out"></div>
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="relative z-10">Authenticating...</span>
+                </>
+              ) : (
+                <span className="relative z-10">Authorize Local Access</span>
+              )}
+            </motion.button>
+          </form>
+
+          <p className="mt-8 text-center text-xs text-gray-400 font-medium">
+            Secured and Encrypted Pipeline via <span className="text-gray-900">AmmicX Systems</span>
+          </p>
+        </motion.div>
+      </div>
+
     </div>
   );
 }
