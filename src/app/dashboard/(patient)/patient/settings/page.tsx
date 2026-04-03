@@ -53,8 +53,9 @@ export default function SettingsPage() {
         if (!pin || pin.length !== 4) { setStatus({ type: 'error', message: 'Enter 4 digits' }); return; }
         setLoading(true);
         try {
-            await api.put(`/users/me/pin?pin=${pin}`);
+            await api.put('/users/me/pin', { pin: pin });
             setStatus({ type: 'success', message: 'PIN set' }); setPin("");
+            localStorage.setItem('najbel_wallet_pin', 'true');
             setTimeout(() => setStatus(null), 3000);
         } catch (err) { setStatus({ type: 'error', message: 'Failed' }); }
         finally { setLoading(false); }
