@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import {
   Hospital,
   HeartPulse,
@@ -147,9 +148,9 @@ export default function HomePage() {
                 {item}
               </button>
             ))}
-            <button className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition">
+            <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-indigo-600 transition">
               Login
-            </button>
+            </Link>
             <button className="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-medium shadow-md hover:bg-indigo-600 transition-all duration-200 active:scale-95">
               Join Now
             </button>
@@ -180,7 +181,7 @@ export default function HomePage() {
               </button>
             ))}
             <div className="pt-4 flex flex-col gap-4">
-              <button className="text-slate-600 font-medium text-left">Login</button>
+              <Link href="/login" className="text-slate-600 font-medium text-left">Login</Link>
               <button className="bg-slate-900 text-white py-3 rounded-full font-medium text-center">
                 Join Now →
               </button>
