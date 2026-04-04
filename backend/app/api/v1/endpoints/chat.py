@@ -81,40 +81,33 @@ async def websocket_endpoint(
                         # ---- Notifications Logic ----
                         try:
                             from sqlmodel import select
-                            from app.models.consultation import Consultation
                             from app.models.user import User
+                            from app.models.patient import Patient
                             from app.models.notification import Notification, NotificationType
                             from app.core.email import send_email_background, generate_chat_notification_email
                             
-                            consult = session.exec(select(Consultation).where(Consultation.id == int(consultation_id))).first()
-                            if consult:
-                                if role == "patient" and not manager.is_doctor_online(str(consultation_id)):
-                                    doctor_user = session.exec(select(User).where(User.id == consult.doctor_id)).first()
-                                    if doctor_user:
-                                        notif = Notification(
-                                            user_id=doctor_user.id,
-                                            title=f"New Message from Patient {sender_name}",
-                                            message="You have a new coordination message.",
-                                            type=NotificationType.CHAT
-                                        )
-                                        session.add(notif)
-                                        preview = user_msg.message[:50] + ("..." if len(user_msg.message) > 50 else "")
-                                        body = generate_chat_notification_email(doctor_user.full_name, sender_name, preview, f"http://localhost:3000/dashboard/Doctor/patients/{consult.patient_id}")
-                                        send_email_background(doctor_user.email, f"New Message from {sender_name}", body)
-                                
-                                elif (role == "doctor" or role == "admin") and not manager.is_patient_online(str(consultation_id)):
-                                    patient_user = session.exec(select(User).where(User.id == consult.patient_id)).first()
+                            # Important: consultation_id is actually strictly mapped to the Patient ID natively under the unified model.
+                            patient_record = session.exec(select(Patient).where(Patient.id == int(consultation_id))).first()
+                            if patient_record:
+                                if (role == "doctor" or role == "admin") and not manager.is_patient_online(str(consultation_id)):
+                                    patient_user = session.exec(select(User).where(User.id == patient_record.user_id)).first()
                                     if patient_user:
                                         notif = Notification(
                                             user_id=patient_user.id,
-                                            title=f"New Message from Care Team",
+                                            title=f"New Message from {sender_name}",
                                             message="Your doctor has sent you a new message.",
                                             type=NotificationType.CHAT
                                         )
                                         session.add(notif)
                                         preview = user_msg.message[:50] + ("..." if len(user_msg.message) > 50 else "")
                                         body = generate_chat_notification_email(patient_user.full_name, sender_name, preview, "http://localhost:3000/dashboard/patient/chat")
-                                        send_email_background(patient_user.email, f"New Message from Care Team", body)
+                                        send_email_background(patient_user.email, f"New Message from {sender_name}", body)
+                                        
+                                elif role == "patient" and not manager.is_doctor_online(str(consultation_id)):
+                                    # Optional: Global alert for new patient messages
+                                    # E.g. notify admins or primary doctors
+                                    pass
+                                    
                                 session.commit()
                         except Exception as ne:
                             print(f"Error handling offline notifications: {ne}")

@@ -72,7 +72,7 @@ def get_active_chat_id(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Get the active chat consultation ID based on Care Team rules"""
+    """Get the unified global chat ID (which maps directly to the Patient's ID)"""
     if current_user.role != UserRole.PATIENT:
         raise HTTPException(status_code=403, detail="Not authorized")
         
@@ -80,84 +80,8 @@ def get_active_chat_id(
     if not patient:
          raise HTTPException(status_code=404, detail="Patient profile not found")
          
-    # 1. Check for most recent accepted referral
-    from app.models.referral import Referral, ReferralStatus
-    referral = db.exec(
-        select(Referral)
-        .where(Referral.patient_id == patient.id)
-        .where(Referral.status == ReferralStatus.ACCEPTED)
-        .order_by(Referral.created_at.desc())
-    ).first()
-    
-    if referral:
-        # Find if a consultation already exists for this specialist-patient pair
-        spec_consult = db.exec(
-            select(Consultation)
-            .where(Consultation.patient_id == patient.id)
-            .where(Consultation.doctor_id == referral.to_doctor_id)
-            .order_by(Consultation.created_at.desc())
-        ).first()
-        
-        if spec_consult:
-            return spec_consult.id
-        else:
-            # Auto-create a coordination room for the specialist
-            new_room = Consultation(
-                appointment_id=0, # Placeholder or link to original if needed
-                patient_id=patient.id,
-                doctor_id=referral.to_doctor_id,
-                symptoms="Referral Handover",
-                diagnosis="Pending Specialist Review",
-                notes="Coordination channel initialized via specialist referral."
-            )
-            db.add(new_room)
-            db.commit()
-            db.refresh(new_room)
-            return new_room.id
-
-    # 2. Check for latest primary appointment
-    latest_app = db.exec(
-        select(Appointment)
-        .where(Appointment.patient_id == patient.id)
-        .order_by(Appointment.created_at.desc())
-    ).first()
-    
-    if latest_app:
-        # Find if a consultation already exists
-        main_consult = db.exec(
-            select(Consultation)
-            .where(Consultation.appointment_id == latest_app.id)
-            .order_by(Consultation.created_at.asc())
-        ).first()
-        
-        if main_consult:
-            return main_consult.id
-        else:
-            # Check one more time before creating to avoid race conditions
-            existing = db.exec(
-                select(Consultation)
-                .where(Consultation.patient_id == patient.id)
-                .where(Consultation.appointment_id == latest_app.id)
-                .order_by(Consultation.created_at.asc())
-            ).first()
-            if existing: return existing.id
-
-            # Auto-create a coordination room for the primary doctor
-            new_room = Consultation(
-                appointment_id=latest_app.id,
-                patient_id=patient.id,
-                doctor_id=latest_app.doctor_id,
-                symptoms="New Coordination",
-                diagnosis="Pending Consultation",
-                notes="Coordination channel initialized for primary clinician."
-            )
-            db.add(new_room)
-            db.commit()
-            db.refresh(new_room)
-            return new_room.id
-            
-    # 3. Last Fallback (Singleton room)
-    return 1
+    # Under the Unfied Chat Model, the chat room ID is permanently bound to the Patient ID
+    return patient.id
 
 @router.get("/{id}", response_model=Consultation)
 def get_consultation(

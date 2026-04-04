@@ -993,9 +993,9 @@ export default function DoctorPatientDetailPage() {
                                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                                         <div className="lg:col-span-3">
                                             <ChatBox 
-                                                currentUser={me?.full_name || "Doctor"} 
+                                                currentUser={`Dr. ${me?.full_name || "Doctor"}`} 
                                                 recipientName={getName(patient)} 
-                                                consultationId={activeChatId || 1}
+                                                consultationId={patient?.id || Number(id)}
                                             />
                                         </div>
                                         <div className="space-y-4">
