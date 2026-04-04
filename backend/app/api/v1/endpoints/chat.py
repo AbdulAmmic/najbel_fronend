@@ -40,7 +40,8 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
-            print(f"[WS] DATA RECEIVED: Room={consultation_id}, Sender={role}, Raw={data[:30]}...")
+            print(f"[WS] DATA RECEIVED: Room={consultation_id}, Sender={role}, Raw={data[:50]}...")
+
             
             # --- Parse incoming message ---
             try:

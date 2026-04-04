@@ -157,15 +157,17 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         fetchHistory();
 
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.hostname}:8000/api/v1/ws/consultations/${consultationId}?role=doctor`;
+        const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
+        const wsUrl = `${protocol}//${host}/api/v1/ws/consultations/${consultationId}?role=doctor`;
         console.log(`[WS] Connecting to: ${wsUrl}`);
         
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
         socket.onopen = () => {
-            console.log(`[WS] Connected to Room ${consultationId} as doctor`);
+            console.log(`[WS] Connected to Unified Room ${consultationId} as doctor`);
         };
+
 
         socket.onmessage = (event) => {
             try {
