@@ -33,9 +33,18 @@ class ConnectionManager:
         """Broadcast to all connections in the room EXCEPT the sender."""
         room_id = str(room_id)
         if room_id in self.active_connections:
+            dead_connections = []
             for connection in self.active_connections[room_id]:
                 if connection["ws"] != sender:
-                    await connection["ws"].send_text(message)
+                    try:
+                        await connection["ws"].send_text(message)
+                    except Exception as e:
+                        print(f"[WS] Broadcast failed for {connection.get('role')}: {e}")
+                        dead_connections.append(connection)
+            
+            # Cleanup
+            for dead in dead_connections:
+                self.active_connections[room_id].remove(dead)
 
     def is_doctor_online(self, room_id: str) -> bool:
         room_id = str(room_id)

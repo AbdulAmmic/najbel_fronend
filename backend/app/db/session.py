@@ -1,9 +1,8 @@
 from typing import Generator
 from sqlmodel import SQLModel, create_engine, Session
 from app.core.config import settings
-from app.models.bank import Bank # Ensure model is registered
-from app.models.transaction import Transaction # Ensure model is registered
-from app.models.service_template import ServiceTemplate # Ensure model is registered
+from app.models.chat import ChatMessage # Standard chat model
+import app.models # Bulk register all clinical models
 
 # SQLite needs check_same_thread=False; PostgreSQL does not support it
 if settings.DATABASE_URL.startswith("sqlite"):

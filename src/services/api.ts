@@ -13,6 +13,17 @@ const getBaseUrl = () => {
 
 const API_URL = getBaseUrl();
 
+export const getWsBaseUrl = () => {
+    if (typeof window === 'undefined') return '';
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostname = window.location.hostname;
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+        return `${protocol}//localhost:8000/api/v1`;
+    }
+    return `${protocol}//najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1`;
+};
+
 const api: AxiosInstance = axios.create({
     baseURL: API_URL,
     headers: {

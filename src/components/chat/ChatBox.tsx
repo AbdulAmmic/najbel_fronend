@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Send, Phone, Video, Info, Mic, Trash2, StopCircle, Play, Pause, Image as ImageIcon, Check, CheckCheck, Zap, Activity } from "lucide-react";
-import api from "@/services/api";
+import api, { getWsBaseUrl } from "@/services/api";
 
 interface Message {
     id: number;
@@ -135,7 +135,7 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
     useEffect(() => {
         const fetchHistory = async () => {
             try {
-                const res = await api.get(`chats/history/${consultationId}`);
+                const res = await api.get(`chat/chats/history/${consultationId}`);
                 const history = res.data.map((msg: any) => ({
                     id: msg.id,
                     sender: msg.sender_name,
@@ -161,9 +161,9 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
            window.location.hostname === '127.0.0.1' || 
            window.location.hostname === '0.0.0.0');
 
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsHost = isLocal ? "localhost:8000" : "najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev";
-        const wsUrl = `${protocol}//${wsHost}/api/v1/ws/consultations/${consultationId}?role=doctor`;
+        const wsBase = getWsBaseUrl();
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=doctor${token ? `&token=${token}` : ''}`;
         
         console.log(`[CHAT_DEBUG] Doctor connecting to: ${wsUrl}`);
         

@@ -21,7 +21,7 @@ import {
     Activity
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import api, { consultations } from "@/services/api";
+import api, { consultations, getWsBaseUrl } from "@/services/api";
 
 interface Message {
     id: number | string;
@@ -219,7 +219,7 @@ export default function ChatPage() {
         // 1. Fetch History from the database
         const fetchHistory = async () => {
             try {
-                const res = await api.get(`chats/history/${consultationId}`);
+                const res = await api.get(`chat/chats/history/${consultationId}`);
                 const history = res.data.map((msg: any) => ({
                     id: msg.id,
                     sender: msg.sender_name,
@@ -242,10 +242,9 @@ export default function ChatPage() {
         fetchHistory();
 
         // 2. Connect WebSocket
-        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsHost = isLocal ? "localhost:8000" : "najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev";
-        const wsUrl = `${protocol}//${wsHost}/api/v1/ws/consultations/${consultationId}?role=patient`;
+        const wsBase = getWsBaseUrl();
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
         
         console.log(`[WS] Connecting to: ${wsUrl}`);
 
