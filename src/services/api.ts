@@ -19,9 +19,9 @@ export const getWsBaseUrl = () => {
     const hostname = window.location.hostname;
     
     if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
-        return `${protocol}//localhost:8000/api/v1`;
+        return `${protocol}//localhost:8000/api/v1/chat`;
     }
-    return `${protocol}//najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1`;
+    return `${protocol}//najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/chat`;
 };
 
 const api: AxiosInstance = axios.create({

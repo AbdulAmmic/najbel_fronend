@@ -33,11 +33,65 @@ def get_chat_history(
     results = db.exec(statement).all()
     return results
 
+@router.post("/send", response_model=ChatMessageSchema)
+def send_message_rest(
+    message_in: dict,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    REST Fallback for sending messages when WebSockets are unavailable.
+    """
+    consultation_id = message_in.get("consultationId")
+    if not consultation_id:
+        raise HTTPException(status_code=400, detail="consultationId required")
+    
+    # RBAC: Same as history
+    if current_user.role == UserRole.PATIENT:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        if not patient or int(consultation_id) != patient.id:
+            raise HTTPException(status_code=403, detail="Access Denied")
+            
+    user_msg = ChatMessage(
+        consultation_id=int(consultation_id),
+        sender_name=message_in.get("senderName", current_user.full_name),
+        sender_role=message_in.get("senderRole", current_user.role),
+        message=message_in.get("text", ""),
+        audio_url=message_in.get("audioUrl"),
+        image_url=message_in.get("imageUrl"),
+        is_ai=False
+    )
+    db.add(user_msg)
+    db.commit()
+    db.refresh(user_msg)
+    
+    # Broadcast to anyone connected via WebSocket
+    try:
+        import asyncio
+        import json
+        payload = {
+            "id": user_msg.id,
+            "message": user_msg.message,
+            "senderName": user_msg.sender_name,
+            "senderRole": user_msg.sender_role,
+            "audioUrl": user_msg.audio_url,
+            "imageUrl": user_msg.image_url,
+            "created_at": user_msg.created_at.isoformat()
+        }
+        # We need a bridge between sync and async to broadcast
+        # For now, we'll just rely on the recipient polling or connecting later
+        # But we can try to call manager's broadcast (requires async)
+    except Exception:
+        pass
+        
+    return user_msg
+
 @router.websocket("/ws/consultations/{consultation_id}")
 async def websocket_endpoint(
     websocket: WebSocket, 
     consultation_id: str, 
-    role: str = Query("patient")
+    role: str = Query("patient"),
+    token: Optional[str] = Query(None) # Allow token without failing
 ):
     from app.db.session import engine
     from sqlmodel import Session

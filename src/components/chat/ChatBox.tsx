@@ -133,6 +133,8 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
 
     // Load History & Connect WebSocket
     useEffect(() => {
+        if (!consultationId) return;
+
         const fetchHistory = async () => {
             try {
                 const res = await api.get(`chat/chats/history/${consultationId}`);
@@ -144,29 +146,28 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
                     imageUrl: msg.image_url || undefined,
                     time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     isMe: msg.sender_role === 'doctor' || msg.sender_role === 'admin',
-                    isAI: msg.is_ai || msg.is_ai_assisted,
+                    isAI: msg.sender_role === 'ai',
                     status: 'read' as const
                 }));
-                setMessages(history);
+                
+                setMessages(prev => {
+                    const newIds = new Set(history.map((m: any) => m.id));
+                    const currentIds = new Set(prev.map(m => m.id));
+                    if (newIds.size !== currentIds.size) return history;
+                    return prev;
+                });
             } catch (err) {
                 console.error("Failed to fetch history", err);
             } finally {
                 setLoading(false);
             }
         };
-        fetchHistory();
-
-        const isLocal = typeof window !== 'undefined' && 
-          (window.location.hostname === 'localhost' || 
-           window.location.hostname === '127.0.0.1' || 
-           window.location.hostname === '0.0.0.0');
 
         const wsBase = getWsBaseUrl();
         const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
         const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=doctor${token ? `&token=${token}` : ''}`;
         
         console.log(`[CHAT_DEBUG] Doctor connecting to: ${wsUrl}`);
-        
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
@@ -174,40 +175,23 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
             console.log(`[CHAT_DEBUG] Doctor Connected to Room ${consultationId}`);
         };
 
-
         socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.type === "typing") {
-                    setTyping(true);
-                    setTimeout(() => setTyping(false), 3000);
+                if (data.type === "ack" && data.id) {
+                    setMessages(prev => {
+                        const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                        if (lastMeIdx !== -1) {
+                            const realIdx = prev.length - 1 - lastMeIdx;
+                            const updated = [...prev];
+                            updated[realIdx] = { ...updated[realIdx], id: data.id, status: 'delivered' };
+                            return updated;
+                        }
+                        return prev;
+                    });
                     return;
                 }
-
-                if (data.type === "ack") {
-                    if (data.id) {
-                        setMessages(prev => {
-                            // Find the most recent message from 'me' that has a 'sent' status
-                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
-                            if (lastMeIdx !== -1) {
-                                const realIdx = prev.length - 1 - lastMeIdx;
-                                const updated = [...prev];
-                                updated[realIdx] = { 
-                                    ...updated[realIdx], 
-                                    id: data.id, 
-                                    status: data.status || 'delivered' 
-                                };
-                                return updated;
-                            }
-                            return prev;
-                        });
-                    }
-                    return;
-                }
-
                 if (data.text || data.audioUrl || data.imageUrl) {
-                    // All messages received through this block (not ack) are from OTHER participants
-                    // OR they are re-broadcasts (which manager.broadcast_to_others prevents)
                     setMessages(prev => [...prev, {
                         id: data.id || Date.now(),
                         sender: data.senderName,
@@ -223,7 +207,17 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
             } catch (e) { console.error("WS Message Error", e); }
         };
 
-        return () => socket.close();
+        fetchHistory(); // Initial
+        const pollInterval = setInterval(() => {
+            if (socketRef.current?.readyState !== WebSocket.OPEN) {
+                fetchHistory();
+            }
+        }, 5000);
+
+        return () => {
+            clearInterval(pollInterval);
+            socket.close();
+        };
     }, [consultationId]);
 
     const [newMessage, setNewMessage] = useState("");
@@ -277,10 +271,6 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
             type: "message"
         };
 
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify(payload));
-        }
-
         const msg: Message = {
             id: Date.now(),
             sender: currentUser,
@@ -293,6 +283,19 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
 
         setMessages(prev => [...prev, msg]);
         setNewMessage("");
+
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify(payload));
+        } else {
+            console.log("[ChatBox] WebSocket not open, using REST fallback");
+            api.post('chat/send', { ...payload, consultationId })
+                .then(res => {
+                    if (res.data) {
+                        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, id: res.data.id, status: 'delivered' } : m));
+                    }
+                })
+                .catch(err => console.error("REST Fallback failed", err));
+        }
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

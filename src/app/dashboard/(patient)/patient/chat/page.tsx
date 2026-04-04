@@ -256,37 +256,26 @@ export default function ChatPage() {
             try {
                 const data = JSON.parse(event.data);
 
-                if (data.type === "typing") {
-                    setTyping(true);
-                    setTimeout(() => setTyping(false), 3000);
-                    return;
-                }
-
                 // Acknowledgement from server: update temp ID with real DB id
-                if (data.type === "ack") {
-                    if (data.id) {
-                        setMessages(prev => {
-                            // Find the most recent message from 'me' that has a 'sent' status
-                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
-                            if (lastMeIdx !== -1) {
-                                const realIdx = prev.length - 1 - lastMeIdx;
-                                const updated = [...prev];
-                                updated[realIdx] = { 
-                                    ...updated[realIdx], 
-                                    id: data.id, 
-                                    status: data.status || 'delivered' 
-                                };
-                                return updated;
-                            }
-                            return prev;
-                        });
-                    }
+                if (data.type === "ack" && data.id) {
+                    setMessages(prev => {
+                        const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                        if (lastMeIdx !== -1) {
+                            const realIdx = prev.length - 1 - lastMeIdx;
+                            const updated = [...prev];
+                            updated[realIdx] = { 
+                                ...updated[realIdx], 
+                                id: data.id, 
+                                status: data.status || 'delivered' 
+                            };
+                            return updated;
+                        }
+                        return prev;
+                    });
                     return;
                 }
 
                 if (data.text || data.audioUrl || data.imageUrl) {
-                    setTyping(false);
-                    // All messages received here are from OTHER participants
                     setMessages(prev => [...prev, {
                         id: data.id || Date.now(),
                         sender: data.senderName,
@@ -304,9 +293,41 @@ export default function ChatPage() {
             }
         };
 
+        const fetchHistoryFallback = async () => {
+            try {
+                const res = await api.get(`chat/chats/history/${consultationId}`);
+                const history = res.data.map((msg: any) => ({
+                    id: msg.id,
+                    sender: msg.sender_name,
+                    text: msg.message,
+                    audioUrl: msg.audio_url || undefined,
+                    imageUrl: msg.image_url || undefined,
+                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    isMe: msg.sender_role === 'patient',
+                    isAI: msg.sender_role === 'ai',
+                    status: 'read' as const
+                }));
+                setMessages(prev => {
+                    const newIds = new Set(history.map((m: any) => m.id));
+                    const currentIds = new Set(prev.map(m => m.id));
+                    if (newIds.size !== currentIds.size) return history;
+                    return prev;
+                });
+            } catch (err) { console.error("Polling failed", err); }
+        };
+
+        const pollInterval = setInterval(() => {
+            if (socketRef.current?.readyState !== WebSocket.OPEN) {
+                fetchHistoryFallback();
+            }
+        }, 5000);
+
         socket.onclose = () => console.log("WS Disconnected");
 
-        return () => socket.close();
+        return () => {
+            clearInterval(pollInterval);
+            socket.close();
+        };
     }, [consultationId]);
 
     // Removed localStorage sync to prevent sync issues with DB
@@ -381,14 +402,6 @@ export default function ChatPage() {
             type: "message"
         };
 
-        console.log('[CHAT_DEBUG] Sending message payload:', payload);
-        if (socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify(payload));
-            console.log('[CHAT_DEBUG] Message sent to socket successfully');
-        } else {
-            console.error('[CHAT_DEBUG] Socket not open! readyState:', socketRef.current.readyState);
-        }
-
         const msgId = `temp-${Date.now()}`;
         const msg: Message = {
             id: msgId,
@@ -401,7 +414,19 @@ export default function ChatPage() {
 
         setMessages(prev => [...prev, msg]);
         setNewMessage("");
-        simulateDeliveryAndRead(msgId);
+
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify(payload));
+        } else {
+            console.log('[CHAT_DEBUG] WebSocket down, using REST fallback');
+            api.post('chat/send', { ...payload, consultationId })
+                .then(res => {
+                    if (res.data) {
+                        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: res.data.id, status: 'delivered' } : m));
+                    }
+                })
+                .catch(err => console.error("REST send failed", err));
+        }
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
