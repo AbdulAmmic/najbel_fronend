@@ -405,24 +405,46 @@ async def gafiapay_webhook(
     try:
         data = json.loads(payload_bytes)
         
+        # Forensic Logging: Always record what Gafiapay sends
+        try:
+            with open("gafia_payloads.log", "a") as logf:
+                logf.write(f"[{datetime.utcnow()}] {json.dumps(data)}\n")
+        except: pass
+
         # Handle array payloads securely
         if isinstance(data, list):
             data = data[0] if len(data) > 0 else {}
             
         event = data.get("event", "payment.success")
         
-        if event in ["payment.success", "transfer.success", "charge.success"]:
-            # Depending on Gafiapay payload, data could be nested
+        if event in ["payment.success", "transfer.success", "charge.success", "transaction.success"]:
+            # Robust Extraction: Look at top level or inside 'data' or 'transaction'
             tx_data = data.get("data", data)
+            if not isinstance(tx_data, dict): tx_data = data
             
-            reference = tx_data.get("reference")
+            # Deep search for nested transaction info
+            inner_tx = tx_data.get("transaction", {})
+            if not isinstance(inner_tx, dict): inner_tx = {}
             
-            raw_amount = tx_data.get("amount")
+            reference = tx_data.get("reference") or inner_tx.get("reference")
+            
+            raw_amount = tx_data.get("amount") or inner_tx.get("amount")
             if raw_amount is None:
-                raw_amount = tx_data.get("settled_amount", 0)
+                raw_amount = tx_data.get("settled_amount") or inner_tx.get("settled_amount") or 0
+                
             amount_paid = float(raw_amount) if raw_amount is not None else 0.0
             
-            account_number = tx_data.get("account_number") or tx_data.get("virtual_account")
+            # Normalize Account Number mapping
+            account_number = (
+                tx_data.get("account_number") or 
+                tx_data.get("virtual_account") or 
+                tx_data.get("accountNumber") or
+                inner_tx.get("account_number") or
+                inner_tx.get("accountNumber")
+            )
+            
+            # Clean account_number (string only)
+            account_number = str(account_number).strip() if account_number else None
             
             patient_id_target = None
             
@@ -438,11 +460,13 @@ async def gafiapay_webhook(
             
             # Scenario 2: Direct Virtual Account transfer 
             if not patient_id_target and account_number:
+                # 1. Primary: Exact match in Wallet table
                 wallet_match = db.exec(select(Wallet).where(Wallet.virtual_account_number == str(account_number))).first()
                 if wallet_match:
                     patient_id_target = wallet_match.patient_id
                 else:    
-                    # Fallback: The UI formerly used patient.unique_id digits as the virtual account
+                    # 2. Secondary Fallback: UI formerly used patient.unique_id digits
+                    # ONLY use this if account_number looks like a known patient ID length/format
                     patients = db.exec(select(Patient)).all()
                     for p in patients:
                         numeric_id = ''.join(filter(str.isdigit, p.unique_id)) if p.unique_id else ""
@@ -458,14 +482,14 @@ async def gafiapay_webhook(
                         type=TransactionType.TOPUP,
                         payment_method=PaymentMethod.TRANSFER,
                         status=TransactionStatus.COMPLETED,
-                        reference=f"GAF-VT-{int(datetime.utcnow().timestamp())}",
+                        reference=reference or f"GAF-VT-{int(datetime.utcnow().timestamp())}",
                         cashier_name="Gafiapay System"
                     )
                     db.add(txn_vt)
             
             if not patient_id_target:
-                print(f"Webhook WARNING: Could not map payment to any patient. Payload: {data}")
-                return {"status": "error", "reason": "patient_unmapped", "payload": data}
+                print(f"Webhook WARNING: Could not map payment. Event: {event}, Account: {account_number}, Reference: {reference}")
+                return {"status": "error", "reason": "patient_unmapped", "account_received": account_number}
                 
             # Perform Wallet Credit
             wallet = db.exec(select(Wallet).where(Wallet.patient_id == patient_id_target)).first()
