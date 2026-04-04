@@ -418,7 +418,14 @@ async def gafiapay_webhook(
             
         event = data.get("event", "payment.success")
         
-        if event in ["payment.success", "transfer.success", "charge.success", "transaction.success"]:
+        # Support various Gafiapay naming conventions for success events
+        success_events = [
+            "payment.success", "transfer.success", "charge.success", "transaction.success",
+            "payment.received", "transfer.received", "payment.completed", "transfer.completed",
+            "notification"
+        ]
+        
+        if event in success_events:
             # Robust Extraction: Look at top level or inside 'data' or 'transaction'
             tx_data = data.get("data", data)
             if not isinstance(tx_data, dict): tx_data = data
@@ -427,11 +434,14 @@ async def gafiapay_webhook(
             inner_tx = tx_data.get("transaction", {})
             if not isinstance(inner_tx, dict): inner_tx = {}
             
-            reference = tx_data.get("reference") or inner_tx.get("reference")
+            meta_tx = inner_tx.get("metadata", {})
+            if not isinstance(meta_tx, dict): meta_tx = {}
+            
+            reference = tx_data.get("reference") or inner_tx.get("reference") or inner_tx.get("orderNo")
             
             raw_amount = tx_data.get("amount") or inner_tx.get("amount")
             if raw_amount is None:
-                raw_amount = tx_data.get("settled_amount") or inner_tx.get("settled_amount") or 0
+                raw_amount = tx_data.get("settled_amount") or inner_tx.get("settled_amount") or meta_tx.get("grossAmount") or 0
                 
             amount_paid = float(raw_amount) if raw_amount is not None else 0.0
             
@@ -441,7 +451,10 @@ async def gafiapay_webhook(
                 tx_data.get("virtual_account") or 
                 tx_data.get("accountNumber") or
                 inner_tx.get("account_number") or
-                inner_tx.get("accountNumber")
+                inner_tx.get("accountNumber") or
+                meta_tx.get("virtualAccountNo") or
+                meta_tx.get("virtual_account") or
+                meta_tx.get("account_number")
             )
             
             # Clean account_number (string only)
