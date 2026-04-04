@@ -156,9 +156,10 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         };
         fetchHistory();
 
+        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
-        const wsUrl = `${protocol}//${host}/api/v1/ws/consultations/${consultationId}?role=doctor`;
+        const wsHost = isLocal ? "localhost:8000" : "najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev";
+        const wsUrl = `${protocol}//${wsHost}/api/v1/ws/consultations/${consultationId}?role=doctor`;
         console.log(`[WS] Connecting to: ${wsUrl}`);
         
         const socket = new WebSocket(wsUrl);
@@ -262,12 +263,12 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         if (e) e.preventDefault();
         if (!newMessage.trim()) return;
 
-        const isAiAssisted = true; 
+        const isAiAssisted = false; 
         const payload = {
             text: newMessage,
             senderName: currentUser,
             senderRole: "doctor",
-            isAiAssisted: false, 
+            isAiAssisted: isAiAssisted, 
             type: "message"
         };
 
@@ -312,9 +313,10 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
             const msg: Message = {
                 id: msgId,
                 sender: currentUser,
+                text: "📷 Image",
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isMe: true,
-                isAI: true,
+                isAI: false,
                 imageUrl: base64Image,
                 status: 'sent'
             };
@@ -343,6 +345,9 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = () => {
+                    const base64Audio = reader.result as string;
+                    const msgId = Date.now();
+
                     if (socketRef.current?.readyState === WebSocket.OPEN) {
                         const payload = {
                             text: "🎵 Voice Note",
@@ -357,9 +362,10 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
                     const msg: Message = {
                         id: msgId,
                         sender: currentUser,
+                        text: "🎵 Voice Note",
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isMe: true,
-                        isAI: true,
+                        isAI: false,
                         audioUrl: base64Audio,
                         status: 'sent'
                     };

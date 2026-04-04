@@ -1,7 +1,13 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 
 const getBaseUrl = () => {
-    // Both dev and prod now connect to the dedicated deployed backend directly
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:8000/api/v1';
+        }
+    }
+    // Deployed backend directly
     return 'https://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1';
 };
 

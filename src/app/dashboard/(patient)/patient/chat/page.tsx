@@ -242,9 +242,11 @@ export default function ChatPage() {
         fetchHistory();
 
         // 2. Connect WebSocket
+        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
-        const wsUrl = `${protocol}//${host}/api/v1/ws/consultations/${consultationId}?role=patient`;
+        const wsHost = isLocal ? "localhost:8000" : "najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev";
+        const wsUrl = `${protocol}//${wsHost}/api/v1/ws/consultations/${consultationId}?role=patient`;
+        
         console.log(`[WS] Connecting to: ${wsUrl}`);
 
         const socket = new WebSocket(wsUrl);
