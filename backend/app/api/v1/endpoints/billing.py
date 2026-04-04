@@ -9,6 +9,7 @@ from app.models.wallet import Wallet
 from app.models.transaction import Transaction, TransactionType, TransactionStatus, PaymentMethod
 from app.models.service_template import ServiceTemplate
 from app.core.websockets import manager
+from app.models.gafiapay_log import GafiapayLog
 from app.models.bank import Bank
 from app.models.action_otp import ActionOTP
 from app.core.email import send_email_background, generate_wallet_alert_email, generate_otp_email
@@ -402,15 +403,15 @@ async def gafiapay_webhook(
     # if not verify_webhook_signature(payload_bytes, signature):
     #     raise HTTPException(status_code=400, detail="Invalid HMAC signature")
         
+    # Forensic Logging: Always record what Gafiapay sends to the DB
+    gafia_log = GafiapayLog(payload=payload_bytes.decode('utf-8'))
+    db.add(gafia_log)
+    db.commit()
+    db.refresh(gafia_log)
+
     try:
         data = json.loads(payload_bytes)
         
-        # Forensic Logging: Always record what Gafiapay sends
-        try:
-            with open("gafia_payloads.log", "a") as logf:
-                logf.write(f"[{datetime.utcnow()}] {json.dumps(data)}\n")
-        except: pass
-
         # Handle array payloads securely
         if isinstance(data, list):
             data = data[0] if len(data) > 0 else {}
@@ -445,6 +446,11 @@ async def gafiapay_webhook(
             
             # Clean account_number (string only)
             account_number = str(account_number).strip() if account_number else None
+            
+            # Update the log with extracted info for easier auditing
+            gafia_log.account_received = account_number
+            db.add(gafia_log)
+            db.commit()
             
             patient_id_target = None
             
@@ -489,6 +495,9 @@ async def gafiapay_webhook(
             
             if not patient_id_target:
                 print(f"Webhook WARNING: Could not map payment. Event: {event}, Account: {account_number}, Reference: {reference}")
+                gafia_log.status = "unmapped"
+                db.add(gafia_log)
+                db.commit()
                 return {"status": "error", "reason": "patient_unmapped", "account_received": account_number}
                 
             # Perform Wallet Credit
@@ -500,6 +509,9 @@ async def gafiapay_webhook(
             wallet.balance += amount_paid
             wallet.updated_at = datetime.utcnow()
             db.add(wallet)
+
+            gafia_log.status = "success"
+            db.add(gafia_log)
             db.commit()
             
             # Trigger real-time UI updates
@@ -521,6 +533,12 @@ async def gafiapay_webhook(
         trace = traceback.format_exc()
         print(f"Webhook Error DUMP: {e}\n{trace}")
         db.rollback()
+        
+        # Update log with error
+        gafia_log.status = "error"
+        gafia_log.error_message = str(e)
+        db.add(gafia_log)
+        db.commit()
         # Return 200 so Gafiapay stops retrying, but we can see the trace in our API response
         return {"status": "internal_error", "message": str(e), "trace": trace}
 
