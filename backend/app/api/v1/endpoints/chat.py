@@ -1,8 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlmodel import Session, select
 from app.core.websockets import manager
 from app.api import deps
 from app.models.chat import ChatMessage
+from app.models.user import User, UserRole, Patient
 from app.schemas.chat import ChatMessage as ChatMessageSchema
 from typing import List, Any
 
@@ -15,16 +16,21 @@ import json
 def get_chat_history(
     consultation_id: int,
     db: Session = Depends(deps.get_db),
-    # current_user: models.User = Depends(deps.get_current_active_user) # Optional security
+    current_user: User = Depends(deps.get_current_user)
 ):
     """
-    Retrieve chat history for a consultation
+    Retrieve chat history for a consultation with RBAC
     """
-    from sqlmodel import select
-    from app.models.chat import ChatMessage
+    # RBAC logic
+    if current_user.role == UserRole.PATIENT:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        if not patient or consultation_id != patient.id:
+            raise HTTPException(status_code=403, detail="Access Denied: You can only view your own chat history.")
+    elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN]:
+        raise HTTPException(status_code=403, detail="Access Denied: Insufficient permissions.")
+
     statement = select(ChatMessage).where(ChatMessage.consultation_id == consultation_id).order_by(ChatMessage.created_at.asc())
     results = db.exec(statement).all()
-    # Explicitly ensure we return the results as a list of schema-compliant objects
     return results
 
 @router.websocket("/ws/consultations/{consultation_id}")

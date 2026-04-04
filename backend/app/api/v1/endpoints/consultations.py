@@ -80,6 +80,14 @@ def get_active_chat_id(
     if not patient:
          raise HTTPException(status_code=404, detail="Patient profile not found")
          
+    # Check if patient has at least one consultation
+    consultation = db.exec(select(Consultation).where(Consultation.patient_id == patient.id)).first()
+    if not consultation:
+        raise HTTPException(
+            status_code=403, 
+            detail="Access Denied: You must have at least one completed consultation to access the chat with doctors."
+        )
+
     # Under the Unfied Chat Model, the chat room ID is permanently bound to the Patient ID
     return patient.id
 

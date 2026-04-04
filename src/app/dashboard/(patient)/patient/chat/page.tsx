@@ -151,8 +151,7 @@ export default function ChatPage() {
     const audioChunksRef = useRef<BlobPart[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [consultationId, setConsultationId] = useState<number | null>(null);
-    const [notAllowed, setNotAllowed] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
@@ -165,8 +164,11 @@ export default function ChatPage() {
                   return;
                 }
                 setConsultationId(activeId);
-            } catch (err) {
+            } catch (err: any) {
                 console.warn("No active chat session found:", err);
+                if (err.response?.status === 403) {
+                    setErrorMessage(err.response.data?.detail || "You must have at least one completed consultation to access the chat.");
+                }
                 setNotAllowed(true);
                 setLoading(false);
             }
@@ -309,21 +311,47 @@ export default function ChatPage() {
     // Handle initial loading
     if (notAllowed) {
         return (
-            <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] bg-[#f8fafc] text-center p-6">
-                <div className="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6 shadow-sm border border-blue-100">
-                    <Zap className="w-10 h-10" />
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] bg-[#f8fafc] text-center p-6 -mx-4 -my-6">
+                <div className="relative mb-8">
+                    <div className="w-24 h-24 bg-white rounded-[2rem] border border-gray-100 shadow-2xl shadow-blue-200/50 flex items-center justify-center relative z-10 animate-in zoom-in duration-700">
+                        <Zap className="w-12 h-12 text-blue-600 fill-blue-50" />
+                    </div>
+                    <div className="absolute inset-0 bg-blue-400 blur-3xl opacity-20 animate-pulse" />
                 </div>
-                <h2 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Access Denied</h2>
-                <p className="text-sm text-gray-500 max-w-sm mb-8 leading-relaxed font-medium">
-                    You cannot chat with a doctor before consultation. Book a consultation first, after booked then continue.
-                </p>
-                <button 
-                    onClick={() => router.push('/dashboard/patient/consultations/book')} 
-                    className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-2"
-                >
-                    <Clock className="w-4 h-4" />
-                    Book Consultation Now
-                </button>
+                
+                <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">Clinical Channel Locked</h2>
+                
+                <div className="max-w-md bg-white border border-gray-100 p-6 rounded-[2rem] shadow-xl shadow-gray-200/40 mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                    <p className="text-lg text-gray-600 leading-relaxed font-semibold mb-2">
+                        {errorMessage || "You must have at least one completed consultation to access the chat with doctors."}
+                    </p>
+                    <p className="text-sm text-gray-400 font-medium italic">
+                        This channel is strictly reserved for follow-up care and clinical synchronization with your Najbel healthcare team.
+                    </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 items-center animate-in fade-in slide-in-from-bottom-12 duration-1000">
+                    <button 
+                        onClick={() => router.push('/dashboard/patient/appointments/book')} 
+                        className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-3 text-lg"
+                    >
+                        <Clock className="w-5 h-5" />
+                        Book Appointment
+                    </button>
+                    <button 
+                        onClick={() => router.back()} 
+                        className="px-10 py-4 bg-white border border-gray-200 text-gray-600 font-bold rounded-2xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-lg"
+                    >
+                        Go Back
+                    </button>
+                </div>
+                
+                <div className="mt-12 flex items-center gap-6 opacity-40 grayscale animate-in fade-in duration-1000 delay-500">
+                    <div className="flex items-center gap-2 font-black tracking-tighter text-gray-400">
+                        <Activity className="w-5 h-5" />
+                        NAJBEL CLINICAL
+                    </div>
+                </div>
             </div>
         );
     }
@@ -346,6 +374,7 @@ export default function ChatPage() {
         const payload = {
             text: newMessage,
             senderName: "Patient",
+            senderRole: "patient",
             type: "message"
         };
 
@@ -381,6 +410,7 @@ export default function ChatPage() {
             if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                 const msgPayload = JSON.stringify({
                     senderName: "Patient",
+                    senderRole: "patient",
                     text: "📷 Image",
                     imageUrl: base64Image,
                     type: "message"
@@ -428,6 +458,7 @@ export default function ChatPage() {
                     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                         const msgPayload = JSON.stringify({
                             senderName: "Patient",
+                            senderRole: "patient",
                             text: "🎵 Voice Note",
                             audioUrl: base64Audio,
                             type: "message"
