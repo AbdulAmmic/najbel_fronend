@@ -156,17 +156,22 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         };
         fetchHistory();
 
-        const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+        const isLocal = typeof window !== 'undefined' && 
+          (window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1' || 
+           window.location.hostname === '0.0.0.0');
+
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsHost = isLocal ? "localhost:8000" : "najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev";
         const wsUrl = `${protocol}//${wsHost}/api/v1/ws/consultations/${consultationId}?role=doctor`;
-        console.log(`[WS] Connecting to: ${wsUrl}`);
+        
+        console.log(`[CHAT_DEBUG] Doctor connecting to: ${wsUrl}`);
         
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
         socket.onopen = () => {
-            console.log(`[WS] Connected to Unified Room ${consultationId} as doctor`);
+            console.log(`[CHAT_DEBUG] Doctor Connected to Room ${consultationId}`);
         };
 
 

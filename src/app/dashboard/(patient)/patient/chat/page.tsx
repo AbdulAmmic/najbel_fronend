@@ -382,8 +382,12 @@ export default function ChatPage() {
             type: "message"
         };
 
+        console.log('[CHAT_DEBUG] Sending message payload:', payload);
         if (socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify(payload));
+            console.log('[CHAT_DEBUG] Message sent to socket successfully');
+        } else {
+            console.error('[CHAT_DEBUG] Socket not open! readyState:', socketRef.current.readyState);
         }
 
         const msgId = `temp-${Date.now()}`;
