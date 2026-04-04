@@ -224,18 +224,13 @@ export default function ChatPage() {
                     imageUrl: msg.image_url || undefined,
                     time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     isMe: msg.sender_role === 'patient',
-                    isAI: msg.is_ai || msg.is_ai_assisted,
+                    isAI: msg.sender_role === 'ai',
                     status: 'read' as const
                 }));
 
                 setMessages(history);
             } catch (err) {
                 console.error("Failed to fetch chat history", err);
-                // Offline fallback: use localStorage cache
-                const local = localStorage.getItem(`patient_chat_${consultationId}`);
-                if (local) {
-                    setMessages(JSON.parse(local));
-                }
             } finally {
                 setLoading(false);
             }
@@ -266,12 +261,16 @@ export default function ChatPage() {
                 if (data.type === "ack") {
                     if (data.id) {
                         setMessages(prev => {
-                            // Find the most recent temp message and update its ID
-                            const idx = [...prev].reverse().findIndex(m => String(m.id).startsWith('temp-') && m.isMe);
-                            if (idx !== -1) {
-                                const realIdx = prev.length - 1 - idx;
+                            // Find the most recent message from 'me' that has a 'sent' status
+                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                            if (lastMeIdx !== -1) {
+                                const realIdx = prev.length - 1 - lastMeIdx;
                                 const updated = [...prev];
-                                updated[realIdx] = { ...updated[realIdx], id: data.id, status: 'delivered' as const };
+                                updated[realIdx] = { 
+                                    ...updated[realIdx], 
+                                    id: data.id, 
+                                    status: data.status || 'delivered' 
+                                };
                                 return updated;
                             }
                             return prev;
@@ -283,7 +282,6 @@ export default function ChatPage() {
                 if (data.text || data.audioUrl || data.imageUrl) {
                     setTyping(false);
                     // All messages received here are from OTHER participants
-                    // (sender's own messages are handled via optimistic update + ack)
                     setMessages(prev => [...prev, {
                         id: data.id || Date.now(),
                         sender: data.senderName,
@@ -292,7 +290,7 @@ export default function ChatPage() {
                         imageUrl: data.imageUrl,
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isMe: data.senderRole === 'patient',
-                        isAI: data.isAI || data.isAiAssisted || data.senderRole === 'doctor',
+                        isAI: data.senderRole === 'ai' || data.isAI,
                         status: 'read'
                     }]);
                 }
@@ -306,12 +304,7 @@ export default function ChatPage() {
         return () => socket.close();
     }, [consultationId]);
 
-    // Save state to local storage to persist voice notes across page reload
-    useEffect(() => {
-        if (consultationId && !loading && messages.length > 0) {
-            localStorage.setItem(`patient_chat_${consultationId}`, JSON.stringify(messages));
-        }
-    }, [messages, loading, consultationId]);
+    // Removed localStorage sync to prevent sync issues with DB
 
     // Handle initial loading
     if (notAllowed) {

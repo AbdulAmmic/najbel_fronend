@@ -180,12 +180,28 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
 
                 if (data.type === "ack") {
                     if (data.id) {
-                        setMessages(prev => prev.map((m, i) => i === prev.length - 1 && m.isMe ? { ...m, id: data.id, status: 'delivered' } : m));
+                        setMessages(prev => {
+                            // Find the most recent message from 'me' that has a 'sent' status
+                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                            if (lastMeIdx !== -1) {
+                                const realIdx = prev.length - 1 - lastMeIdx;
+                                const updated = [...prev];
+                                updated[realIdx] = { 
+                                    ...updated[realIdx], 
+                                    id: data.id, 
+                                    status: data.status || 'delivered' 
+                                };
+                                return updated;
+                            }
+                            return prev;
+                        });
                     }
                     return;
                 }
 
                 if (data.text || data.audioUrl || data.imageUrl) {
+                    // All messages received through this block (not ack) are from OTHER participants
+                    // OR they are re-broadcasts (which manager.broadcast_to_others prevents)
                     setMessages(prev => [...prev, {
                         id: data.id || Date.now(),
                         sender: data.senderName,
@@ -194,7 +210,7 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
                         imageUrl: data.imageUrl,
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         isMe: data.senderRole === 'doctor' || data.senderRole === 'admin',
-                        isAI: data.isAI || data.isAiAssisted,
+                        isAI: data.senderRole === 'ai' || data.isAI,
                         status: 'read'
                     }]);
                 }

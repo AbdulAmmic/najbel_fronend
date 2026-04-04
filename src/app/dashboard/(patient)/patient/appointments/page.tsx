@@ -227,11 +227,13 @@ export default function PatientAppointmentsPage() {
                 <CheckCircle2 className="w-6 h-6 text-emerald-600" />
               </div>
               <h2 className="text-lg font-bold text-gray-900">{hasWalletPin ? "Confirm Payment" : "Set Wallet PIN"}</h2>
-              <p className="text-[11px] text-gray-400 mt-1">{hasWalletPin ? "Consultation fee required" : "Secure your wallet before booking"}</p>
+              <p className="text-[12px] font-semibold text-emerald-600 mt-1">
+                 {hasWalletPin ? "Consultation Fee: ₦20,000" : "Consultation Fee: ₦20,000"}
+              </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 mb-5 text-center">
               <p className="text-[10px] text-gray-400 font-medium mb-1">
-                {hasWalletPin ? "Enter your 4-digit Wallet PIN to authorize deduction." : "Create a 4-digit Wallet PIN to protect your funds."}
+                {hasWalletPin ? "Enter your 4-digit Wallet PIN to authorize this deduction." : "Create a 4-digit Wallet PIN to protect your funds."}
               </p>
               <div className="flex justify-center mt-3">
                 <input

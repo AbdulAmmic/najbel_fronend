@@ -21,8 +21,10 @@ def get_chat_history(
     Retrieve chat history for a consultation
     """
     from sqlmodel import select
+    from app.models.chat import ChatMessage
     statement = select(ChatMessage).where(ChatMessage.consultation_id == consultation_id).order_by(ChatMessage.created_at.asc())
     results = db.exec(statement).all()
+    # Explicitly ensure we return the results as a list of schema-compliant objects
     return results
 
 @router.websocket("/ws/consultations/{consultation_id}")
@@ -43,17 +45,18 @@ async def websocket_endpoint(
             print(f"[WS] DATA RECEIVED: Room={consultation_id}, Sender={role}, Raw={data[:50]}...")
 
             
-            # --- Parse incoming message ---
             try:
                 payload = json.loads(data)
                 user_text = payload.get("text", "")
-                sender_name = payload.get("senderName", "Patient")
+                # Prioritize payload senderName, fallback to role default
+                sender_name = payload.get("senderName") or ("Doctor" if role in ["doctor", "admin"] else "Patient")
                 audio_url = payload.get("audioUrl", None)
                 image_url = payload.get("imageUrl", None)
                 is_ai_assisted = payload.get("isAiAssisted", False)
-            except:
+            except Exception as pe:
+                print(f"[WS] PARSE ERROR: {pe}")
                 user_text = data
-                sender_name = "Patient" if role == "patient" else "Doctor"
+                sender_name = "Doctor" if role in ["doctor", "admin"] else "Patient"
                 audio_url = None
                 image_url = None
                 is_ai_assisted = False
@@ -124,7 +127,8 @@ async def websocket_endpoint(
                     "senderRole": role,
                     "text": user_text or "",
                     "isAiAssisted": is_ai_assisted,
-                    "isAI": False
+                    "isAI": False,
+                    "createdAt": None # Will be handled by receiver's local time if needed
                 }
                 if audio_url:
                     broadcast_payload["audioUrl"] = audio_url
@@ -132,14 +136,14 @@ async def websocket_endpoint(
                     broadcast_payload["imageUrl"] = image_url
 
                 # Send full message to OTHER participants only (sender already has it)
-                print(f"[WS] BROADCASTING: Room={consultation_id}, Content='{user_text[:20]}...'")
+                print(f"[WS] BROADCASTING: Room={consultation_id}, ID={saved_msg_id}, Content='{user_text[:20]}...'")
                 await manager.broadcast_to_others(json.dumps(broadcast_payload), consultation_id, websocket)
 
-                # Send lightweight confirmation back to sender with the DB id
+                # Send ack back to sender with the real DB id
                 await websocket.send_text(json.dumps({
                     "type": "ack",
-                    "tempId": None,
-                    "id": saved_msg_id
+                    "id": saved_msg_id,
+                    "status": "delivered"
                 }))
             
                 # --- AI Response Logic ---

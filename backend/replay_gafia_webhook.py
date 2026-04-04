@@ -6,7 +6,7 @@ from datetime import datetime
 def replay_musa_fund():
     with engine.connect() as conn:
         print("Starting Replay for Musa (Log ID 1)...")
-        # 1. Get the payload
+        # 1. Get the payload doctors Paylloads.get()->(listening)
         res = conn.execute(text("SELECT payload FROM gafiapaylog WHERE id = 1"))
         row = res.fetchone()
         if not row:
@@ -14,14 +14,12 @@ def replay_musa_fund():
             return
             
         data = json.loads(row[0])
-        
-        # 2. Extract info using the same new robust logic from billing.py
         tx_data = data.get("data", data)
         if not isinstance(tx_data, dict): tx_data = data
-        
+
         inner_tx = tx_data.get("transaction", {})
         if not isinstance(inner_tx, dict): inner_tx = {}
-        
+    
         meta_tx = inner_tx.get("metadata", {})
         if not isinstance(meta_tx, dict): meta_tx = {}
         
