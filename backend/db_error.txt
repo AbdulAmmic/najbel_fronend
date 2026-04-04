@@ -1,0 +1,2 @@
+null value in column "created_at" of relation "user" violates not-null constraint
+DETAIL:  Failing row contains (admin@najbel.com, System Administrator, ADMIN, t, null, null, null, null, 1, $pbkdf2-sha256$29000$7N2bk1JqzRlDCEEIodRaKw$NxqsokXhVYL7Q2nkghmx..., null).

@@ -122,7 +122,10 @@ def get_patient_active_chat_id(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Get the active chat consultation ID for a specific patient based on Care Team rules"""
+    """Get the active chat ID for a patient. 
+    Under the Unified Chat Model, this is always the Patient ID 
+    so that all care team members and the patient share a single history thread.
+    """
     if current_user.role not in [UserRole.ADMIN, UserRole.DOCTOR, UserRole.NURSE, UserRole.RECEPTIONIST]:
         raise HTTPException(status_code=403, detail="Not authorized")
         
@@ -130,88 +133,4 @@ def get_patient_active_chat_id(
     if not patient:
          raise HTTPException(status_code=404, detail="Patient not found")
          
-    # 1. Check for most recent accepted referral
-    from app.models.referral import Referral, ReferralStatus
-    from app.models.consultation import Consultation
-    from app.models.appointment import Appointment
-    referral = db.exec(
-        select(Referral)
-        .where(Referral.patient_id == patient.id)
-        .where(Referral.status == ReferralStatus.ACCEPTED)
-        .order_by(Referral.created_at.desc())
-    ).first()
-    
-    if referral:
-        # Find if a consultation exists for the specialist
-        spec_consult = db.exec(
-            select(Consultation)
-            .where(Consultation.patient_id == patient.id)
-            .where(Consultation.doctor_id == referral.to_doctor_id)
-            .order_by(Consultation.created_at.asc())
-        ).first()
-        
-        if not spec_consult:
-            # Check one more time before creating to avoid race conditions
-            existing = db.exec(
-                select(Consultation)
-                .where(Consultation.patient_id == patient_id)
-                .where(Consultation.doctor_id == referral.to_doctor_id)
-                .where(Consultation.appointment_id == 0)
-                .order_by(Consultation.created_at.asc())
-            ).first()
-            if existing: return existing.id
-
-            new_room = Consultation(
-                appointment_id=0,
-                patient_id=patient_id,
-                doctor_id=referral.to_doctor_id,
-                symptoms="Referred Specialist Coordination",
-                diagnosis="Pending Specialist Review",
-                notes=f"Coordination room for referred specialist Dr. {referral.to_doctor_id}"
-            )
-            db.add(new_room)
-            db.commit()
-            db.refresh(new_room)
-            return new_room.id
-        return spec_consult.id
-            
-    # 2. Check for latest primary appointment
-    latest_app = db.exec(
-        select(Appointment)
-        .where(Appointment.patient_id == patient.id)
-        .order_by(Appointment.created_at.desc())
-    ).first()
-    
-    if latest_app:
-        # Find if a consultation exists
-        main_consult = db.exec(
-            select(Consultation)
-            .where(Consultation.appointment_id == latest_app.id)
-            .order_by(Consultation.created_at.asc())
-        ).first()
-        
-        if not main_consult:
-            # Check one more time before creating to avoid race conditions
-            existing = db.exec(
-                select(Consultation)
-                .where(Consultation.appointment_id == latest_app.id)
-                .order_by(Consultation.created_at.asc())
-            ).first()
-            if existing: return existing.id
-
-            new_room = Consultation(
-                appointment_id=latest_app.id,
-                patient_id=patient_id,
-                doctor_id=latest_app.doctor_id,
-                symptoms="General clinical coordination",
-                diagnosis="Ongoing Management",
-                notes=f"Coordination room for appointment #{latest_app.id}"
-            )
-            db.add(new_room)
-            db.commit()
-            db.refresh(new_room)
-            return new_room.id
-        return main_consult.id
-            
-    # 3. Default to 1
-    return 1
+    return patient.id

@@ -266,7 +266,8 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         const payload = {
             text: newMessage,
             senderName: currentUser,
-            isAiAssisted: isAiAssisted,
+            senderRole: "doctor",
+            isAiAssisted: false, 
             type: "message"
         };
 

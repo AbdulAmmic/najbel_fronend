@@ -995,7 +995,7 @@ export default function DoctorPatientDetailPage() {
                                             <ChatBox 
                                                 currentUser={`Dr. ${me?.full_name || "Doctor"}`} 
                                                 recipientName={getName(patient)} 
-                                                consultationId={patient?.id || Number(id)}
+                                                consultationId={Number(activeChatId) || patient?.id || Number(id)}
                                             />
                                         </div>
                                         <div className="space-y-4">

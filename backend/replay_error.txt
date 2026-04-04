@@ -1,0 +1,297 @@
+﻿python : C:\Users\IMLUX\Do
+cuments\works\najbel\najbe
+l_clinic\backend\replay_ga
+fia_webhook.py:41: 
+DeprecationWarning: dateti
+me.datetime.utcnow() is 
+deprecated and scheduled 
+for removal in a future 
+version. Use 
+timezone-aware objects to 
+represent datetimes in 
+UTC: datetime.datetime.now
+(datetime.UTC).
+At line:1 char:1
++ python 
+replay_gafia_webhook.py 
+2>&1 | Out-File -Encoding 
+utf8 replay_ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (C  
+  :\Users\IMLUX\...(dat   
+ etime.UTC).:String) [    
+], RemoteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
+ 
+  {"amt": float(amount), 
+"now": datetime.utcnow(), 
+"pid": pid})
+C:\Users\IMLUX\Documents\w
+orks\najbel\najbel_clinic\
+backend\replay_gafia_webho
+ok.py:45: 
+DeprecationWarning: dateti
+me.datetime.utcnow() is 
+deprecated and scheduled 
+for removal in a future 
+version. Use 
+timezone-aware objects to 
+represent datetimes in 
+UTC: datetime.datetime.now
+(datetime.UTC).
+  {"pid": pid, "amt": 
+float(amount), "ref": f"GA
+F-REPLAY-{int(datetime.utc
+now().timestamp())}", 
+"now": datetime.utcnow()})
+Starting Replay for Musa (Log ID 1)...
+Extracted: Amount=0.0, Account=None
+Warning: Account mismatch or missing! Got 'None'
+Targeting Patient PID: 1
+Traceback (most recent 
+call last):
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1963, in 
+_exec_single_context
+    
+self.dialect.do_execute(
+    
+~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, 
+str_statement, 
+effective_parameters, 
+context
+        ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
+    )
+    ^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\defau
+lt.py", line 943, in 
+do_execute
+    
+cursor.execute(statement, 
+parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^
+^^^^^^^^^^^^^^^
+psycopg2.errors.InvalidTex
+tRepresentation: invalid 
+input value for enum 
+transactiontype: "topup"
+LINE 1: ...erence, 
+cashier_name, created_at) 
+VALUES (1, 0.0, 'topup', 
+'...
+                          
+                          
+         ^
+
+
+The above exception was 
+the direct cause of the 
+following exception:
+
+Traceback (most recent 
+call last):
+  File "C:\Users\IMLUX\Doc
+uments\works\najbel\najbel
+_clinic\backend\replay_gaf
+ia_webhook.py", line 54, 
+in <module>
+    replay_musa_fund()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\IMLUX\Doc
+uments\works\najbel\najbel
+_clinic\backend\replay_gaf
+ia_webhook.py", line 44, 
+in replay_musa_fund
+    
+conn.execute(text("INSERT 
+INTO transaction 
+(patient_id, amount, 
+type, payment_method, 
+status, reference, 
+cashier_name, created_at) 
+VALUES (:pid, :amt, 
+'topup', 'transfer', 
+'completed', :ref, 'Gafia 
+Replay System', :now)"),
+    ~~~~~~~~~~~~^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
+                 {"pid": 
+pid, "amt": 
+float(amount), "ref": f"GA
+F-REPLAY-{int(datetime.utc
+now().timestamp())}", 
+"now": datetime.utcnow()})
+                 ^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1415, in execute
+    return meth(
+        self,
+        
+distilled_parameters,
+        execution_options 
+or NO_OPTIONS,
+    )
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\sql\elements
+.py", line 523, in 
+_execute_on_connection
+    return connection._exe
+cute_clauseelement(
+           ~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~^
+        self, 
+distilled_params, 
+execution_options
+        ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1637, in 
+_execute_clauseelement
+    ret = 
+self._execute_context(
+        dialect,
+    ...<8 lines>...
+        
+cache_hit=cache_hit,
+    )
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1842, in 
+_execute_context
+    return 
+self._exec_single_context(
+           
+~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, 
+statement, parameters
+        ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1982, in 
+_exec_single_context
+    self._handle_dbapi_exc
+eption(
+    ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~^
+        e, str_statement, 
+effective_parameters, 
+cursor, context
+        ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 2351, in 
+_handle_dbapi_exception
+    raise sqlalchemy_excep
+tion.with_traceback(exc_in
+fo[2]) from e
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\base.
+py", line 1963, in 
+_exec_single_context
+    
+self.dialect.do_execute(
+    
+~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, 
+str_statement, 
+effective_parameters, 
+context
+        ^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^
+    )
+    ^
+  File "C:\Users\IMLUX\App
+Data\Local\Programs\Python
+\Python313\Lib\site-packag
+es\sqlalchemy\engine\defau
+lt.py", line 943, in 
+do_execute
+    
+cursor.execute(statement, 
+parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^
+^^^^^^^^^^^^^^^
+sqlalchemy.exc.DataError: 
+(psycopg2.errors.InvalidTe
+xtRepresentation) invalid 
+input value for enum 
+transactiontype: "topup"
+LINE 1: ...erence, 
+cashier_name, created_at) 
+VALUES (1, 0.0, 'topup', 
+'...
+                          
+                          
+         ^
+
+[SQL: INSERT INTO 
+transaction (patient_id, 
+amount, type, 
+payment_method, status, 
+reference, cashier_name, 
+created_at) VALUES 
+(%(pid)s, %(amt)s, 
+'topup', 'transfer', 
+'completed', %(ref)s, 
+'Gafia Replay System', 
+%(now)s)]
+[parameters: {'pid': 1, 
+'amt': 0.0, 'ref': 
+'GAF-REPLAY-1775287676', 
+'now': 
+datetime.datetime(2026, 
+4, 4, 8, 27, 56, 306210)}]
+(Background on this error 
+at: https://sqlalche.me/e/
+20/9h9h)
