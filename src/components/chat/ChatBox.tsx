@@ -298,6 +298,17 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         reader.onloadend = () => {
             const base64Image = reader.result as string;
             const msgId = Date.now();
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+                const payload = {
+                    text: "📷 Image",
+                    senderName: currentUser,
+                    senderRole: "doctor",
+                    imageUrl: base64Image,
+                    type: "message"
+                };
+                socketRef.current.send(JSON.stringify(payload));
+            }
+
             const msg: Message = {
                 id: msgId,
                 sender: currentUser,
@@ -332,8 +343,17 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
                 const reader = new FileReader();
                 reader.readAsDataURL(audioBlob);
                 reader.onloadend = () => {
-                    const base64Audio = reader.result as string;
-                    const msgId = Date.now();
+                    if (socketRef.current?.readyState === WebSocket.OPEN) {
+                        const payload = {
+                            text: "🎵 Voice Note",
+                            senderName: currentUser,
+                            senderRole: "doctor",
+                            audioUrl: base64Audio,
+                            type: "message"
+                        };
+                        socketRef.current.send(JSON.stringify(payload));
+                    }
+
                     const msg: Message = {
                         id: msgId,
                         sender: currentUser,

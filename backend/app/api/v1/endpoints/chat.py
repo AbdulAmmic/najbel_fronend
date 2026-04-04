@@ -65,7 +65,15 @@ async def websocket_endpoint(
                 sender_name = "Doctor" if role in ["doctor", "admin"] else "Patient"
                 audio_url = None
                 image_url = None
-                is_ai_assisted = False
+                # Extract data safely with logging
+                user_text = data.get("text")
+                audio_url = data.get("audioUrl") 
+                image_url = data.get("imageUrl")
+                sender_name = data.get("senderName", "Unknown")
+                role = data.get("senderRole", "patient") # Default to patient for safety
+                is_ai_assisted = data.get("isAiAssisted", False)
+
+                print(f"[CHAT] Message received room={consultation_id} role={role} text={bool(user_text)} img={bool(image_url)} audio={bool(audio_url)}")
 
             # Save if there is any content (text, audio, or image)
             if user_text or audio_url or image_url:
@@ -87,6 +95,7 @@ async def websocket_endpoint(
                         session.commit()
                         session.refresh(user_msg)
                         saved_msg_id = user_msg.id
+                        print(f"[CHAT] Message persisted ID={saved_msg_id}")
 
                         # ---- Notifications Logic ----
                         try:

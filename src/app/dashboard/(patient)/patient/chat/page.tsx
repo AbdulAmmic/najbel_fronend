@@ -152,6 +152,8 @@ export default function ChatPage() {
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const [errorMessage, setErrorMessage] = useState("");
+    const [consultationId, setConsultationId] = useState<number | string | null>(null);
+    const [notAllowed, setNotAllowed] = useState(false);
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
@@ -409,9 +411,9 @@ export default function ChatPage() {
 
             if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                 const msgPayload = JSON.stringify({
+                    text: "📷 Image",
                     senderName: "Patient",
                     senderRole: "patient",
-                    text: "📷 Image",
                     imageUrl: base64Image,
                     type: "message"
                 });
@@ -457,9 +459,9 @@ export default function ChatPage() {
 
                     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
                         const msgPayload = JSON.stringify({
+                            text: "🎵 Voice Note",
                             senderName: "Patient",
                             senderRole: "patient",
-                            text: "🎵 Voice Note",
                             audioUrl: base64Audio,
                             type: "message"
                         });
