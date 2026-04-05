@@ -178,6 +178,7 @@ export default function ChatPage() {
                 }
                 setConsultationId(data.active_chat_id);
                 setIsActive(true);
+                setLoading(false);
             } catch (err: any) {
                 console.warn("No active chat session found:", err);
                 setErrorMessage("Unable to sync clinical channel. Please try again later.");
