@@ -154,11 +154,18 @@ def get_chat_history(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    """Legacy history endpoint — consultation_id == patient_id in unified model."""
+    """Legacy history endpoint — works with both old consultation_id AND new patient_id."""
     if current_user.role == UserRole.PATIENT:
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
-        if not patient or patient.id != consultation_id:
-            raise HTTPException(status_code=403, detail="Access Denied")
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        # Allow if: consultation_id == patient.id (unified model)
+        # OR: consultation_id is a valid consultation owned by this patient
+        if patient.id != consultation_id:
+            from app.models.consultation import Consultation
+            consultation = db.get(Consultation, consultation_id)
+            if not consultation or consultation.patient_id != patient.id:
+                raise HTTPException(status_code=403, detail="Access Denied")
     elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE]:
         raise HTTPException(status_code=403, detail="Access Denied")
 

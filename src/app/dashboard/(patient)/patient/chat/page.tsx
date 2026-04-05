@@ -4,25 +4,23 @@ import { useState, useEffect, useRef } from "react";
 import {
     Send,
     ArrowLeft,
-    Paperclip,
-    Smile,
     Check,
     CheckCheck,
-    MoreVertical,
-    Zap,
     Clock,
     Phone,
-    Video,
     Mic,
     Trash2,
     Play,
     Pause,
     Image as ImageIcon,
-    Activity
+    Zap,
+    ShoppingBag,
+    Activity,
+    Video,
+    MoreVertical
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import api, { consultations, getWsBaseUrl, chat } from "@/services/api";
-import { ShoppingBag } from "lucide-react";
+import api, { getWsBaseUrl } from "@/services/api";
 
 interface Message {
     id: number | string;
@@ -464,7 +462,7 @@ export default function ChatPage() {
             });
             // Confirm delivery
             setMessages(prev => prev.map(m =>
-                m.id === msgId ? { ...m, id: saved?.id || msgId, status: 'sent' } : m
+                m.id === msgId ? { ...m, id: saved?.data?.id || msgId, status: 'sent' } : m
             ));
         } catch (err) {
             console.error("Message save failed:", err);
@@ -505,13 +503,12 @@ export default function ChatPage() {
                 socketRef.current.send(wsPayload);
             } else {
                 // REST fallback for image
-                chat.sendMessage({
-                    consultation_id: consultationId!,
+                api.post(`chat/patient/${consultationId}/send`, {
                     message: "📷 Image",
-                    sender_name: "Patient",
+                    sender_name: patientName || "Patient",
                     sender_role: "patient",
                     image_url: base64Image
-                }).catch(err => console.error("Image REST fallback failed", err));
+                }).catch((err: unknown) => console.error("Image REST fallback failed", err));
             }
 
             const newMsg: Message = {
@@ -562,13 +559,12 @@ export default function ChatPage() {
                         socketRef.current.send(wsPayload);
                     } else {
                         // REST fallback for audio
-                        chat.sendMessage({
-                            consultation_id: consultationId!,
+                        api.post(`chat/patient/${consultationId}/send`, {
                             message: "🎵 Voice Note",
-                            sender_name: "Patient",
+                            sender_name: patientName || "Patient",
                             sender_role: "patient",
                             audio_url: base64Audio
-                        }).catch(err => console.error("Audio REST fallback failed", err));
+                        }).catch((err: unknown) => console.error("Audio REST fallback failed", err));
                     }
 
                     const newMsg: Message = {

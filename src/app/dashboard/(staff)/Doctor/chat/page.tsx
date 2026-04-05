@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, MessageSquare, Loader2, ArrowLeft, Users, User, Clock, Send, Mic, Image as ImageIcon, Play, Pause, Trash2, Check, CheckCheck, Phone } from "lucide-react";
+import { Search, MessageSquare, Loader2, ArrowLeft, Users, Clock, Send, Play, Pause, Check, CheckCheck, Phone } from "lucide-react";
 import api, { auth, getWsBaseUrl } from "@/services/api";
 
 // ─── Types ───────────────────────────────────────────────

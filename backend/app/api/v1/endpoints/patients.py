@@ -6,6 +6,27 @@ from app.models.user import User, Patient, UserRole
 
 router = APIRouter()
 
+@router.get("/me", response_model=Any)
+def get_my_patient_profile(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Get the current patient's own profile (patient_id, etc.)."""
+    patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    return {
+        "id": patient.id,
+        "user_id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "unique_id": patient.unique_id,
+        "gender": patient.gender,
+        "date_of_birth": patient.date_of_birth,
+        "phone_number": current_user.phone_number,
+        "blood_group": patient.blood_group,
+    }
+
 @router.get("/", response_model=List[Any])
 def get_all_patients(
     db: Session = Depends(deps.get_db),
