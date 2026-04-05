@@ -21,7 +21,8 @@ import {
     Activity
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import api, { consultations, getWsBaseUrl } from "@/services/api";
+import api, { consultations, getWsBaseUrl, chat } from "@/services/api";
+import { ShoppingBag } from "lucide-react";
 
 interface Message {
     id: number | string;
@@ -152,6 +153,9 @@ export default function ChatPage() {
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const [reason, setReason] = useState<string | null>(null);
+    const [consultationId, setConsultationId] = useState<number | null>(null);
+    const [notAllowed, setNotAllowed] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
@@ -215,10 +219,10 @@ export default function ChatPage() {
         if (!consultationId) return;
 
         // 1. Fetch History from the database
-        const fetchHistory = async () => {
+        const syncMessages = async () => {
             try {
-                const res = await api.get(`chat/chats/history/${consultationId}`);
-                const history = res.data.map((msg: any) => ({
+                const history = await chat.getHistory(consultationId);
+                const formatted = history.map((msg: any) => ({
                     id: msg.id,
                     sender: msg.sender_name,
                     text: msg.message,
@@ -229,15 +233,17 @@ export default function ChatPage() {
                     isAI: msg.sender_role === 'ai',
                     status: 'read' as const
                 }));
-
-                setMessages(history);
-            } catch (err) {
-                console.error("Failed to fetch chat history", err);
-            } finally {
-                setLoading(false);
-            }
+                setMessages(prev => {
+                    const shadow = [...prev];
+                    const newIds = new Set(formatted.map((m: any) => m.id));
+                    const currentIds = new Set(shadow.filter(m => !m.id.toString().startsWith('temp-')).map(m => m.id));
+                    
+                    // Logic to update: if we have new messages or status changes
+                    if (newIds.size !== currentIds.size) return formatted;
+                    return prev;
+                });
+            } catch (err) { console.error("Sync failed", err); }
         };
-        fetchHistory();
 
         // 2. Connect WebSocket
         const wsBase = getWsBaseUrl();
@@ -249,12 +255,9 @@ export default function ChatPage() {
         const socket = new WebSocket(wsUrl);
         socketRef.current = socket;
 
-
-        socket.onmessage = (event) => {
+        socket.onmessage = (event: MessageEvent) => {
             try {
                 const data = JSON.parse(event.data);
-
-                // Acknowledgement from server: update temp ID with real DB id
                 if (data.type === "ack" && data.id) {
                     setMessages(prev => {
                         const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
@@ -291,32 +294,9 @@ export default function ChatPage() {
             }
         };
 
-        const fetchHistoryFallback = async () => {
-            try {
-                const res = await api.get(`chat/chats/history/${consultationId}`);
-                const history = res.data.map((msg: any) => ({
-                    id: msg.id,
-                    sender: msg.sender_name,
-                    text: msg.message,
-                    audioUrl: msg.audio_url || undefined,
-                    imageUrl: msg.image_url || undefined,
-                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    isMe: msg.sender_role === 'patient',
-                    isAI: msg.sender_role === 'ai',
-                    status: 'read' as const
-                }));
-                setMessages(prev => {
-                    const newIds = new Set(history.map((m: any) => m.id));
-                    const currentIds = new Set(prev.map(m => m.id));
-                    if (newIds.size !== currentIds.size) return history;
-                    return prev;
-                });
-            } catch (err) { console.error("Polling failed", err); }
-        };
-
         const pollInterval = setInterval(() => {
             if (socketRef.current?.readyState !== WebSocket.OPEN) {
-                fetchHistoryFallback();
+                syncMessages();
             }
         }, 5000);
 
@@ -428,10 +408,16 @@ export default function ChatPage() {
             socketRef.current.send(JSON.stringify(payload));
         } else {
             console.log('[CHAT_DEBUG] WebSocket down, using REST fallback');
-            api.post('chat/send', { ...payload, consultationId })
+            chat.sendMessage({ 
+                ...payload, 
+                consultation_id: consultationId,
+                message: newMessage,
+                sender_name: "Patient",
+                sender_role: "patient"
+            })
                 .then(res => {
-                    if (res.data) {
-                        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: res.data.id, status: 'delivered' } : m));
+                    if (res) {
+                        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: res.id, status: 'delivered' } : m));
                     }
                 })
                 .catch(err => console.error("REST send failed", err));

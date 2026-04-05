@@ -288,7 +288,13 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
             socketRef.current.send(JSON.stringify(payload));
         } else {
             console.log("[ChatBox] WebSocket not open, using REST fallback");
-            api.post('chat/send', { ...payload, consultationId })
+            const restPayload = {
+                consultation_id: consultationId,
+                message: newMessage,
+                sender_name: currentUser,
+                sender_role: "doctor"
+            };
+            api.post('chat/send', restPayload)
                 .then(res => {
                     if (res.data) {
                         setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, id: res.data.id, status: 'delivered' } : m));

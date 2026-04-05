@@ -358,12 +358,6 @@ export const rooms = {
     }
 }
 
-export const chat = {
-    getHistory: async (consultationId: number) => {
-        const response = await api.get(`chat/chats/history/${consultationId}/`);
-        return response.data;
-    }
-}
 
 export const notifications = {
     getAll: async () => {

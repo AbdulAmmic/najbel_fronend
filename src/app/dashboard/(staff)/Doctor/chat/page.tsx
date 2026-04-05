@@ -156,8 +156,9 @@ export default function ClinicalMessenger() {
                 {selectedRoomId ? (
                     <div className="flex-1 flex flex-col">
                          <ChatBox 
+                            currentUser={`Dr. ${userMe?.full_name || "Doctor"}`}
+                            recipientName={rooms.find(r => r.consultation_id === selectedRoomId)?.patient_name || "Patient"}
                             consultationId={selectedRoomId} 
-                            user={userMe}
                          />
                     </div>
                 ) : (

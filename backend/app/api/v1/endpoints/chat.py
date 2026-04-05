@@ -6,7 +6,7 @@ from app.models.chat import ChatMessage
 from app.models.user import User, UserRole, Patient
 from app.schemas.chat import ChatMessage as ChatMessageSchema
 from app.core.config import settings
-from typing import List, Any
+from typing import List, Any, Optional
 import json
 import traceback
 
