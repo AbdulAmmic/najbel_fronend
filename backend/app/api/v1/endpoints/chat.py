@@ -11,64 +11,142 @@ import json
 import traceback
 
 router = APIRouter()
+
+# ─────────────────────────────────────────────
+# UNIFIED PATIENT CHAT MODEL
+# consultation_id in chat_messages IS the patient_id.
+# No consultation, no room concept. Just patient ↔ care team.
+# ─────────────────────────────────────────────
+
+@router.get("/patient/{patient_id}/history")
+def get_patient_chat_history(
+    patient_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Fast patient chat history — keyed by patient_id.
+    Staff can read any patient. Patient can only read their own.
+    """
+    if current_user.role == UserRole.PATIENT:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        if not patient or patient.id != patient_id:
+            raise HTTPException(status_code=403, detail="Access Denied")
+    elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE, UserRole.RECEPTIONIST]:
+        raise HTTPException(status_code=403, detail="Access Denied")
+
+    msgs = db.exec(
+        select(ChatMessage)
+        .where(ChatMessage.consultation_id == patient_id)
+        .order_by(ChatMessage.created_at.asc())
+    ).all()
+    return [
+        {
+            "id": m.id,
+            "sender_name": m.sender_name,
+            "sender_role": m.sender_role,
+            "message": m.message,
+            "audio_url": m.audio_url,
+            "image_url": m.image_url,
+            "is_ai": m.is_ai,
+            "created_at": m.created_at.isoformat()
+        }
+        for m in msgs
+    ]
+
+
+@router.post("/patient/{patient_id}/send")
+def send_patient_message(
+    patient_id: int,
+    message_in: dict,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    REST endpoint to send a message in a patient's chat thread.
+    Staff can send to any patient. Patient can only send in their own thread.
+    """
+    if current_user.role == UserRole.PATIENT:
+        patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+        if not patient or patient.id != patient_id:
+            raise HTTPException(status_code=403, detail="Access Denied")
+
+    text = message_in.get("message") or message_in.get("text") or ""
+    sender_name = message_in.get("sender_name") or message_in.get("senderName") or current_user.full_name
+    sender_role = message_in.get("sender_role") or message_in.get("senderRole") or str(current_user.role.value)
+
+    msg = ChatMessage(
+        consultation_id=patient_id,  # Unified: consultation_id == patient_id
+        sender_name=sender_name,
+        sender_role=sender_role,
+        message=text,
+        audio_url=message_in.get("audio_url") or message_in.get("audioUrl"),
+        image_url=message_in.get("image_url") or message_in.get("imageUrl"),
+        is_ai=False
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    return {
+        "id": msg.id,
+        "sender_name": msg.sender_name,
+        "sender_role": msg.sender_role,
+        "message": msg.message,
+        "audio_url": msg.audio_url,
+        "image_url": msg.image_url,
+        "created_at": msg.created_at.isoformat()
+    }
+
+
+@router.get("/patients/list")
+def list_patients_for_chat(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Returns all patients for the doctor/staff chat sidebar.
+    Includes unread count and last message preview.
+    """
+    if current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE, UserRole.RECEPTIONIST]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    patients = db.exec(select(Patient)).all()
+    result = []
+    for p in patients:
+        u = p.user
+        if not u:
+            continue
+        # Get last message for preview
+        last_msg = db.exec(
+            select(ChatMessage)
+            .where(ChatMessage.consultation_id == p.id)
+            .order_by(ChatMessage.created_at.desc())
+        ).first()
+        result.append({
+            "patient_id": p.id,
+            "patient_name": u.full_name,
+            "last_message": last_msg.message if last_msg else None,
+            "last_timestamp": last_msg.created_at.isoformat() if last_msg else None,
+        })
+
+    # Sort: patients with messages first, then by last message time
+    result.sort(key=lambda x: x["last_timestamp"] or "", reverse=True)
+    return result
+
+
+# ─────────────────────────────────────────────
+# LEGACY ENDPOINTS (kept for backward compat)
+# ─────────────────────────────────────────────
+
 @router.get("/active-rooms")
 def get_active_chat_rooms(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """
-    List all consultations that have chat messages or are active sessions (Staff only).
-    Returns the SAME consultation_id the patient is connected to.
-    """
-    if current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE]:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    """Redirect to /patients/list"""
+    return list_patients_for_chat(db, current_user)
 
-    from app.models.consultation import Consultation
-    from app.models.appointment import Appointment, AppointmentStatus
-
-    # Get consultations that have ANY chat messages OR are in an active state
-    # This ensures doctor always joins the same room as the patient
-    consultations_with_msgs = db.exec(
-        select(ChatMessage.consultation_id).distinct()
-    ).all()
-
-    # Also include consultations for IN_CONSULTATION or recent COMPLETED appointments
-    active_consultations = db.exec(
-        select(Consultation)
-        .join(Appointment, Consultation.appointment_id == Appointment.id, isouter=True)
-        .where(
-            (Consultation.id.in_(consultations_with_msgs)) |
-            (Appointment.status.in_([
-                AppointmentStatus.IN_CONSULTATION,
-                AppointmentStatus.COMPLETED
-            ]))
-        )
-        .order_by(Consultation.created_at.desc())
-    ).all()
-
-    result = []
-    seen = set()
-    for c in active_consultations:
-        if c.id in seen:
-            continue
-        seen.add(c.id)
-        # Get patient name
-        patient = db.exec(
-            select(Patient, User)
-            .where(Patient.id == c.patient_id)
-            .join(User, Patient.user_id == User.id)
-        ).first()
-        if not patient:
-            continue
-        p, u = patient
-        result.append({
-            "consultation_id": c.id,
-            "patient_id": p.id,
-            "patient_name": u.full_name,
-            "created_at": c.created_at.isoformat()
-        })
-
-    return result
 
 @router.get("/chats/history/{consultation_id}", response_model=List[ChatMessageSchema])
 def get_chat_history(
@@ -76,26 +154,21 @@ def get_chat_history(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    """
-    Retrieve chat history for a consultation with RBAC
-    """
-    # RBAC logic
+    """Legacy history endpoint — consultation_id == patient_id in unified model."""
     if current_user.role == UserRole.PATIENT:
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
-        if not patient:
-            raise HTTPException(status_code=404, detail="Patient profile not found")
-        
-        # Check if the requested consultation belongs to this patient
-        from app.models.consultation import Consultation
-        consultation = db.get(Consultation, consultation_id)
-        if not consultation or consultation.patient_id != patient.id:
-            raise HTTPException(status_code=403, detail="Access Denied: You can only view your own consultations.")
-    elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN]:
-        raise HTTPException(status_code=403, detail="Access Denied: Insufficient permissions.")
+        if not patient or patient.id != consultation_id:
+            raise HTTPException(status_code=403, detail="Access Denied")
+    elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE]:
+        raise HTTPException(status_code=403, detail="Access Denied")
 
-    statement = select(ChatMessage).where(ChatMessage.consultation_id == consultation_id).order_by(ChatMessage.created_at.asc())
-    results = db.exec(statement).all()
-    return results
+    msgs = db.exec(
+        select(ChatMessage)
+        .where(ChatMessage.consultation_id == consultation_id)
+        .order_by(ChatMessage.created_at.asc())
+    ).all()
+    return msgs
+
 
 @router.post("/send", response_model=ChatMessageSchema)
 def send_message_rest(
@@ -103,34 +176,28 @@ def send_message_rest(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    """
-    REST Fallback for sending messages when WebSockets are unavailable.
-    Accepts both snake_case and camelCase field names for compatibility.
-    """
-    # Accept both naming conventions
-    consultation_id = message_in.get("consultation_id") or message_in.get("consultationId")
-    if not consultation_id:
-        raise HTTPException(status_code=400, detail="consultation_id required")
+    """Legacy REST send — works with patient_id as consultation_id."""
+    patient_id = (
+        message_in.get("patient_id") or
+        message_in.get("consultation_id") or
+        message_in.get("consultationId")
+    )
+    if not patient_id:
+        raise HTTPException(status_code=400, detail="patient_id required")
 
-    consultation_id = int(consultation_id)
+    patient_id = int(patient_id)
 
-    # RBAC: Patients can only send to their own consultations
     if current_user.role == UserRole.PATIENT:
-        from app.models.consultation import Consultation
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
-        if not patient:
-            raise HTTPException(status_code=403, detail="Patient profile not found")
-        consultation = db.get(Consultation, consultation_id)
-        if not consultation or consultation.patient_id != patient.id:
+        if not patient or patient.id != patient_id:
             raise HTTPException(status_code=403, detail="Access Denied")
 
-    # Accept both 'message' and 'text' field names
     text = message_in.get("message") or message_in.get("text") or ""
     sender_name = message_in.get("sender_name") or message_in.get("senderName") or current_user.full_name
-    sender_role = message_in.get("sender_role") or message_in.get("senderRole") or str(current_user.role)
+    sender_role = message_in.get("sender_role") or message_in.get("senderRole") or str(current_user.role.value)
 
-    user_msg = ChatMessage(
-        consultation_id=consultation_id,
+    msg = ChatMessage(
+        consultation_id=patient_id,
         sender_name=sender_name,
         sender_role=sender_role,
         message=text,
@@ -138,108 +205,84 @@ def send_message_rest(
         image_url=message_in.get("imageUrl") or message_in.get("image_url"),
         is_ai=False
     )
-    db.add(user_msg)
+    db.add(msg)
     db.commit()
-    db.refresh(user_msg)
+    db.refresh(msg)
+    return msg
 
-    return user_msg
 
-@router.websocket("/ws/consultations/{consultation_id}")
-async def websocket_endpoint(
-    websocket: WebSocket, 
-    consultation_id: str, 
+# ─────────────────────────────────────────────
+# WEBSOCKET - Room key = patient_id
+# Both doctor and patient connect to the same room
+# ─────────────────────────────────────────────
+
+@router.websocket("/ws/patient/{patient_id}")
+async def patient_room_ws(
+    websocket: WebSocket,
+    patient_id: str,
     role: str = Query("patient"),
-    token: Optional[str] = Query(None) # Allow token without failing
+    token: Optional[str] = Query(None)
 ):
-    from app.db.session import engine
-    from sqlmodel import Session
+    """
+    Unified WebSocket room for a patient's chat thread.
+    Both patient and doctor(s) connect here using patient_id as room.
+    """
+    room = f"p-{patient_id}"
+    print(f"[WS] Connecting to patient room={room} role={role}")
+    await manager.connect(websocket, room, role)
 
-    print(f"[WS] Connection accepted for room={consultation_id} role={role}")
-    print(f"[WS] Active DB Strategy: {settings.DATABASE_URL[:30]}...")
-    
-    await manager.connect(websocket, consultation_id, role)
-    
     try:
         while True:
             data = await websocket.receive_text()
-            print(f"[WS] RAW RECEIVED: {data[:100]}...")
-            
             try:
                 payload = json.loads(data)
                 user_text = payload.get("text", "")
-                sender_name = payload.get("senderName") or ("Doctor" if role in ["doctor", "admin"] else "Patient")
-                audio_url = payload.get("audioUrl", None)
-                image_url = payload.get("imageUrl", None)
+                sender_name = payload.get("senderName") or ("Doctor" if role in ["doctor", "admin", "nurse"] else "Patient")
+                audio_url = payload.get("audioUrl")
+                image_url = payload.get("imageUrl")
                 sender_role = payload.get("senderRole") or role
-                is_ai_assisted = payload.get("isAiAssisted", False)
-                print(f"[WS] PARSED: text='{user_text[:20]}' role={sender_role} audio={bool(audio_url)} image={bool(image_url)}")
-            except Exception as pe:
-                print(f"[WS] JSON PARSE FAIL: {pe}. Using raw data as text.")
+            except Exception:
                 user_text = data
                 sender_name = "Doctor" if role in ["doctor", "admin"] else "Patient"
                 sender_role = role
                 audio_url = None
                 image_url = None
-                is_ai_assisted = False
 
-            # 1. Broadcast to others in the room
-            print(f"[WS] Broadcasting to others in room {consultation_id}...")
-            await manager.broadcast_to_others(data, consultation_id, websocket)
+            # Broadcast to everyone else in this patient's room
+            await manager.broadcast_to_others(data, room, websocket)
 
-            # 2. If sender is a patient, broadcast to ALL doctors via clinical_feed
-            # Enrich payload with consultationId so doctor dashboards know which room to update
-            if role == "patient":
-                print(f"[WS] Broadcasting to clinical_feed (All Doctors)...")
-                enriched = json.dumps({
-                    "consultationId": consultation_id,
-                    "text": user_text,
-                    "senderName": sender_name,
-                    "senderRole": sender_role,
-                    "audioUrl": audio_url,
-                    "imageUrl": image_url,
-                    "type": "patient_message"
-                })
-                await manager.broadcast_to_doctors(enriched)
-
-            # 3. Persist to DB
-            if user_text or audio_url or image_url:
-                print(f"[WS] Attempting DB persistence...")
-                try:
-                    with Session(engine) as session:
-                        user_msg = ChatMessage(
-                            consultation_id=int(consultation_id),
-                            sender_name=sender_name,
-                            sender_role=sender_role,
-                            message=user_text or "",
-                            audio_url=audio_url,
-                            image_url=image_url,
-                            is_ai=False,
-                            is_ai_assisted=is_ai_assisted
-                        )
-                        session.add(user_msg)
-                        session.commit()
-                        session.refresh(user_msg)
-                        print(f"[WS] DB SUCCESS: Saved ID={user_msg.id}")
-                        
-                        # 4. Send ACK to sender
-                        await websocket.send_json({
-                            "type": "ack",
-                            "id": user_msg.id,
-                            "status": "sent"
-                        })
-                except Exception as dbe:
-                    print(f"[WS] DB EXCEPTION: {dbe}")
-                    traceback.print_exc()
-            else:
-                print(f"[WS] No content to save.")
+            # If message has content, save to DB (WS path for real-time only; REST is primary)
+            # Note: REST /send is called first by frontend, so WS DB save is secondary
+            # We skip DB save here to avoid duplicates — REST already saves it
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket, consultation_id)
-        print(f"[WS] Disconnected room={consultation_id}")
+        manager.disconnect(websocket, room)
+        print(f"[WS] Disconnected from patient room={room}")
     except Exception as e:
-        print(f"[WS] CRITICAL ERROR in loop: {e}")
-        traceback.print_exc()
-        manager.disconnect(websocket, consultation_id)
+        print(f"[WS] Error in patient room {room}: {e}")
+        manager.disconnect(websocket, room)
+
+
+# Legacy WS endpoint (keep alive for backward compat)
+@router.websocket("/ws/consultations/{consultation_id}")
+async def websocket_endpoint_legacy(
+    websocket: WebSocket,
+    consultation_id: str,
+    role: str = Query("patient"),
+    token: Optional[str] = Query(None)
+):
+    """Legacy WS — routes to the patient room using consultation_id as patient_id."""
+    room = f"p-{consultation_id}"
+    print(f"[WS] Legacy connect → patient room={room} role={role}")
+    await manager.connect(websocket, room, role)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.broadcast_to_others(data, room, websocket)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, room)
+    except Exception as e:
+        manager.disconnect(websocket, room)
 
 
 @router.websocket("/ws/clinical_feed")
@@ -247,31 +290,21 @@ async def clinical_feed_endpoint(
     websocket: WebSocket,
     token: Optional[str] = Query(None)
 ):
-    """
-    Dedicated WebSocket for doctors/staff to receive ALL patient messages in real-time.
-    Doctors connect here and get notified whenever ANY patient sends a message.
-    """
-    print("[WS] Doctor connecting to clinical_feed")
-    # Register in clinical_feed so they get patient broadcasts
     feed_id = "clinical_feed"
     await websocket.accept()
     if feed_id not in manager.active_connections:
         manager.active_connections[feed_id] = []
     if not any(conn["ws"] == websocket for conn in manager.active_connections[feed_id]):
         manager.active_connections[feed_id].append({"ws": websocket, "role": "doctor"})
-
     try:
         while True:
-            # Keep connection alive - doctors only listen on this channel
             await websocket.receive_text()
     except WebSocketDisconnect:
         if feed_id in manager.active_connections:
             manager.active_connections[feed_id] = [
                 c for c in manager.active_connections[feed_id] if c["ws"] != websocket
             ]
-        print("[WS] Doctor disconnected from clinical_feed")
-    except Exception as e:
-        print(f"[WS] clinical_feed error: {e}")
+    except Exception:
         if feed_id in manager.active_connections:
             manager.active_connections[feed_id] = [
                 c for c in manager.active_connections[feed_id] if c["ws"] != websocket

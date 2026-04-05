@@ -152,41 +152,63 @@ export default function ChatPage() {
     const audioChunksRef = useRef<BlobPart[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [reason, setReason] = useState<string | null>(null);
-    const [consultationId, setConsultationId] = useState<number | null>(null);
+    // Unified model: key is patient_id, no consultation needed
+    const [patientId, setPatientId] = useState<number | null>(null);
     const [notAllowed, setNotAllowed] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
-    const [isActive, setIsActive] = useState(false);
+    const [patientName, setPatientName] = useState("Patient");
 
-    // Dynamic Discovery of Active Chat Session
+    // Keep backward compat alias
+    const consultationId = patientId;
+    // Compat aliases for existing JSX
+    const reason: string | null = null;
+    const isActive = !notAllowed && patientId !== null;
+
+    // ── Init: Get patient_id directly (fast, no payment gate) ──
     useEffect(() => {
-        const discoverSession = async () => {
+        const init = async () => {
             try {
-                // active-chat returns: {active_chat_id: int | null, reason: str | null}
-                const data = await consultations.getActiveChatId();
-                if (!data.active_chat_id) {
-                    setReason(data.reason || "no_session");
-                    setIsActive(false);
-                    // If we have history but no active ID, don't lock the whole page
-                    if (data.last_consultation_id) {
-                         setConsultationId(data.last_consultation_id);
-                    } else {
-                        setNotAllowed(true);
-                    }
+                const me = await api.get("users/me");
+                const user = me.data;
+                if (!user) throw new Error("Not logged in");
+                setPatientName(user.full_name || "Patient");
+
+                // Get my patient profile to find patient_id
+                const profileRes = await api.get("patients/me").catch(() => null);
+                let pid: number | null = null;
+
+                if (profileRes?.data?.id) {
+                    pid = profileRes.data.id;
+                } else {
+                    // Fallback: search by user_id
+                    const allRes = await api.get("patients/").catch(() => null);
+                    const found = allRes?.data?.find((p: any) => p.user_id === user.id);
+                    if (found) pid = found.id;
+                }
+
+                if (!pid) {
+                    setErrorMessage("Patient profile not found. Please contact support.");
+                    setNotAllowed(true);
                     setLoading(false);
                     return;
                 }
-                setConsultationId(data.active_chat_id);
-                setIsActive(true);
+
+                // Load cached history instantly
+                try {
+                    const cached = sessionStorage.getItem(`chat_p${pid}`);
+                    if (cached) setMessages(JSON.parse(cached));
+                } catch { }
+
+                setPatientId(pid);
                 setLoading(false);
-            } catch (err: any) {
-                console.warn("No active chat session found:", err);
-                setErrorMessage("Unable to sync clinical channel. Please try again later.");
+            } catch (err) {
+                console.error("Chat init failed:", err);
+                setErrorMessage("Unable to load chat. Please try again.");
                 setNotAllowed(true);
                 setLoading(false);
             }
         };
-        discoverSession();
+        init();
     }, []);
 
     const scrollToBottom = () => {
@@ -232,11 +254,13 @@ export default function ChatPage() {
         const syncMessages = async () => {
             if (!mounted) return;
             try {
-                const history = await chat.getHistory(consultationId);
-                const formatted = history.map((msg: any) => ({
+                // New fast patient-centric endpoint
+                const res = await api.get(`chat/patient/${consultationId}/history`);
+                if (!mounted) return;
+                const formatted = res.data.map((msg: any) => ({
                     id: msg.id,
                     sender: msg.sender_name,
-                    text: msg.message,
+                    text: msg.message || "",
                     audioUrl: msg.audio_url || undefined,
                     imageUrl: msg.image_url || undefined,
                     time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -247,7 +271,10 @@ export default function ChatPage() {
                 setMessages(prev => {
                     const dbIds = new Set(formatted.map((m: any) => m.id));
                     const pending = prev.filter(m => !dbIds.has(m.id) && m.status === 'sent');
-                    return [...formatted, ...pending];
+                    const merged = [...formatted, ...pending];
+                    // Cache for instant reload
+                    try { sessionStorage.setItem(`chat_p${consultationId}`, JSON.stringify(formatted)); } catch { }
+                    return merged;
                 });
             } catch (err) { console.error("Sync failed", err); }
         };
@@ -261,8 +288,9 @@ export default function ChatPage() {
             if (!mounted) return;
             const wsBase = getWsBaseUrl();
             const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-            const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
-            console.log(`[WS] Connecting patient: ${wsUrl}`);
+            // Unified endpoint: /ws/patient/{patient_id}
+            const wsUrl = `${wsBase}/ws/patient/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
+            console.log(`[WS] Patient → p-${consultationId}`);
 
             socket = new WebSocket(wsUrl);
             socketRef.current = socket;
@@ -429,10 +457,9 @@ export default function ChatPage() {
 
         // STEP 1: Always persist via REST (guaranteed DB save)
         try {
-            const saved = await chat.sendMessage({
-                consultation_id: consultationId,
+            const saved = await api.post(`chat/patient/${consultationId}/send`, {
                 message: text,
-                sender_name: "Patient",
+                sender_name: patientName || "Patient",
                 sender_role: "patient"
             });
             // Confirm delivery
