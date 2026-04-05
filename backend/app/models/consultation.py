@@ -23,8 +23,4 @@ class Consultation(ConsultationBase, table=True):
     prescriptions: List["Prescription"] = Relationship(back_populates="consultation")
     lab_results: List["LabResult"] = Relationship(back_populates="consultation")
 
-# Forward refs
-from .appointment import Appointment
-from .user import Doctor, Patient
-from .prescription import Prescription
-from .lab_result import LabResult
+# End of file

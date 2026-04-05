@@ -42,4 +42,4 @@ class Appointment(AppointmentBase, table=True):
     doctor: "Doctor" = Relationship(back_populates="appointments")
     patient: "Patient" = Relationship(back_populates="appointments")
 
-from .user import Doctor, Patient
+# End of file

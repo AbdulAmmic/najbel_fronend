@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import {
     auth, appointments, labs, prescriptions, vitals,
-    patientService, medicalRecords, beds
+    patientService, medicalRecords, beds, chat
 } from "@/services/api";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -204,12 +204,13 @@ export default function DoctorDashboard() {
     const [vitalsList, setVitalsList]   = useState<any[]>([]);
     const [records, setRecords]         = useState<any[]>([]);
     const [bedsList, setBedsList]       = useState<any[]>([]);
+    const [activeRooms, setActiveRooms] = useState<any[]>([]);
     const [expandedLab, setExpandedLab]   = useState<number | null>(null);
 
     useEffect(() => {
-        (async () => {
+        const fetchData = async () => {
             try {
-                const [me, pt, ap, lb, rx, vt, rec, bd] = await Promise.all([
+                const [me, pt, ap, lb, rx, vt, rec, bd, rooms] = await Promise.all([
                     auth.getMe(),
                     patientService.getAll().catch(() => []),
                     appointments.getAll().catch(() => []),
@@ -218,6 +219,7 @@ export default function DoctorDashboard() {
                     vitals.getAll().catch(() => []),
                     medicalRecords.getAll().catch(() => []),
                     beds.getAll().catch(() => []),
+                    chat.getActiveRooms().catch(() => []),
                 ]);
                 setUser(me);
                 setPatients(Array.isArray(pt) ? pt : []);
@@ -229,9 +231,21 @@ export default function DoctorDashboard() {
                 setVitalsList(Array.isArray(vt) ? vt : []);
                 setRecords(Array.isArray(rec) ? rec : []);
                 setBedsList(Array.isArray(bd) ? bd : []);
+                setActiveRooms(Array.isArray(rooms) ? rooms : []);
             } catch (e) { console.error(e); }
             finally { setLoading(false); }
-        })();
+        };
+        fetchData();
+        
+        // Polling for active sessions / updates every 10s
+        const interval = setInterval(async () => {
+            try {
+                const rooms = await chat.getActiveRooms();
+                setActiveRooms(Array.isArray(rooms) ? rooms : []);
+            } catch {}
+        }, 10000);
+        
+        return () => clearInterval(interval);
     }, []);
 
     // Derived
@@ -389,7 +403,7 @@ export default function DoctorDashboard() {
                             <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
                                     <h3 className="font-bold text-gray-900 text-sm">Patient Profiles</h3>
-                                    <Link href="/dashboard/Doctor/patients" className="text-xs text-blue-600 font-semibold flex items-center gap-1">
+                                    <Link href="/dashboard/doctor/patients" className="text-xs text-blue-600 font-semibold flex items-center gap-1">
                                         View All <ArrowUpRight className="w-3 h-3" />
                                     </Link>
                                 </div>
@@ -406,7 +420,7 @@ export default function DoctorDashboard() {
                                             const gender  = p?.gender || "—";
                                             const blood   = p?.blood_group || "";
                                             return (
-                                                <div key={p.id} onClick={() => router.push(`/dashboard/Doctor/patients/${p.id}`)}
+                                                <div key={p.id} onClick={() => router.push(`/dashboard/doctor/patients/${p.id}`)}
                                                     className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50/60 cursor-pointer transition-colors group"
                                                 >
                                                     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
@@ -430,8 +444,52 @@ export default function DoctorDashboard() {
                                 )}
                             </div>
 
-                            {/* Today's queue + waiting */}
                             <div className="space-y-3">
+                                {/* Active Clinical Messenger Hub */}
+                                <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden h-fit">
+                                    <div className="flex items-center justify-between px-5 py-4 border-b border-blue-50 bg-blue-50/10">
+                                        <h3 className="font-bold text-blue-900 text-sm flex items-center gap-2">
+                                            <Activity className="w-4 h-4 text-blue-500" /> Clinical Messenger
+                                        </h3>
+                                        <Link href="/dashboard/doctor/chat" className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                            {activeRooms.length} ACTIVE
+                                        </Link>
+                                    </div>
+                                    {activeRooms.length === 0 ? (
+                                        <div className="py-12 flex flex-col items-center gap-2 text-slate-300">
+                                            <Activity className="w-8 h-8 opacity-20" />
+                                            <p className="text-[11px] font-bold uppercase tracking-wider">No Active Sessions</p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-slate-50">
+                                            {activeRooms.map((room, i) => (
+                                                <div 
+                                                    key={i} 
+                                                    onClick={() => router.push(`/dashboard/doctor/chat?session=${room.consultation_id}`)}
+                                                    className="px-5 py-4 hover:bg-blue-50/30 transition-colors cursor-pointer group"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-inner">
+                                                                {init(room.patient_name)}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-black text-slate-900 truncate group-hover:text-blue-600 transition-colors">{room.patient_name}</p>
+                                                                <p className="text-[10px] font-bold text-emerald-500 uppercase flex items-center gap-1">
+                                                                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Live Session
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <Link href="/dashboard/doctor/chat" className="block text-center py-3 bg-slate-50/50 hover:bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest transition-colors">
+                                                Open Messenger Hub
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                                     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
                                         <h3 className="font-bold text-gray-900 text-sm">Today's Queue</h3>

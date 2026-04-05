@@ -22,4 +22,4 @@ class RadiologyScan(RadiologyScanBase, table=True):
     
     patient: "Patient" = Relationship(back_populates="scans")
     
-from .user import Patient
+

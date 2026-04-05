@@ -30,5 +30,4 @@ class Referral(ReferralBase, table=True):
     # Relationships
     patient: "Patient" = Relationship(back_populates="referrals")
 
-# Forward refs
-from .user import Doctor, Patient
+

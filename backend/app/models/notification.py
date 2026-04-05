@@ -24,4 +24,4 @@ class Notification(SQLModel, table=True):
 
     user: Optional["User"] = Relationship(back_populates="notifications")
 
-from .user import User
+

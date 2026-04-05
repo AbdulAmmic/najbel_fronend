@@ -12,4 +12,4 @@ class AttendanceLog(SQLModel, table=True):
 
     user: "User" = Relationship(back_populates="attendance_logs")
 
-from .user import User
+

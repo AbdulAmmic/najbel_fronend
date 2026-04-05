@@ -34,12 +34,12 @@ class User(UserBase, table=True):
     @property
     def has_wallet_pin(self) -> bool:
         return self.hashed_pin is not None
+    # Identity relationships
     doctor_profile: Optional["Doctor"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     patient_profile: Optional["Patient"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     attendance_logs: List["AttendanceLog"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     shifts: List["Shift"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     notifications: List["Notification"] = Relationship(back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
-    drug_orders: List["DrugOrder"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Doctor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -49,9 +49,10 @@ class Doctor(SQLModel, table=True):
     department: Optional[str] = None
     consultation_fee: float = Field(default=0.0)
     
-    user: User = Relationship(back_populates="doctor_profile")
+    user: "User" = Relationship(back_populates="doctor_profile")
     appointments: List["Appointment"] = Relationship(back_populates="doctor", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     lab_results: List["LabResult"] = Relationship(back_populates="doctor", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    consultations: List["Consultation"] = Relationship(back_populates="doctor", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 class Patient(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -80,7 +81,7 @@ class Patient(SQLModel, table=True):
     insurance_provider: Optional[str] = None
     insurance_policy_number: Optional[str] = None
     
-    user: User = Relationship(back_populates="patient_profile")
+    user: "User" = Relationship(back_populates="patient_profile")
     appointments: List["Appointment"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     vitals: List["Vitals"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     lab_results: List["LabResult"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -94,6 +95,8 @@ class Patient(SQLModel, table=True):
     medication_administrations: List["MedicationAdministration"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     nurse_activity_logs: List["NurseActivityLog"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
     referrals: List["Referral"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    drug_orders: List["DrugOrder"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+    consultations: List["Consultation"] = Relationship(back_populates="patient", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 if TYPE_CHECKING:
     from .attendance import AttendanceLog
@@ -114,6 +117,7 @@ if TYPE_CHECKING:
     from .medication_administration import MedicationAdministration
     from .nurse_activity_log import NurseActivityLog
     from .referral import Referral
+    from .consultation import Consultation
 
 class PasswordReset(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

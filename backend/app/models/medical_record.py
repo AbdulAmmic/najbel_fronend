@@ -18,4 +18,4 @@ class MedicalRecord(MedicalRecordBase, table=True):
     patient: "Patient" = Relationship()
     doctor: "Doctor" = Relationship()
 
-from .user import Patient, Doctor
+# End of file

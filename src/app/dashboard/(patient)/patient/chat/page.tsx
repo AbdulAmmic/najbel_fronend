@@ -151,26 +151,24 @@ export default function ChatPage() {
     const audioChunksRef = useRef<BlobPart[]>([]);
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [errorMessage, setErrorMessage] = useState("");
-    const [consultationId, setConsultationId] = useState<number | string | null>(null);
-    const [notAllowed, setNotAllowed] = useState(false);
+    const [reason, setReason] = useState<string | null>(null);
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
         const discoverSession = async () => {
             try {
-                const activeId = await consultations.getActiveChatId();
-                if (!activeId) {
-                  setNotAllowed(true);
-                  setLoading(false);
-                  return;
+                // active-chat returns: {active_chat_id: int | null, reason: str | null}
+                const data = await consultations.getActiveChatId();
+                if (!data.active_chat_id) {
+                    setReason(data.reason || "no_session");
+                    setNotAllowed(true);
+                    setLoading(false);
+                    return;
                 }
-                setConsultationId(activeId);
+                setConsultationId(data.active_chat_id);
             } catch (err: any) {
                 console.warn("No active chat session found:", err);
-                if (err.response?.status === 403) {
-                    setErrorMessage(err.response.data?.detail || "You must have at least one completed consultation to access the chat.");
-                }
+                setErrorMessage("Unable to sync clinical channel. Please try again later.");
                 setNotAllowed(true);
                 setLoading(false);
             }
@@ -337,44 +335,55 @@ export default function ChatPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-120px)] bg-[#f8fafc] text-center p-6 -mx-4 -my-6">
                 <div className="relative mb-8">
-                    <div className="w-24 h-24 bg-white rounded-[2rem] border border-gray-100 shadow-2xl shadow-blue-200/50 flex items-center justify-center relative z-10 animate-in zoom-in duration-700">
-                        <Zap className="w-12 h-12 text-blue-600 fill-blue-50" />
+                    <div className={`w-24 h-24 bg-white rounded-[2rem] border border-gray-100 shadow-2xl flex items-center justify-center relative z-10 animate-in zoom-in duration-700 ${reason === 'payment_required' ? 'shadow-orange-200/50' : 'shadow-blue-200/50'}`}>
+                        {reason === 'payment_required' ? (
+                            <ShoppingBag className="w-12 h-12 text-orange-500 fill-orange-50" />
+                        ) : (
+                            <Zap className="w-12 h-12 text-blue-600 fill-blue-50" />
+                        )}
                     </div>
-                    <div className="absolute inset-0 bg-blue-400 blur-3xl opacity-20 animate-pulse" />
+                    <div className={`absolute inset-0 blur-3xl opacity-20 animate-pulse ${reason === 'payment_required' ? 'bg-orange-400' : 'bg-blue-400'}`} />
                 </div>
                 
-                <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">Clinical Channel Locked</h2>
+                <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    {reason === 'payment_required' ? 'Consultation Fee Required' : 'Clinical Channel Locked'}
+                </h2>
                 
                 <div className="max-w-md bg-white border border-gray-100 p-6 rounded-[2rem] shadow-xl shadow-gray-200/40 mb-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
                     <p className="text-lg text-gray-600 leading-relaxed font-semibold mb-2">
-                        {errorMessage || "You must have at least one completed consultation to access the chat with doctors."}
+                        {reason === 'payment_required' 
+                            ? "To access the doctor-patient chat, please settle your consultation fee via the billing dashboard." 
+                            : (errorMessage || "You must have an active consultation session to access the medical team chat.")}
                     </p>
                     <p className="text-sm text-gray-400 font-medium italic">
-                        This channel is strictly reserved for follow-up care and clinical synchronization with your Najbel healthcare team.
+                        The Najbel Clinical Feed is strictly reserved for paid consultations and active care synchronization.
                     </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 items-center animate-in fade-in slide-in-from-bottom-12 duration-1000">
-                    <button 
-                        onClick={() => router.push('/dashboard/patient/appointments/book')} 
-                        className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-3 text-lg"
-                    >
-                        <Clock className="w-5 h-5" />
-                        Book Appointment
-                    </button>
+                    {reason === 'payment_required' ? (
+                        <button 
+                            onClick={() => router.push('/dashboard/patient/billing')} 
+                            className="px-10 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-2xl shadow-xl shadow-orange-500/30 active:scale-95 transition-all flex items-center gap-3 text-lg"
+                        >
+                            <ShoppingBag className="w-5 h-5" />
+                            Go to Billing
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={() => router.push('/dashboard/patient/appointments/book')} 
+                            className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-3 text-lg"
+                        >
+                            <Clock className="w-5 h-5" />
+                            Book Appointment
+                        </button>
+                    )}
                     <button 
                         onClick={() => router.back()} 
                         className="px-10 py-4 bg-white border border-gray-200 text-gray-600 font-bold rounded-2xl shadow-sm hover:bg-gray-50 active:scale-95 transition-all text-lg"
                     >
                         Go Back
                     </button>
-                </div>
-                
-                <div className="mt-12 flex items-center gap-6 opacity-40 grayscale animate-in fade-in duration-1000 delay-500">
-                    <div className="flex items-center gap-2 font-black tracking-tighter text-gray-400">
-                        <Activity className="w-5 h-5" />
-                        NAJBEL CLINICAL
-                    </div>
                 </div>
             </div>
         );

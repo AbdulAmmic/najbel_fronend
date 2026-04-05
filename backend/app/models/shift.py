@@ -22,4 +22,4 @@ class Shift(SQLModel, table=True):
     
     user: "User" = Relationship(back_populates="shifts")
 
-from .user import User
+

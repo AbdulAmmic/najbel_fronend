@@ -50,4 +50,4 @@ class PrescriptionItem(SQLModel, table=True):
     prescription: Optional["Prescription"] = Relationship(back_populates="items")
     inventory_item: Optional["InventoryItem"] = Relationship()
 
-from .inventory import InventoryItem 
+# End of file

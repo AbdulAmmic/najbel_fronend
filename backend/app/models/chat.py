@@ -15,3 +15,7 @@ class ChatMessage(SQLModel, table=True):
     is_ai: bool = Field(default=False)
     is_ai_assisted: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationship (optional but good for mapper)
+    # Note: consultation_id might be a Patient ID in the Unified Chat Model
+    # so we keep this relationship loose or purely for the mapper's registry.

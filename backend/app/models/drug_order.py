@@ -24,13 +24,13 @@ class DrugOrderBase(SQLModel):
 
 class DrugOrder(DrugOrderBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    patient_id: int = Field(foreign_key="user.id")
+    patient_id: int = Field(foreign_key="patient.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    patient: "User" = Relationship(back_populates="drug_orders")
+    patient: "Patient" = Relationship(back_populates="drug_orders")
 
-from .user import User
+# End of file
 
 
 class DrugOrderItemBase(SQLModel):

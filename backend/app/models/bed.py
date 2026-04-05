@@ -24,4 +24,4 @@ class Bed(BedBase, table=True):
     # Relationships
     patient: Optional["Patient"] = Relationship(back_populates="bed")
 
-from .user import Patient
+

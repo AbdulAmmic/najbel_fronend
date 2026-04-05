@@ -9,20 +9,57 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, room_id: str, role: str = "patient"):
         room_id = str(room_id)
         await websocket.accept()
+        
         if room_id not in self.active_connections:
             self.active_connections[room_id] = []
         self.active_connections[room_id].append({"ws": websocket, "role": role})
 
+        # Special logic: Doctors and Admissions staff join a global 'clinical_feed'
+        # This allows them to receive notifications for ANY patient's message
+        if role in ["doctor", "admin", "super_admin", "nurse"]:
+            feed_id = "clinical_feed"
+            if feed_id not in self.active_connections:
+                self.active_connections[feed_id] = []
+            # Check if already in feed to avoid duplicates
+            if not any(conn["ws"] == websocket for conn in self.active_connections[feed_id]):
+                self.active_connections[feed_id].append({"ws": websocket, "role": role})
+
     def disconnect(self, websocket: WebSocket, room_id: str):
         room_id = str(room_id)
+        # Remove from specific room
         if room_id in self.active_connections:
-            # Filter out the connection
             self.active_connections[room_id] = [
                 conn for conn in self.active_connections[room_id] 
                 if conn["ws"] != websocket
             ]
             if not self.active_connections[room_id]:
                 del self.active_connections[room_id]
+        
+        # Also remove from clinical_feed if they were there
+        feed_id = "clinical_feed"
+        if feed_id in self.active_connections:
+            self.active_connections[feed_id] = [
+                conn for conn in self.active_connections[feed_id] 
+                if conn["ws"] != websocket
+            ]
+            if not self.active_connections[feed_id]:
+                del self.active_connections[feed_id]
+
+    async def broadcast_to_doctors(self, message: str):
+        """Broadcasts only to connections in the clinical_feed channel."""
+        feed_id = "clinical_feed"
+        if feed_id in self.active_connections:
+            dead_connections = []
+            for connection in self.active_connections[feed_id]:
+                try:
+                    await connection["ws"].send_text(message)
+                except Exception as e:
+                    print(f"[WS] Feed broadcast failed: {e}")
+                    dead_connections.append(connection)
+            
+            # Cleanup dead
+            for dead in dead_connections:
+                self.active_connections[feed_id].remove(dead)
 
     async def broadcast(self, message: str, room_id: str):
         if room_id in self.active_connections:

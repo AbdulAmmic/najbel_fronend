@@ -250,7 +250,7 @@ export const consultations = {
         return response.data;
     },
     getActiveChatId: async () => {
-        const response = await api.get('consultations/active-chat-id');
+        const response = await api.get('consultations/active-chat');
         return response.data;
     }
 }
@@ -710,6 +710,21 @@ export const directiveService = {
     },
     updateStatus: async (id: number, data: { status: string, nurse_comment?: string }) => {
         const response = await api.patch(`directives/${id}`, data);
+        return response.data;
+    }
+};
+
+export const chat = {
+    getActiveRooms: async () => {
+        const response = await api.get('chat/active-rooms');
+        return response.data;
+    },
+    getHistory: async (consultationId: number | string) => {
+        const response = await api.get(`chat/chats/history/${consultationId}`);
+        return response.data;
+    },
+    sendMessage: async (data: { consultation_id: number | string, message?: string, sender_name: string, sender_role: string, audio_url?: string, image_url?: string }) => {
+        const response = await api.post('chat/send', data);
         return response.data;
     }
 };

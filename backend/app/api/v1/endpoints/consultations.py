@@ -67,12 +67,12 @@ def create_consultation(
     
     return consultation
 
-@router.get("/active-chat-id", response_model=int)
-def get_active_chat_id(
+@router.get("/active-chat")
+def get_active_chat_session(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Get the unified global chat ID (which maps directly to the Patient's ID)"""
+    """Get the active chat session for a patient, enforcing payment gating"""
     if current_user.role != UserRole.PATIENT:
         raise HTTPException(status_code=403, detail="Not authorized")
         
@@ -80,16 +80,36 @@ def get_active_chat_id(
     if not patient:
          raise HTTPException(status_code=404, detail="Patient profile not found")
          
-    # Check if patient has at least one consultation
-    consultation = db.exec(select(Consultation).where(Consultation.patient_id == patient.id)).first()
+    # Find the most recent consultation
+    consultation = db.exec(
+        select(Consultation)
+        .where(Consultation.patient_id == patient.id)
+        .order_by(Consultation.created_at.desc())
+    ).first()
+    
     if not consultation:
         raise HTTPException(
-            status_code=403, 
-            detail="Access Denied: You must have at least one completed consultation to access the chat with doctors."
+            status_code=404, 
+            detail="No consultation found. Please book an appointment to start a chat."
         )
 
-    # Under the Unfied Chat Model, the chat room ID is permanently bound to the Patient ID
-    return patient.id
+    # Check for payment (Invoice)
+    from app.models.invoice import Invoice
+    invoice = db.exec(select(Invoice).where(Invoice.consultation_id == consultation.id)).first()
+    
+    if not invoice or invoice.status != "paid":
+        return {
+            "status": "payment_required",
+            "consultation_id": consultation.id,
+            "invoice_id": invoice.id if invoice else None,
+            "detail": "Consultation fee payment required to access chat."
+        }
+        
+    return {
+        "status": "active",
+        "consultation_id": consultation.id,
+        "patient_name": current_user.full_name
+    }
 
 @router.get("/{id}", response_model=Consultation)
 def get_consultation(

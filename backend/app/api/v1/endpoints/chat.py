@@ -11,6 +11,42 @@ import json
 import traceback
 
 router = APIRouter()
+@router.get("/active-rooms")
+def get_active_chat_rooms(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    List all active consultations that have paid invoices (Staff only)
+    """
+    if current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    from app.models.invoice import Invoice
+    from app.models.consultation import Consultation
+    
+    # Simple query: Consultations with PAID invoices
+    # We join with Invoice to ensure payment status
+    statement = (
+        select(Consultation, Patient, User)
+        .join(Patient, Consultation.patient_id == Patient.id)
+        .join(User, Patient.user_id == User.id)
+        .join(Invoice, Consultation.id == Invoice.consultation_id)
+        .where(Invoice.status == "paid")
+        .order_by(Consultation.created_at.desc())
+    )
+    
+    results = db.exec(statement).all()
+    
+    return [
+        {
+            "consultation_id": c.id,
+            "patient_id": p.id,
+            "patient_name": u.full_name,
+            "created_at": c.created_at.isoformat()
+        }
+        for c, p, u in results
+    ]
 
 @router.get("/chats/history/{consultation_id}", response_model=List[ChatMessageSchema])
 def get_chat_history(
@@ -24,8 +60,14 @@ def get_chat_history(
     # RBAC logic
     if current_user.role == UserRole.PATIENT:
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
-        if not patient or consultation_id != patient.id:
-            raise HTTPException(status_code=403, detail="Access Denied: You can only view your own chat history.")
+        if not patient:
+            raise HTTPException(status_code=404, detail="Patient profile not found")
+        
+        # Check if the requested consultation belongs to this patient
+        from app.models.consultation import Consultation
+        consultation = db.get(Consultation, consultation_id)
+        if not consultation or consultation.patient_id != patient.id:
+            raise HTTPException(status_code=403, detail="Access Denied: You can only view your own consultations.")
     elif current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN]:
         raise HTTPException(status_code=403, detail="Access Denied: Insufficient permissions.")
 
@@ -124,11 +166,16 @@ async def websocket_endpoint(
                 image_url = None
                 is_ai_assisted = False
 
-            # 1. Broadcast to others immediately
-            print(f"[WS] Broadcasting to others...")
+            # 1. Broadcast to others in the room
+            print(f"[WS] Broadcasting to others in room {consultation_id}...")
             await manager.broadcast_to_others(data, consultation_id, websocket)
 
-            # 2. Persist to DB
+            # 2. Shared Doctor Pool Logic: If sender is a patient, also broadcast to the clinical_feed
+            if role == "patient":
+                print(f"[WS] Broadcasting to clinical_feed (Shared Doctor Pool)...")
+                await manager.broadcast_to_doctors(data)
+
+            # 3. Persist to DB
             if user_text or audio_url or image_url:
                 print(f"[WS] Attempting DB persistence...")
                 try:
@@ -148,7 +195,7 @@ async def websocket_endpoint(
                         session.refresh(user_msg)
                         print(f"[WS] DB SUCCESS: Saved ID={user_msg.id}")
                         
-                        # 3. Send ACK to sender
+                        # 4. Send ACK to sender
                         await websocket.send_json({
                             "type": "ack",
                             "id": user_msg.id,
