@@ -391,7 +391,7 @@ export default function ChatPage() {
 
     const handleSendMessage = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!newMessage.trim() || !socketRef.current) return;
+        if (!newMessage.trim()) return;
 
         const payload = {
             text: newMessage,
@@ -416,10 +416,9 @@ export default function ChatPage() {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify(payload));
         } else {
-            console.log('[CHAT_DEBUG] WebSocket down, using REST fallback');
+            console.log('[CHAT_DEBUG] WebSocket not open, using REST fallback');
             chat.sendMessage({ 
-                ...payload, 
-                consultation_id: consultationId,
+                consultation_id: consultationId!,
                 message: newMessage,
                 sender_name: "Patient",
                 sender_role: "patient"

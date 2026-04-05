@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { appointments, patients, labs, departments, beds, prescriptions as prescriptionsApi, consultations } from "@/services/api";
 import { formatDate, calculateAge } from "@/utils/date";
+import ChatBox from "@/components/chat/ChatBox";
+import api from "@/services/api";
 
 declare global {
     interface Window {
@@ -69,6 +71,9 @@ export default function ConsultationPage({ params }: { params: Promise<{ id: str
     const [appointment, setAppointment] = useState<any>(null);
     const [patient, setPatient] = useState<any>(null);
     const [history, setHistory] = useState<any[]>([]);
+    const [consultationId, setConsultationId] = useState<number | null>(null);
+    const [chatLoading, setChatLoading] = useState(false);
+    const [doctorName, setDoctorName] = useState("Doctor");
 
     // Available Resources State
     const [availableLabs, setAvailableLabs] = useState<any[]>([]);
@@ -179,6 +184,33 @@ export default function ConsultationPage({ params }: { params: Promise<{ id: str
 
         if (id) fetchData();
     }, [id]);
+
+    // Start or fetch consultation session when Chat tab is clicked
+    const handleStartChatSession = async () => {
+        if (consultationId) return; // Already have one
+        setChatLoading(true);
+        try {
+            const data = await consultations.startSession(Number(id));
+            setConsultationId(data.consultation_id);
+        } catch (err) {
+            // Fallback: try to get existing consultation
+            try {
+                const existing = await consultations.getByAppointment(Number(id));
+                if (existing?.id) setConsultationId(existing.id);
+            } catch (e) {
+                console.error("Failed to start chat session", e);
+            }
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    // Fetch current doctor's name for the chat
+    useEffect(() => {
+        api.get('users/me').then(res => {
+            setDoctorName(res.data?.full_name || "Doctor");
+        }).catch(() => {});
+    }, []);
 
     const startRecording = (textarea: string) => {
         setActiveTextarea(textarea);
@@ -421,10 +453,14 @@ Recommendations: Continue monitoring vitals. Follow-up in 2 weeks.
                                 { id: "labs", label: "Lab Tests", icon: TestTube },
                                 { id: "refer", label: "Refer", icon: Send },
                                 { id: "admit", label: "Admit", icon: Bed },
+                                { id: "chat", label: "Chat Patient", icon: MessageSquare },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    onClick={() => {
+                                        setActiveTab(tab.id);
+                                        if (tab.id === "chat") handleStartChatSession();
+                                    }}
                                     className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium ${activeTab === tab.id
                                         ? "text-blue-600 border-b-2 border-blue-600"
                                         : "text-gray-600 hover:text-gray-900"
@@ -759,6 +795,33 @@ Recommendations: Continue monitoring vitals. Follow-up in 2 weeks.
                                             placeholder="Why is this patient being admitted?..."
                                         />
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Chat with Patient */}
+                            {activeTab === "chat" && (
+                                <div>
+                                    {chatLoading ? (
+                                        <div className="flex items-center justify-center h-40 gap-3">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                            <span className="text-gray-500">Opening secure channel...</span>
+                                        </div>
+                                    ) : consultationId ? (
+                                        <ChatBox
+                                            consultationId={consultationId}
+                                            currentUser={doctorName}
+                                            recipientName={patient?.user?.full_name || patient?.full_name || "Patient"}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center h-40 gap-3 text-gray-400">
+                                            <MessageSquare className="h-10 w-10 opacity-30" />
+                                            <p>Could not open chat channel. Please try again.</p>
+                                            <button
+                                                onClick={handleStartChatSession}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                                            >Retry</button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

@@ -83,49 +83,43 @@ def send_message_rest(
 ):
     """
     REST Fallback for sending messages when WebSockets are unavailable.
+    Accepts both snake_case and camelCase field names for compatibility.
     """
-    consultation_id = message_in.get("consultationId")
+    # Accept both naming conventions
+    consultation_id = message_in.get("consultation_id") or message_in.get("consultationId")
     if not consultation_id:
-        raise HTTPException(status_code=400, detail="consultationId required")
-    
-    # RBAC: Same as history
+        raise HTTPException(status_code=400, detail="consultation_id required")
+
+    consultation_id = int(consultation_id)
+
+    # RBAC: Patients can only send to their own consultations
     if current_user.role == UserRole.PATIENT:
+        from app.models.consultation import Consultation
         patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
-        if not patient or int(consultation_id) != patient.id:
+        if not patient:
+            raise HTTPException(status_code=403, detail="Patient profile not found")
+        consultation = db.get(Consultation, consultation_id)
+        if not consultation or consultation.patient_id != patient.id:
             raise HTTPException(status_code=403, detail="Access Denied")
-            
+
+    # Accept both 'message' and 'text' field names
+    text = message_in.get("message") or message_in.get("text") or ""
+    sender_name = message_in.get("sender_name") or message_in.get("senderName") or current_user.full_name
+    sender_role = message_in.get("sender_role") or message_in.get("senderRole") or str(current_user.role)
+
     user_msg = ChatMessage(
-        consultation_id=int(consultation_id),
-        sender_name=message_in.get("senderName", current_user.full_name),
-        sender_role=message_in.get("senderRole", current_user.role),
-        message=message_in.get("text", ""),
-        audio_url=message_in.get("audioUrl"),
-        image_url=message_in.get("imageUrl"),
+        consultation_id=consultation_id,
+        sender_name=sender_name,
+        sender_role=sender_role,
+        message=text,
+        audio_url=message_in.get("audioUrl") or message_in.get("audio_url"),
+        image_url=message_in.get("imageUrl") or message_in.get("image_url"),
         is_ai=False
     )
     db.add(user_msg)
     db.commit()
     db.refresh(user_msg)
-    
-    # Broadcast to anyone connected via WebSocket
-    try:
-        import asyncio
-        import json
-        payload = {
-            "id": user_msg.id,
-            "message": user_msg.message,
-            "senderName": user_msg.sender_name,
-            "senderRole": user_msg.sender_role,
-            "audioUrl": user_msg.audio_url,
-            "imageUrl": user_msg.image_url,
-            "created_at": user_msg.created_at.isoformat()
-        }
-        # We need a bridge between sync and async to broadcast
-        # For now, we'll just rely on the recipient polling or connecting later
-        # But we can try to call manager's broadcast (requires async)
-    except Exception:
-        pass
-        
+
     return user_msg
 
 @router.websocket("/ws/consultations/{consultation_id}")

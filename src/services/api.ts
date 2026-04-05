@@ -252,6 +252,10 @@ export const consultations = {
     getActiveChatId: async () => {
         const response = await api.get('consultations/active-chat');
         return response.data;
+    },
+    startSession: async (appointmentId: number) => {
+        const response = await api.post(`consultations/start/${appointmentId}`);
+        return response.data;
     }
 }
 

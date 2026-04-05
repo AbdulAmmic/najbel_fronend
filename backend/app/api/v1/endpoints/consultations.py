@@ -5,6 +5,7 @@ from app.api import deps
 from app.models.user import User, UserRole, Doctor, Patient
 from app.models.appointment import Appointment, AppointmentStatus, AppointmentType
 from app.models.consultation import Consultation
+from app.models.invoice import Invoice, InvoiceStatus
 from app.core.websockets import manager
 from datetime import datetime
 
@@ -67,6 +68,49 @@ def create_consultation(
     
     return consultation
 
+@router.post("/start/{appointment_id}")
+def start_or_get_consultation(
+    appointment_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Find or create a consultation record for a given appointment (Doctor only). Used for chat."""
+    if current_user.role != UserRole.DOCTOR:
+        raise HTTPException(status_code=403, detail="Only doctors can start consultations")
+
+    doctor = db.exec(select(Doctor).where(Doctor.user_id == current_user.id)).first()
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Doctor profile not found")
+
+    appointment = db.get(Appointment, appointment_id)
+    if not appointment:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    # Return existing if already exists
+    existing = db.exec(select(Consultation).where(Consultation.appointment_id == appointment_id)).first()
+    if existing:
+        return {"consultation_id": existing.id, "is_new": False}
+
+    # Create a skeleton consultation for chat
+    consultation = Consultation(
+        appointment_id=appointment_id,
+        patient_id=appointment.patient_id,
+        doctor_id=doctor.id,
+        symptoms="Pending",
+        diagnosis="Pending",
+        notes=None,
+        is_admitted=False
+    )
+    db.add(consultation)
+
+    # Update appointment to in-consultation
+    appointment.status = AppointmentStatus.IN_CONSULTATION
+    db.add(appointment)
+    db.commit()
+    db.refresh(consultation)
+
+    return {"consultation_id": consultation.id, "is_new": True}
+
 @router.get("/active-chat")
 def get_active_chat_session(
     db: Session = Depends(deps.get_db),
@@ -102,18 +146,17 @@ def get_active_chat_session(
             is_paid = True
             
     # 2. Check for Invoice (Staff-booked fallback)
-    from app.models.invoice import Invoice
     invoice = None
     if not is_paid:
         invoice = db.exec(
             select(Invoice)
             .where(
-                (Invoice.consultation_id == consultation.id) | 
+                (Invoice.consultation_id == consultation.id) |
                 (Invoice.appointment_id == consultation.appointment_id)
             )
         ).first()
-        
-        if invoice and invoice.status ==InvoiceStatus.PAID:
+
+        if invoice and invoice.status == InvoiceStatus.PAID:
             is_paid = True
     
     if not is_paid and not (appointment and appointment.status in [AppointmentStatus.COMPLETED, AppointmentStatus.IN_CONSULTATION]):
