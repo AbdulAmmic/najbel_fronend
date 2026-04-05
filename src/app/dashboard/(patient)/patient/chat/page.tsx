@@ -156,6 +156,7 @@ export default function ChatPage() {
     const [consultationId, setConsultationId] = useState<number | null>(null);
     const [notAllowed, setNotAllowed] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
+    const [isActive, setIsActive] = useState(false);
 
     // Dynamic Discovery of Active Chat Session
     useEffect(() => {
@@ -165,11 +166,18 @@ export default function ChatPage() {
                 const data = await consultations.getActiveChatId();
                 if (!data.active_chat_id) {
                     setReason(data.reason || "no_session");
-                    setNotAllowed(true);
+                    setIsActive(false);
+                    // If we have history but no active ID, don't lock the whole page
+                    if (data.last_consultation_id) {
+                         setConsultationId(data.last_consultation_id);
+                    } else {
+                        setNotAllowed(true);
+                    }
                     setLoading(false);
                     return;
                 }
                 setConsultationId(data.active_chat_id);
+                setIsActive(true);
             } catch (err: any) {
                 console.warn("No active chat session found:", err);
                 setErrorMessage("Unable to sync clinical channel. Please try again later.");
@@ -351,7 +359,7 @@ export default function ChatPage() {
                         </button>
                     ) : (
                         <button 
-                            onClick={() => router.push('/dashboard/patient/appointments/book')} 
+                            onClick={() => router.push('/dashboard/patient/appointments')} 
                             className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-600/30 active:scale-95 transition-all flex items-center gap-3 text-lg"
                         >
                             <Clock className="w-5 h-5" />
@@ -586,6 +594,26 @@ export default function ChatPage() {
                     <div className="absolute top-20 left-10 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full pointer-events-none" />
                     <div className="absolute bottom-20 right-10 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full pointer-events-none" />
 
+                    {!isActive && consultationId && (
+                        <div className="sticky top-0 z-30 mb-6 py-4 px-6 bg-amber-50 border-b border-amber-100 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
+                             <div className="flex items-center gap-3">
+                                 <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
+                                     <Clock className="w-5 h-5" />
+                                 </div>
+                                 <div className="text-center sm:text-left">
+                                     <p className="text-sm font-bold text-gray-900">Historical View Only</p>
+                                     <p className="text-[11px] text-gray-500">You are viewing a closed consultation. Book a new appointment to chat with a doctor.</p>
+                                 </div>
+                             </div>
+                             <button 
+                                onClick={() => router.push('/dashboard/patient/appointments')}
+                                className="px-5 py-2 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95"
+                             >
+                                 Book Appointment
+                             </button>
+                        </div>
+                    )}
+
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400">
                             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -702,8 +730,8 @@ export default function ChatPage() {
                                     type="text"
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
-                                    placeholder="Message AI Support..."
-                                    disabled={loading}
+                                    placeholder={isActive ? "Message AI Support..." : "Consultation closed (Read-only)"}
+                                    disabled={loading || !isActive}
                                     className="w-full pl-5 pr-[110px] py-3.5 bg-gray-50 border-2 border-gray-100/50 rounded-full outline-none focus:bg-white focus:border-blue-300 focus:ring-4 focus:ring-blue-50 transition-all font-bold text-gray-700 placeholder:text-gray-400 disabled:opacity-50"
                                 />
                                 <div className="absolute right-1.5 flex items-center gap-0.5">

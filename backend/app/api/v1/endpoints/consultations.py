@@ -78,7 +78,7 @@ def get_active_chat_session(
         
     patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
     if not patient:
-         raise HTTPException(status_code=404, detail="Patient profile not found")
+         return {"active_chat_id": None, "last_consultation_id": None, "reason": "no_profile"}
          
     # Find the most recent consultation
     consultation = db.exec(
@@ -88,10 +88,7 @@ def get_active_chat_session(
     ).first()
     
     if not consultation:
-        raise HTTPException(
-            status_code=404, 
-            detail="No consultation found. Please book an appointment to start a chat."
-        )
+        return {"active_chat_id": None, "last_consultation_id": None, "reason": "no_session"}
 
     # Check for payment (Invoice)
     from app.models.invoice import Invoice
@@ -99,15 +96,17 @@ def get_active_chat_session(
     
     if not invoice or invoice.status != "paid":
         return {
-            "status": "payment_required",
-            "consultation_id": consultation.id,
+            "active_chat_id": None,
+            "last_consultation_id": consultation.id,
+            "reason": "payment_required",
             "invoice_id": invoice.id if invoice else None,
             "detail": "Consultation fee payment required to access chat."
         }
         
     return {
-        "status": "active",
-        "consultation_id": consultation.id,
+        "active_chat_id": consultation.id,
+        "last_consultation_id": consultation.id,
+        "reason": "active",
         "patient_name": current_user.full_name
     }
 
