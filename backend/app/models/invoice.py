@@ -14,6 +14,8 @@ class Invoice(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     invoice_number: str = Field(index=True, unique=True)
     patient_id: int = Field(foreign_key="patient.id")
+    appointment_id: Optional[int] = Field(default=None, foreign_key="appointment.id")
+    consultation_id: Optional[int] = Field(default=None, foreign_key="consultation.id")
     amount: float
     status: InvoiceStatus = Field(default=InvoiceStatus.PENDING)
     due_date: datetime

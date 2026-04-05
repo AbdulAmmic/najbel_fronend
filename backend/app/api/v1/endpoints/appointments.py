@@ -126,6 +126,7 @@ async def create_appointment(
         invoice = Invoice(
             invoice_number=f"INV-{uuid.uuid4().hex[:8].upper()}",
             patient_id=patient_id,
+            appointment_id=appointment.id,
             amount=fee,
             status=InvoiceStatus.PENDING,
             due_date=datetime.utcnow()

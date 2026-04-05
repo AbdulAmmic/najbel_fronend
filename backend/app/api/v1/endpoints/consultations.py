@@ -90,11 +90,34 @@ def get_active_chat_session(
     if not consultation:
         return {"active_chat_id": None, "last_consultation_id": None, "reason": "no_session"}
 
-    # Check for payment (Invoice)
-    from app.models.invoice import Invoice
-    invoice = db.exec(select(Invoice).where(Invoice.consultation_id == consultation.id)).first()
+    # Logic to determine if "Paid":
+    # 1. Check associated Appointment
+    is_paid = False
+    appointment = db.get(Appointment, consultation.appointment_id)
     
-    if not invoice or invoice.status != "paid":
+    if appointment:
+        # If it's a wallet payment, we assume success IF it reached this stage (debit is mandatory for wallet appts)
+        if appointment.type == AppointmentType.ONLINE and appointment.communication_preference == "in_app_chat":
+            # For online/chat appts, we consider them paid if they were successfully booked by patient
+            is_paid = True
+            
+    # 2. Check for Invoice (Staff-booked fallback)
+    from app.models.invoice import Invoice
+    invoice = None
+    if not is_paid:
+        invoice = db.exec(
+            select(Invoice)
+            .where(
+                (Invoice.consultation_id == consultation.id) | 
+                (Invoice.appointment_id == consultation.appointment_id)
+            )
+        ).first()
+        
+        if invoice and invoice.status ==InvoiceStatus.PAID:
+            is_paid = True
+    
+    if not is_paid and not (appointment and appointment.status in [AppointmentStatus.COMPLETED, AppointmentStatus.IN_CONSULTATION]):
+        # If no payment record found and NOT explicitly approved by doctor (already consulting)
         return {
             "active_chat_id": None,
             "last_consultation_id": consultation.id,
