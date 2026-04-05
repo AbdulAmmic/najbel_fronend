@@ -428,14 +428,14 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
     };
 
     if (loading) return (
-        <div className="flex flex-col h-[600px] bg-white rounded-[32px] border border-slate-100 items-center justify-center gap-4">
+        <div className="flex flex-col h-full min-h-[400px] bg-white rounded-[32px] border border-slate-100 items-center justify-center gap-4">
             <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading Secure Channel...</p>
         </div>
     );
 
     return (
-        <div className="flex flex-col h-[600px] bg-gradient-to-br from-white to-sky-50 rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative">
+        <div className="flex flex-col h-full bg-gradient-to-br from-white to-sky-50 rounded-2xl shadow-xl border border-gray-100 overflow-hidden relative">
             {/* Chat Header */}
             <div className="p-4 border-b border-gray-100 bg-white/90 backdrop-blur-md shadow-sm flex items-center justify-between z-10 relative shrink-0">
                 <div className="flex items-center gap-4">
