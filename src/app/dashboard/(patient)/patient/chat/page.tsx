@@ -441,16 +441,25 @@ export default function ChatPage() {
         reader.onloadend = () => {
             const base64Image = reader.result as string;
             const msgId = `temp-${Date.now()}`;
+            const wsPayload = JSON.stringify({
+                text: "📷 Image",
+                senderName: "Patient",
+                senderRole: "patient",
+                imageUrl: base64Image,
+                type: "message"
+            });
 
             if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-                const msgPayload = JSON.stringify({
-                    text: "📷 Image",
-                    senderName: "Patient",
-                    senderRole: "patient",
-                    imageUrl: base64Image,
-                    type: "message"
-                });
-                socketRef.current.send(msgPayload);
+                socketRef.current.send(wsPayload);
+            } else {
+                // REST fallback for image
+                chat.sendMessage({
+                    consultation_id: consultationId!,
+                    message: "📷 Image",
+                    sender_name: "Patient",
+                    sender_role: "patient",
+                    image_url: base64Image
+                }).catch(err => console.error("Image REST fallback failed", err));
             }
 
             const newMsg: Message = {
@@ -489,16 +498,25 @@ export default function ChatPage() {
                 reader.onloadend = () => {
                     const base64Audio = reader.result as string;
                     const msgId = `temp-${Date.now()}`;
+                    const wsPayload = JSON.stringify({
+                        text: "🎵 Voice Note",
+                        senderName: "Patient",
+                        senderRole: "patient",
+                        audioUrl: base64Audio,
+                        type: "message"
+                    });
 
                     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-                        const msgPayload = JSON.stringify({
-                            text: "🎵 Voice Note",
-                            senderName: "Patient",
-                            senderRole: "patient",
-                            audioUrl: base64Audio,
-                            type: "message"
-                        });
-                        socketRef.current.send(msgPayload);
+                        socketRef.current.send(wsPayload);
+                    } else {
+                        // REST fallback for audio
+                        chat.sendMessage({
+                            consultation_id: consultationId!,
+                            message: "🎵 Voice Note",
+                            sender_name: "Patient",
+                            sender_role: "patient",
+                            audio_url: base64Audio
+                        }).catch(err => console.error("Audio REST fallback failed", err));
                     }
 
                     const newMsg: Message = {

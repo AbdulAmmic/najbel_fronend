@@ -11,9 +11,35 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    run_migrations()
     # Warm up passlib's CryptContext to avoid lazy loading delay on first login
     pwd_context.hash("warmup_password")
     yield
+
+def run_migrations():
+    """
+    Safe inline migrations for columns added after initial deployment.
+    Uses IF NOT EXISTS so this is idempotent on every startup.
+    """
+    from app.db.session import engine
+    from sqlalchemy import text
+
+    migrations = [
+        # Invoice: add appointment_id and consultation_id (added 2026-04-05)
+        "ALTER TABLE invoice ADD COLUMN IF NOT EXISTS appointment_id INTEGER REFERENCES appointment(id) ON DELETE SET NULL",
+        "ALTER TABLE invoice ADD COLUMN IF NOT EXISTS consultation_id INTEGER REFERENCES consultation(id) ON DELETE SET NULL",
+    ]
+
+    with engine.connect() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+                print(f"[MIGRATION] OK: {stmt[:60]}...")
+            except Exception as e:
+                # Column may already exist (non-Postgres DBs don't support IF NOT EXISTS)
+                print(f"[MIGRATION] Skipped (already applied or error): {e}")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

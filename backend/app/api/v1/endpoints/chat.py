@@ -150,7 +150,7 @@ async def websocket_endpoint(
                 image_url = payload.get("imageUrl", None)
                 sender_role = payload.get("senderRole") or role
                 is_ai_assisted = payload.get("isAiAssisted", False)
-                print(f"[WS] PARSED: text='{user_text[:20]}...' role={sender_role}")
+                print(f"[WS] PARSED: text='{user_text[:20]}' role={sender_role} audio={bool(audio_url)} image={bool(image_url)}")
             except Exception as pe:
                 print(f"[WS] JSON PARSE FAIL: {pe}. Using raw data as text.")
                 user_text = data
@@ -164,10 +164,20 @@ async def websocket_endpoint(
             print(f"[WS] Broadcasting to others in room {consultation_id}...")
             await manager.broadcast_to_others(data, consultation_id, websocket)
 
-            # 2. Shared Doctor Pool Logic: If sender is a patient, also broadcast to the clinical_feed
+            # 2. If sender is a patient, broadcast to ALL doctors via clinical_feed
+            # Enrich payload with consultationId so doctor dashboards know which room to update
             if role == "patient":
-                print(f"[WS] Broadcasting to clinical_feed (Shared Doctor Pool)...")
-                await manager.broadcast_to_doctors(data)
+                print(f"[WS] Broadcasting to clinical_feed (All Doctors)...")
+                enriched = json.dumps({
+                    "consultationId": consultation_id,
+                    "text": user_text,
+                    "senderName": sender_name,
+                    "senderRole": sender_role,
+                    "audioUrl": audio_url,
+                    "imageUrl": image_url,
+                    "type": "patient_message"
+                })
+                await manager.broadcast_to_doctors(enriched)
 
             # 3. Persist to DB
             if user_text or audio_url or image_url:
@@ -208,3 +218,39 @@ async def websocket_endpoint(
         print(f"[WS] CRITICAL ERROR in loop: {e}")
         traceback.print_exc()
         manager.disconnect(websocket, consultation_id)
+
+
+@router.websocket("/ws/clinical_feed")
+async def clinical_feed_endpoint(
+    websocket: WebSocket,
+    token: Optional[str] = Query(None)
+):
+    """
+    Dedicated WebSocket for doctors/staff to receive ALL patient messages in real-time.
+    Doctors connect here and get notified whenever ANY patient sends a message.
+    """
+    print("[WS] Doctor connecting to clinical_feed")
+    # Register in clinical_feed so they get patient broadcasts
+    feed_id = "clinical_feed"
+    await websocket.accept()
+    if feed_id not in manager.active_connections:
+        manager.active_connections[feed_id] = []
+    if not any(conn["ws"] == websocket for conn in manager.active_connections[feed_id]):
+        manager.active_connections[feed_id].append({"ws": websocket, "role": "doctor"})
+
+    try:
+        while True:
+            # Keep connection alive - doctors only listen on this channel
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        if feed_id in manager.active_connections:
+            manager.active_connections[feed_id] = [
+                c for c in manager.active_connections[feed_id] if c["ws"] != websocket
+            ]
+        print("[WS] Doctor disconnected from clinical_feed")
+    except Exception as e:
+        print(f"[WS] clinical_feed error: {e}")
+        if feed_id in manager.active_connections:
+            manager.active_connections[feed_id] = [
+                c for c in manager.active_connections[feed_id] if c["ws"] != websocket
+            ]

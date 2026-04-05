@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
     Search,
     MessageSquare,
-    Loader2
+    Loader2,
+    Mic,
+    Image as ImageIcon
 } from "lucide-react";
-import { chat, auth } from "@/services/api";
+import { chat, auth, getWsBaseUrl } from "@/services/api";
 import ChatBox from "@/components/chat/ChatBox";
 
 interface ActiveRoom {
@@ -16,6 +18,7 @@ interface ActiveRoom {
     created_at: string;
     last_message?: string;
     last_timestamp?: string;
+    unread?: number;
 }
 
 export default function ClinicalMessenger() {
@@ -24,6 +27,7 @@ export default function ClinicalMessenger() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [userMe, setUserMe] = useState<any>(null);
+    const feedWsRef = useRef<WebSocket | null>(null);
 
     // Initial load
     useEffect(() => {
@@ -44,31 +48,38 @@ export default function ClinicalMessenger() {
         init();
     }, []);
 
-    // WebSocket for Clinical Feed (Listen for all patient messages)
+    // WebSocket: Subscribe to ALL patient messages via clinical_feed
     useEffect(() => {
         if (!userMe) return;
 
-        const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/api/v1";
-        const wsToken = localStorage.getItem("token") || "";
-        const ws = new WebSocket(`${wsBase}/chat/ws/clinical_feed?token=${wsToken}`);
+        const wsBase = getWsBaseUrl();
+        const wsToken = typeof window !== 'undefined' ? localStorage.getItem("token") || "" : "";
+        const wsUrl = `${wsBase}/ws/clinical_feed?token=${wsToken}`;
+        
+        console.log("[ClinicalFeed] Connecting to:", wsUrl);
+        const ws = new WebSocket(wsUrl);
+        feedWsRef.current = ws;
 
-        ws.onopen = () => console.log("[ClinicalFeed] Connected");
+        ws.onopen = () => console.log("[ClinicalFeed] Connected - receiving all patient messages");
         ws.onmessage = (event) => {
             try {
                 const payload = JSON.parse(event.data);
-                // We only care about patient messages to update the rooms list
-                // If it's a message for a room we have in the list, update its preview
+                const roomId = Number(payload.consultationId);
+                const preview = payload.audioUrl ? "🎵 Voice note" 
+                             : payload.imageUrl ? "📷 Image" 
+                             : (payload.text || payload.message || "New message");
+
                 setRooms(prev => {
                     const updated = [...prev];
-                    const roomIdx = updated.findIndex(r => r.consultation_id === Number(payload.consultationId));
+                    const roomIdx = updated.findIndex(r => r.consultation_id === roomId);
                     if (roomIdx > -1) {
-                        updated[roomIdx] = {
+                        const room = { 
                             ...updated[roomIdx],
-                            last_message: payload.text || payload.message,
-                            last_timestamp: payload.timestamp || payload.created_at || new Date().toISOString()
+                            last_message: preview,
+                            last_timestamp: new Date().toISOString(),
+                            unread: selectedRoomId === roomId ? 0 : (updated[roomIdx].unread || 0) + 1
                         };
-                        // Move to top
-                        const room = updated.splice(roomIdx, 1)[0];
+                        updated.splice(roomIdx, 1);
                         updated.unshift(room);
                     }
                     return updated;
@@ -77,6 +88,8 @@ export default function ClinicalMessenger() {
                 console.error("[ClinicalFeed] Parse error:", err);
             }
         };
+        ws.onerror = (e) => console.error("[ClinicalFeed] WS Error", e);
+        ws.onclose = () => console.log("[ClinicalFeed] Disconnected");
 
         return () => ws.close();
     }, [userMe]);
@@ -126,13 +139,26 @@ export default function ClinicalMessenger() {
                         filteredRooms.map(room => (
                             <button 
                                 key={room.consultation_id}
-                                onClick={() => setSelectedRoomId(room.consultation_id)}
+                                onClick={() => {
+                                    setSelectedRoomId(room.consultation_id);
+                                    // Clear unread badge
+                                    setRooms(prev => prev.map(r => 
+                                        r.consultation_id === room.consultation_id ? { ...r, unread: 0 } : r
+                                    ));
+                                }}
                                 className={`w-full text-left p-6 transition-all border-b border-slate-50 flex items-center gap-4 ${
                                     selectedRoomId === room.consultation_id ? "bg-blue-50/50 border-r-4 border-r-blue-600 shadow-inner" : "hover:bg-slate-50/50"
                                 }`}
                             >
-                                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black shrink-0 uppercase">
-                                    {room.patient_name[0]}
+                                <div className="relative">
+                                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 font-black shrink-0 uppercase">
+                                        {room.patient_name[0]}
+                                    </div>
+                                    {(room.unread || 0) > 0 && (
+                                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse">
+                                            {room.unread}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-center mb-1">
@@ -141,7 +167,9 @@ export default function ClinicalMessenger() {
                                             {room.last_timestamp ? new Date(room.last_timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 truncate font-semibold">
+                                    <p className="text-[11px] text-slate-500 truncate font-semibold flex items-center gap-1">
+                                        {room.last_message?.startsWith("🎵") && <Mic className="w-3 h-3 text-purple-400 shrink-0" />}
+                                        {room.last_message?.startsWith("📷") && <ImageIcon className="w-3 h-3 text-blue-400 shrink-0" />}
                                         {room.last_message || "Active Session"}
                                     </p>
                                 </div>
@@ -171,7 +199,11 @@ export default function ClinicalMessenger() {
                             Select a patient from the list on the left to view history and start communicating in real-time.
                         </p>
                         <div className="mt-8 flex gap-3">
-                            <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                            <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
                                 Shared Pool: Active
                             </div>
                             <div className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-100">
