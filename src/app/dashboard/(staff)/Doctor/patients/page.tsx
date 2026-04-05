@@ -186,7 +186,6 @@ export default function MyPatientsPage() {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<"all" | "admitted" | "outpatient">("all");
     const [showFilter, setShowFilter] = useState(false);
-    const searchRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         patientService.getAll()
@@ -250,7 +249,6 @@ export default function MyPatientsPage() {
                 <div className="relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     <input
-                        ref={searchRef}
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search patients…"
