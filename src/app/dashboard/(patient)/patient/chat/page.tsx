@@ -227,7 +227,7 @@ export default function ChatPage() {
     useEffect(() => {
         if (!consultationId) return;
 
-        // 1. Fetch History from the database
+        // 1. Fetch History from the database immediately
         const syncMessages = async () => {
             try {
                 const history = await chat.getHistory(consultationId);
@@ -242,78 +242,86 @@ export default function ChatPage() {
                     isAI: msg.sender_role === 'ai',
                     status: 'read' as const
                 }));
-                setMessages(prev => {
-                    const shadow = [...prev];
-                    const newIds = new Set(formatted.map((m: any) => m.id));
-                    const currentIds = new Set(shadow.filter(m => !m.id.toString().startsWith('temp-')).map(m => m.id));
-                    
-                    // Logic to update: if we have new messages or status changes
-                    if (newIds.size !== currentIds.size) return formatted;
-                    return prev;
-                });
+                setMessages(formatted);
             } catch (err) { console.error("Sync failed", err); }
         };
 
-        // 2. Connect WebSocket
-        const wsBase = getWsBaseUrl();
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-        const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
-        
-        console.log(`[WS] Connecting to: ${wsUrl}`);
+        // 2. Connect WebSocket with auto-reconnect
+        let reconnectTimer: NodeJS.Timeout | null = null;
+        let pollInterval: NodeJS.Timeout | null = null;
+        let socket: WebSocket;
 
-        const socket = new WebSocket(wsUrl);
-        socketRef.current = socket;
+        const connectWS = () => {
+            const wsBase = getWsBaseUrl();
+            const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+            const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
+            console.log(`[WS] Connecting patient: ${wsUrl}`);
 
-        socket.onmessage = (event: MessageEvent) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === "ack" && data.id) {
-                    setMessages(prev => {
-                        const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
-                        if (lastMeIdx !== -1) {
-                            const realIdx = prev.length - 1 - lastMeIdx;
-                            const updated = [...prev];
-                            updated[realIdx] = { 
-                                ...updated[realIdx], 
-                                id: data.id, 
-                                status: data.status || 'delivered' 
-                            };
-                            return updated;
-                        }
-                        return prev;
-                    });
-                    return;
+            socket = new WebSocket(wsUrl);
+            socketRef.current = socket;
+
+            socket.onopen = () => {
+                // Immediately sync history on (re)connect
+                syncMessages();
+                if (pollInterval) clearInterval(pollInterval);
+            };
+
+            socket.onmessage = (event: MessageEvent) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === "ack" && data.id) {
+                        setMessages(prev => {
+                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                            if (lastMeIdx !== -1) {
+                                const realIdx = prev.length - 1 - lastMeIdx;
+                                const updated = [...prev];
+                                updated[realIdx] = { 
+                                    ...updated[realIdx], 
+                                    id: data.id, 
+                                    status: data.status || 'delivered' 
+                                };
+                                return updated;
+                            }
+                            return prev;
+                        });
+                        return;
+                    }
+
+                    if (data.text || data.audioUrl || data.imageUrl) {
+                        setMessages(prev => [...prev, {
+                            id: data.id || Date.now(),
+                            sender: data.senderName,
+                            text: data.text || "",
+                            audioUrl: data.audioUrl,
+                            imageUrl: data.imageUrl,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            isMe: data.senderRole === 'patient',
+                            isAI: data.senderRole === 'ai' || data.isAI,
+                            status: 'read'
+                        }]);
+                    }
+                } catch (e) {
+                    console.error("WS Message Error", e);
                 }
+            };
 
-                if (data.text || data.audioUrl || data.imageUrl) {
-                    setMessages(prev => [...prev, {
-                        id: data.id || Date.now(),
-                        sender: data.senderName,
-                        text: data.text || "",
-                        audioUrl: data.audioUrl,
-                        imageUrl: data.imageUrl,
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        isMe: data.senderRole === 'patient',
-                        isAI: data.senderRole === 'ai' || data.isAI,
-                        status: 'read'
-                    }]);
-                }
-            } catch (e) {
-                console.error("WS Message Error", e);
-            }
+            socket.onclose = () => {
+                // Poll every 2s while disconnected
+                pollInterval = setInterval(syncMessages, 2000);
+                // Reconnect after 3s
+                reconnectTimer = setTimeout(connectWS, 3000);
+            };
+            socket.onerror = () => socket.close();
         };
 
-        const pollInterval = setInterval(() => {
-            if (socketRef.current?.readyState !== WebSocket.OPEN) {
-                syncMessages();
-            }
-        }, 5000);
-
-        socket.onclose = () => console.log("WS Disconnected");
+        // Start history fetch and WS in parallel
+        syncMessages();
+        connectWS();
 
         return () => {
-            clearInterval(pollInterval);
-            socket.close();
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            if (pollInterval) clearInterval(pollInterval);
+            if (socketRef.current) socketRef.current.close();
         };
     }, [consultationId]);
 

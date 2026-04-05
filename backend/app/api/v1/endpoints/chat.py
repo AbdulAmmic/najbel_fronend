@@ -17,36 +17,58 @@ def get_active_chat_rooms(
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
     """
-    List all active consultations that have paid invoices (Staff only)
+    List all consultations that have chat messages or are active sessions (Staff only).
+    Returns the SAME consultation_id the patient is connected to.
     """
     if current_user.role not in [UserRole.DOCTOR, UserRole.ADMIN, UserRole.NURSE]:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
-    from app.models.invoice import Invoice
+
     from app.models.consultation import Consultation
-    
-    # Simple query: Consultations with PAID invoices
-    # We join with Invoice to ensure payment status
-    statement = (
-        select(Consultation, Patient, User)
-        .join(Patient, Consultation.patient_id == Patient.id)
-        .join(User, Patient.user_id == User.id)
-        .join(Invoice, Consultation.id == Invoice.consultation_id)
-        .where(Invoice.status == "paid")
+    from app.models.appointment import Appointment, AppointmentStatus
+
+    # Get consultations that have ANY chat messages OR are in an active state
+    # This ensures doctor always joins the same room as the patient
+    consultations_with_msgs = db.exec(
+        select(ChatMessage.consultation_id).distinct()
+    ).all()
+
+    # Also include consultations for IN_CONSULTATION or recent COMPLETED appointments
+    active_consultations = db.exec(
+        select(Consultation)
+        .join(Appointment, Consultation.appointment_id == Appointment.id, isouter=True)
+        .where(
+            (Consultation.id.in_(consultations_with_msgs)) |
+            (Appointment.status.in_([
+                AppointmentStatus.IN_CONSULTATION,
+                AppointmentStatus.COMPLETED
+            ]))
+        )
         .order_by(Consultation.created_at.desc())
-    )
-    
-    results = db.exec(statement).all()
-    
-    return [
-        {
+    ).all()
+
+    result = []
+    seen = set()
+    for c in active_consultations:
+        if c.id in seen:
+            continue
+        seen.add(c.id)
+        # Get patient name
+        patient = db.exec(
+            select(Patient, User)
+            .where(Patient.id == c.patient_id)
+            .join(User, Patient.user_id == User.id)
+        ).first()
+        if not patient:
+            continue
+        p, u = patient
+        result.append({
             "consultation_id": c.id,
             "patient_id": p.id,
             "patient_name": u.full_name,
             "created_at": c.created_at.isoformat()
-        }
-        for c, p, u in results
-    ]
+        })
+
+    return result
 
 @router.get("/chats/history/{consultation_id}", response_model=List[ChatMessageSchema])
 def get_chat_history(
