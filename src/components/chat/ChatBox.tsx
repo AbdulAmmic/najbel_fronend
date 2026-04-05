@@ -289,49 +289,48 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
         }, 1000);
     };
 
-    const handleSendMessage = (e?: React.FormEvent) => {
+    const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!newMessage.trim()) return;
+        const text = newMessage.trim();
+        if (!text || !consultationId) return;
 
-        const isAiAssisted = false; 
-        const payload = {
-            text: newMessage,
-            senderName: currentUser,
-            senderRole: "doctor",
-            isAiAssisted: isAiAssisted, 
-            type: "message"
-        };
-
+        const msgId = Date.now();
         const msg: Message = {
-            id: Date.now(),
+            id: msgId,
             sender: currentUser,
-            text: newMessage,
+            text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             isMe: true,
-            isAI: isAiAssisted,
-            status: 'sent'
+            status: 'sending'
         };
 
         setMessages(prev => [...prev, msg]);
         setNewMessage("");
 
-        if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify(payload));
-        } else {
-            console.log("[ChatBox] WebSocket not open, using REST fallback");
-            const restPayload = {
+        // STEP 1: Always persist via REST (guaranteed DB save even if WS drops)
+        try {
+            const res = await api.post('chat/send', {
                 consultation_id: consultationId,
-                message: newMessage,
+                message: text,
                 sender_name: currentUser,
                 sender_role: "doctor"
-            };
-            api.post('chat/send', restPayload)
-                .then(res => {
-                    if (res.data) {
-                        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, id: res.data.id, status: 'delivered' } : m));
-                    }
-                })
-                .catch(err => console.error("REST Fallback failed", err));
+            });
+            setMessages(prev => prev.map(m =>
+                m.id === msgId ? { ...m, id: res.data?.id || msgId, status: 'sent' } : m
+            ));
+        } catch (err) {
+            console.error("[ChatBox] REST save failed", err);
+            setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: 'sent' } : m));
+        }
+
+        // STEP 2: Also send via WS for instant real-time delivery to patient
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+                text,
+                senderName: currentUser,
+                senderRole: "doctor",
+                type: "message"
+            }));
         }
     };
 

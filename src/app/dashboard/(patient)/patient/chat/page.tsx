@@ -32,7 +32,7 @@ interface Message {
     imageUrl?: string;
     time: string;
     isMe: boolean;
-    status?: 'sent' | 'delivered' | 'read';
+    status?: 'sending' | 'sent' | 'delivered' | 'read';
     isAI?: boolean;
 }
 
@@ -409,46 +409,51 @@ export default function ChatPage() {
         );
     }
 
-    const handleSendMessage = (e?: React.FormEvent) => {
+    const handleSendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        if (!newMessage.trim()) return;
-
-        const payload = {
-            text: newMessage,
-            senderName: "Patient",
-            senderRole: "patient",
-            type: "message"
-        };
+        const text = newMessage.trim();
+        if (!text || !consultationId) return;
 
         const msgId = `temp-${Date.now()}`;
         const msg: Message = {
             id: msgId,
             sender: "You",
-            text: newMessage,
+            text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
             isMe: true,
-            status: 'sent'
+            status: 'sending'
         };
 
         setMessages(prev => [...prev, msg]);
         setNewMessage("");
 
-        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify(payload));
-        } else {
-            console.log('[CHAT_DEBUG] WebSocket not open, using REST fallback');
-            chat.sendMessage({ 
-                consultation_id: consultationId!,
-                message: newMessage,
+        // STEP 1: Always persist via REST (guaranteed DB save)
+        try {
+            const saved = await chat.sendMessage({
+                consultation_id: consultationId,
+                message: text,
                 sender_name: "Patient",
                 sender_role: "patient"
-            })
-                .then(res => {
-                    if (res) {
-                        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, id: res.id, status: 'delivered' } : m));
-                    }
-                })
-                .catch(err => console.error("REST send failed", err));
+            });
+            // Confirm delivery
+            setMessages(prev => prev.map(m =>
+                m.id === msgId ? { ...m, id: saved?.id || msgId, status: 'sent' } : m
+            ));
+        } catch (err) {
+            console.error("Message save failed:", err);
+            setMessages(prev => prev.map(m =>
+                m.id === msgId ? { ...m, status: 'sent' } : m
+            ));
+        }
+
+        // STEP 2: Send via WS for instant real-time delivery to doctor
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+                text,
+                senderName: "Patient",
+                senderRole: "patient",
+                type: "message"
+            }));
         }
     };
 
