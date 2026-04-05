@@ -5,17 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
     Bell, Search, Stethoscope, Calendar, Users,
-    MessageSquare, LayoutDashboard, ClipboardList,
+    MessageSquare, LayoutDashboard,
     ChevronDown, X, LogOut, Settings
 } from "lucide-react";
 import { auth } from "@/services/api";
 
 const NAV_ITEMS = [
-    { name: "Home",       href: "/dashboard/Doctor",              icon: LayoutDashboard },
-    { name: "Patients",   href: "/dashboard/Doctor/patients",     icon: Users },
-    { name: "Chat",       href: "/dashboard/Doctor/chat",         icon: MessageSquare },
-    { name: "Appts",      href: "/dashboard/Doctor/appointments", icon: Calendar },
-    { name: "Consults",   href: "/dashboard/consultations",       icon: Stethoscope },
+    { name: "Home",     href: "/dashboard/Doctor",              icon: LayoutDashboard },
+    { name: "Patients", href: "/dashboard/Doctor/patients",     icon: Users },
+    { name: "Chat",     href: "/dashboard/Doctor/chat",         icon: MessageSquare },
+    { name: "Appts",    href: "/dashboard/Doctor/appointments", icon: Calendar },
+    { name: "Consults", href: "/dashboard/consultations",       icon: Stethoscope },
 ];
 
 export default function DoctorHeader() {
@@ -44,100 +44,105 @@ export default function DoctorHeader() {
 
     return (
         <>
-            {/* ── Main Header ── */}
-            <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
-                <div className="h-14 px-4 flex items-center gap-3">
+            {/* ── Floating rounded header ── */}
+            <header className="sticky top-0 z-40 px-3 pt-3">
+                <div className="bg-white/95 backdrop-blur-2xl rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.10)] border border-gray-100/80 overflow-hidden">
 
-                    {/* Avatar + Name (left) */}
-                    <button
-                        onClick={() => setShowMenu(!showMenu)}
-                        className="flex items-center gap-2.5 flex-1 min-w-0 active:opacity-70 transition-opacity"
-                    >
-                        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-[12px] font-black shadow-md shadow-blue-200 flex-shrink-0">
-                            {initials}
-                        </div>
-                        <div className="text-left min-w-0 flex-1">
-                            <p className="text-[13px] font-black text-gray-900 leading-none truncate">
-                                Dr. {lastName}
-                            </p>
-                            <p className="text-[10px] text-blue-500 font-bold mt-0.5">Consultant Physician</p>
-                        </div>
-                        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${showMenu ? "rotate-180" : ""}`} />
-                    </button>
+                    {/* Top bar */}
+                    <div className="h-14 px-4 flex items-center gap-3">
 
-                    {/* Right actions */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Avatar + Name (tappable → profile sheet) */}
                         <button
-                            onClick={() => setShowSearch(!showSearch)}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition"
+                            onClick={() => setShowMenu(!showMenu)}
+                            className="flex items-center gap-2.5 flex-1 min-w-0 active:opacity-70 transition-opacity"
                         >
-                            <Search className="w-4.5 h-4.5" />
+                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-[12px] font-black shadow-md shadow-blue-200 flex-shrink-0">
+                                {initials}
+                            </div>
+                            <div className="text-left min-w-0 flex-1">
+                                <p className="text-[13px] font-black text-gray-900 leading-none truncate">
+                                    Dr. {lastName}
+                                </p>
+                                <p className="text-[10px] text-blue-500 font-bold mt-0.5">Consultant Physician</p>
+                            </div>
+                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${showMenu ? "rotate-180" : ""}`} />
                         </button>
-                        <Link
-                            href="/dashboard/Doctor"
-                            className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition"
-                        >
-                            <Bell className="w-4.5 h-4.5" />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 border-2 border-white rounded-full" />
-                        </Link>
-                    </div>
-                </div>
 
-                {/* Inline search */}
-                {showSearch && (
-                    <div className="px-4 pb-3">
-                        <div className="relative">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                autoFocus
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                placeholder="Search patients, records…"
-                                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
-                            />
-                            <button onClick={() => { setSearch(""); setShowSearch(false); }}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center"
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                                onClick={() => setShowSearch(!showSearch)}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition"
                             >
-                                <X className="w-3 h-3 text-gray-500" />
+                                <Search className="w-[18px] h-[18px]" />
                             </button>
+                            <Link
+                                href="/dashboard/Doctor"
+                                className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition"
+                            >
+                                <Bell className="w-[18px] h-[18px]" />
+                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 border-2 border-white rounded-full" />
+                            </Link>
                         </div>
                     </div>
-                )}
 
-                {/* Current page active tab indicator */}
-                <div className="flex px-4 gap-1 overflow-x-auto no-scrollbar pb-0">
-                    {NAV_ITEMS.map(item => {
-                        const isActive = item.href === "/dashboard/Doctor"
-                            ? pathname === item.href
-                            : pathname.startsWith(item.href);
-                        const Icon = item.icon;
-                        return (
-                            <Link
-                                key={item.name}
-                                href={item.href}
-                                className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold whitespace-nowrap border-b-2 transition-all ${
-                                    isActive
-                                        ? "border-blue-600 text-blue-600"
-                                        : "border-transparent text-gray-400 hover:text-gray-600"
-                                }`}
-                            >
-                                <Icon className="w-3 h-3" />
-                                {item.name}
-                            </Link>
-                        );
-                    })}
+                    {/* Inline search */}
+                    {showSearch && (
+                        <div className="px-4 pb-3">
+                            <div className="relative">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    autoFocus
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Search patients, records…"
+                                    className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                                />
+                                <button
+                                    onClick={() => { setSearch(""); setShowSearch(false); }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center"
+                                >
+                                    <X className="w-3 h-3 text-gray-500" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tab nav strip */}
+                    <div className="flex px-3 gap-0.5 overflow-x-auto no-scrollbar pb-2">
+                        {NAV_ITEMS.map(item => {
+                            const isActive = item.href === "/dashboard/Doctor"
+                                ? pathname === item.href
+                                : pathname.startsWith(item.href);
+                            const Icon = item.icon;
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={item.href}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold whitespace-nowrap rounded-xl transition-all ${
+                                        isActive
+                                            ? "bg-blue-50 text-blue-600"
+                                            : "text-gray-400 hover:text-gray-600"
+                                    }`}
+                                >
+                                    <Icon className="w-3 h-3" />
+                                    {item.name}
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
             </header>
 
-            {/* ── Profile Dropdown Sheet ── */}
+            {/* ── Profile dropdown sheet ── */}
             {showMenu && (
                 <>
                     <div
                         className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
                         onClick={() => setShowMenu(false)}
                     />
-                    <div className="fixed top-14 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-xl rounded-b-3xl overflow-hidden mx-2 mt-1">
-                        {/* User card */}
+                    <div className="fixed top-[88px] left-3 right-3 z-50 bg-white rounded-[24px] shadow-[0_16px_48px_rgba(0,0,0,0.16)] border border-gray-100 overflow-hidden">
+                        {/* Gradient user card */}
                         <div className="px-5 py-4 bg-gradient-to-br from-blue-600 to-indigo-700">
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-white text-base font-black border border-white/30">
@@ -155,7 +160,7 @@ export default function DoctorHeader() {
                         <div className="p-3 space-y-1">
                             {[
                                 { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-                                { icon: Bell, label: "Notifications", href: "/dashboard/Doctor" },
+                                { icon: Bell,     label: "Notifications", href: "/dashboard/Doctor" },
                             ].map(item => (
                                 <Link
                                     key={item.label}

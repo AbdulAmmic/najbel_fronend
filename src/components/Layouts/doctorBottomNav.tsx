@@ -3,29 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    LayoutDashboard,
-    Calendar,
-    Users,
-    MessageSquare,
-    Stethoscope,
+    LayoutDashboard, Calendar, Users,
+    MessageSquare, Stethoscope,
 } from "lucide-react";
 
 const navItems = [
-    { name: "Home",        href: "/dashboard/Doctor",              icon: LayoutDashboard },
-    { name: "Patients",    href: "/dashboard/Doctor/patients",     icon: Users },
-    { name: "Chat",        href: "/dashboard/Doctor/chat",         icon: MessageSquare },
-    { name: "Appts",       href: "/dashboard/Doctor/appointments", icon: Calendar },
-    { name: "Consults",    href: "/dashboard/consultations",       icon: Stethoscope },
+    { name: "Home",     href: "/dashboard/Doctor",              icon: LayoutDashboard },
+    { name: "Patients", href: "/dashboard/Doctor/patients",     icon: Users },
+    { name: "Chat",     href: "/dashboard/Doctor/chat",         icon: MessageSquare },
+    { name: "Appts",    href: "/dashboard/Doctor/appointments", icon: Calendar },
+    { name: "Consults", href: "/dashboard/consultations",       icon: Stethoscope },
 ];
 
 export default function DoctorBottomNav() {
     const pathname = usePathname();
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-[100] md:hidden">
-            {/* Safe-area bottom padding for iPhone notch */}
-            <div className="bg-white/95 backdrop-blur-xl border-t border-gray-100 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
-                <div className="flex items-center justify-around px-1 pt-2 pb-safe">
+        /* Floating pill nav — sits above page bottom with side margins & full rounded corners */
+        <nav className="fixed bottom-4 left-3 right-3 z-[100] md:hidden">
+            <div className="bg-white/95 backdrop-blur-2xl rounded-[28px] shadow-[0_8px_32px_rgba(0,0,0,0.14)] border border-gray-100/80 px-2 py-2">
+                <div className="flex items-center justify-around">
                     {navItems.map((item) => {
                         const isActive =
                             item.href === "/dashboard/Doctor"
@@ -36,13 +33,13 @@ export default function DoctorBottomNav() {
                             <Link
                                 key={item.name}
                                 href={item.href}
-                                className="flex flex-col items-center gap-1 px-3 py-1 min-w-[56px] transition-all active:scale-90"
+                                className="flex flex-col items-center gap-1 px-2 py-1 transition-all active:scale-90 min-w-[52px]"
                             >
                                 <div className={`
-                                    w-10 h-7 flex items-center justify-center rounded-2xl transition-all
+                                    w-10 h-7 flex items-center justify-center rounded-2xl transition-all duration-200
                                     ${isActive
-                                        ? "bg-blue-600 shadow-md shadow-blue-300/40"
-                                        : "bg-transparent"
+                                        ? "bg-blue-600 shadow-lg shadow-blue-300/50"
+                                        : ""
                                     }
                                 `}>
                                     <Icon className={`w-[18px] h-[18px] transition-colors ${isActive ? "text-white" : "text-gray-400"}`} />
@@ -54,8 +51,6 @@ export default function DoctorBottomNav() {
                         );
                     })}
                 </div>
-                {/* iPhone safe area spacer */}
-                <div className="h-safe-area-inset-bottom bg-white/95" />
             </div>
         </nav>
     );

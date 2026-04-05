@@ -19,7 +19,7 @@ export default function DoctorLayout({
             </div>
 
             {/* Content — on mobile no sidebar, just full width */}
-            <div className="pb-28 md:pb-0">
+            <div className="pb-36 md:pb-0">
                 {children}
             </div>
 
