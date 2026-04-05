@@ -226,9 +226,11 @@ export default function ChatPage() {
 
     useEffect(() => {
         if (!consultationId) return;
+        let mounted = true;
 
         // 1. Fetch History from the database immediately
         const syncMessages = async () => {
+            if (!mounted) return;
             try {
                 const history = await chat.getHistory(consultationId);
                 const formatted = history.map((msg: any) => ({
@@ -242,7 +244,11 @@ export default function ChatPage() {
                     isAI: msg.sender_role === 'ai',
                     status: 'read' as const
                 }));
-                setMessages(formatted);
+                setMessages(prev => {
+                    const dbIds = new Set(formatted.map((m: any) => m.id));
+                    const pending = prev.filter(m => !dbIds.has(m.id) && m.status === 'sent');
+                    return [...formatted, ...pending];
+                });
             } catch (err) { console.error("Sync failed", err); }
         };
 
@@ -252,6 +258,7 @@ export default function ChatPage() {
         let socket: WebSocket;
 
         const connectWS = () => {
+            if (!mounted) return;
             const wsBase = getWsBaseUrl();
             const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
             const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=patient${token ? `&token=${token}` : ''}`;
@@ -261,12 +268,13 @@ export default function ChatPage() {
             socketRef.current = socket;
 
             socket.onopen = () => {
-                // Immediately sync history on (re)connect
+                if (!mounted) { socket.close(); return; }
+                if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
                 syncMessages();
-                if (pollInterval) clearInterval(pollInterval);
             };
 
             socket.onmessage = (event: MessageEvent) => {
+                if (!mounted) return;
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === "ack" && data.id) {
@@ -288,17 +296,20 @@ export default function ChatPage() {
                     }
 
                     if (data.text || data.audioUrl || data.imageUrl) {
-                        setMessages(prev => [...prev, {
-                            id: data.id || Date.now(),
-                            sender: data.senderName,
-                            text: data.text || "",
-                            audioUrl: data.audioUrl,
-                            imageUrl: data.imageUrl,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            isMe: data.senderRole === 'patient',
-                            isAI: data.senderRole === 'ai' || data.isAI,
-                            status: 'read'
-                        }]);
+                        setMessages(prev => {
+                            if (data.id && prev.some(m => m.id === data.id)) return prev;
+                            return [...prev, {
+                                id: data.id || Date.now(),
+                                sender: data.senderName || "Doctor",
+                                text: data.text || "",
+                                audioUrl: data.audioUrl,
+                                imageUrl: data.imageUrl,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                isMe: data.senderRole === 'patient',
+                                isAI: data.senderRole === 'ai' || data.isAI,
+                                status: 'read'
+                            }];
+                        });
                     }
                 } catch (e) {
                     console.error("WS Message Error", e);
@@ -306,9 +317,8 @@ export default function ChatPage() {
             };
 
             socket.onclose = () => {
-                // Poll every 2s while disconnected
+                if (!mounted) return;
                 pollInterval = setInterval(syncMessages, 2000);
-                // Reconnect after 3s
                 reconnectTimer = setTimeout(connectWS, 3000);
             };
             socket.onerror = () => socket.close();
@@ -319,9 +329,11 @@ export default function ChatPage() {
         connectWS();
 
         return () => {
+            mounted = false;
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (pollInterval) clearInterval(pollInterval);
-            if (socketRef.current) socketRef.current.close();
+            try { socket?.close(); } catch (_) {}
+            socketRef.current = null;
         };
     }, [consultationId]);
 

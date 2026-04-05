@@ -131,107 +131,123 @@ export default function ChatBox({ currentUser, recipientName, recipientAvatar, c
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Load History & Connect WebSocket — runs in parallel for maximum speed
+    // Load History & Connect WebSocket — parallel for speed, safe cleanup
     useEffect(() => {
         if (!consultationId) return;
+        let mounted = true; // prevents ghost reconnects after unmount
         let reconnectTimer: NodeJS.Timeout | null = null;
         let pollInterval: NodeJS.Timeout | null = null;
         let socket: WebSocket;
 
-        const formatMsg = (msg: any, selfRole: string) => ({
-            id: msg.id,
-            sender: msg.sender_name,
-            text: msg.message,
-            audioUrl: msg.audio_url || undefined,
-            imageUrl: msg.image_url || undefined,
-            time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isMe: msg.sender_role === selfRole,
-            isAI: msg.sender_role === 'ai',
-            status: 'read' as const
-        });
-
-        // Determine role from currentUser string
-        const selfRole = currentUser.toLowerCase().startsWith('dr') ? 'doctor' : 'doctor';
+        const mergeHistory = (history: Message[]) => {
+            setMessages(prev => {
+                // Keep optimistic (temp) messages that aren't yet in DB
+                const dbIds = new Set(history.map(m => m.id));
+                const pending = prev.filter(m => typeof m.id === 'number' && !dbIds.has(m.id) && m.status === 'sent');
+                return [...history, ...pending];
+            });
+        };
 
         const fetchHistory = async () => {
+            if (!mounted) return;
             try {
                 const res = await api.get(`chat/chats/history/${consultationId}`);
-                const history = res.data.map((msg: any) => formatMsg(msg, selfRole));
-                setMessages(history);
+                if (!mounted) return;
+                const history = res.data.map((msg: any) => ({
+                    id: msg.id,
+                    sender: msg.sender_name,
+                    text: msg.message,
+                    audioUrl: msg.audio_url || undefined,
+                    imageUrl: msg.image_url || undefined,
+                    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    isMe: msg.sender_role === 'doctor' || msg.sender_role === 'admin',
+                    isAI: msg.sender_role === 'ai',
+                    status: 'read' as const
+                }));
+                mergeHistory(history);
             } catch (err) {
                 console.error("Failed to fetch history", err);
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         };
 
         const connectWS = () => {
+            if (!mounted) return;
             const wsBase = getWsBaseUrl();
             const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
             const wsUrl = `${wsBase}/ws/consultations/${consultationId}?role=doctor${token ? `&token=${token}` : ''}`;
-            console.log(`[CHAT] Connecting: ${wsUrl}`);
+            console.log(`[CHAT] Doctor → room ${consultationId}: ${wsUrl}`);
 
             socket = new WebSocket(wsUrl);
             socketRef.current = socket;
 
             socket.onopen = () => {
+                if (!mounted) { socket.close(); return; }
                 console.log(`[CHAT] Connected to room ${consultationId}`);
-                // Sync history immediately on (re)connect to catch any missed messages
-                fetchHistory();
-                if (pollInterval) clearInterval(pollInterval);
+                if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+                fetchHistory(); // sync latest on connect
             };
 
             socket.onmessage = (event) => {
+                if (!mounted) return;
                 try {
                     const data = JSON.parse(event.data);
+                    // ACK: confirm our sent message
                     if (data.type === "ack" && data.id) {
                         setMessages(prev => {
-                            const lastMeIdx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
-                            if (lastMeIdx !== -1) {
-                                const realIdx = prev.length - 1 - lastMeIdx;
+                            const idx = [...prev].reverse().findIndex(m => m.isMe && m.status === 'sent');
+                            if (idx !== -1) {
+                                const real = prev.length - 1 - idx;
                                 const updated = [...prev];
-                                updated[realIdx] = { ...updated[realIdx], id: data.id, status: 'delivered' };
+                                updated[real] = { ...updated[real], id: data.id, status: 'delivered' };
                                 return updated;
                             }
                             return prev;
                         });
                         return;
                     }
+                    // Incoming message from the other party
                     if (data.text || data.audioUrl || data.imageUrl) {
-                        setMessages(prev => [...prev, {
-                            id: data.id || Date.now(),
-                            sender: data.senderName,
-                            text: data.text || "",
-                            audioUrl: data.audioUrl,
-                            imageUrl: data.imageUrl,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            isMe: data.senderRole === 'doctor' || data.senderRole === 'admin',
-                            isAI: data.senderRole === 'ai' || data.isAI,
-                            status: 'read'
-                        }]);
+                        setMessages(prev => {
+                            // Deduplicate by id
+                            if (data.id && prev.some(m => m.id === data.id)) return prev;
+                            return [...prev, {
+                                id: data.id || Date.now(),
+                                sender: data.senderName || "Unknown",
+                                text: data.text || "",
+                                audioUrl: data.audioUrl,
+                                imageUrl: data.imageUrl,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                isMe: data.senderRole === 'doctor' || data.senderRole === 'admin',
+                                isAI: data.senderRole === 'ai' || data.isAI,
+                                status: 'read'
+                            }];
+                        });
                     }
-                } catch (e) { console.error("WS Message Error", e); }
+                } catch (e) { console.error("WS parse error", e); }
             };
 
             socket.onclose = () => {
-                console.log(`[CHAT] Disconnected. Reconnecting in 3s...`);
-                // Poll while disconnected so messages aren't missed
+                if (!mounted) return; // key: don't reconnect after unmount
+                console.log(`[CHAT] Disconnected. Polling + reconnecting...`);
                 pollInterval = setInterval(fetchHistory, 2000);
-                // Auto-reconnect
                 reconnectTimer = setTimeout(connectWS, 3000);
             };
 
             socket.onerror = () => socket.close();
         };
 
-        // Start both in parallel
+        // Kick off in parallel
         fetchHistory();
         connectWS();
 
         return () => {
+            mounted = false;
             if (reconnectTimer) clearTimeout(reconnectTimer);
             if (pollInterval) clearInterval(pollInterval);
-            if (socketRef.current) socketRef.current.close();
+            try { socket?.close(); } catch (_) {}
+            socketRef.current = null;
         };
     }, [consultationId]);
 
