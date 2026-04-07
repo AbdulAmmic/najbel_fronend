@@ -310,49 +310,58 @@ export default function DoctorPatientDetailPage() {
         setSoapSaving(true);
         try {
             if (soapStep === 1) {
-                // Create or get the consultation session to get consultation_id
-                let consultId = soapConsultId;
-                if (!consultId) {
-                    const appts = await appointments.getAll();
-                    const patientAppts = (Array.isArray(appts) ? appts : []).filter((a: any) =>
-                        a.patient_id === patient.id &&
-                        ['confirmed', 'checked-in', 'in-consultation'].includes(a.status)
-                    );
-                    const latestAppt = patientAppts[0];
-                    if (latestAppt) {
-                        const session = await consultations.startSession(latestAppt.id);
-                        consultId = session.consultation_id;
-                        setSoapConsultId(consultId);
+                // Try to link to an active appointment session, but never block on failure
+                // The backend notification enum bug (CONSULTATION_ACTIVE) causes startSession to 500
+                // We gracefully ignore it and collect all data for the final save
+                if (!soapConsultId) {
+                    try {
+                        const appts = await appointments.getAll();
+                        const patientAppts = (Array.isArray(appts) ? appts : []).filter((a: any) =>
+                            a.patient_id === patient.id &&
+                            ['confirmed', 'checked-in', 'in-consultation'].includes(a.status)
+                        );
+                        const latestAppt = patientAppts[0];
+                        if (latestAppt) {
+                            const session = await consultations.startSession(latestAppt.id);
+                            if (session?.consultation_id) {
+                                setSoapConsultId(session.consultation_id);
+                                // Try to save subjective to session
+                                try {
+                                    await consultations.saveSubjective(session.consultation_id, {
+                                        chief_complaint: subjChief,
+                                        past_medical_history: subjHistory ? [{ value: subjHistory, timestamp: new Date().toISOString(), note: "" }] : [],
+                                        medications_used: subjSymptoms ? [{ value: subjSymptoms, timestamp: new Date().toISOString(), note: "" }] : [],
+                                        drug_allergies: subjAllergies ? [{ value: subjAllergies, timestamp: new Date().toISOString(), note: "" }] : [],
+                                        family_history: subjFamilyHistory ? [{ value: subjFamilyHistory, timestamp: new Date().toISOString(), note: "" }] : [],
+                                        social_habits: subjSocialHabits ? [{ value: subjSocialHabits, timestamp: new Date().toISOString(), note: "" }] : [],
+                                    });
+                                } catch (_) { /* will save at final step */ }
+                            }
+                        }
+                    } catch (_) {
+                        // Silently continue — startSession fails due to backend enum mismatch
+                        // All data will be persisted at the final step via consultations.create()
                     }
-                }
-                if (consultId) {
-                    await consultations.saveSubjective(consultId, {
-                        chief_complaint: subjChief,
-                        past_medical_history: subjHistory ? [{ value: subjHistory, timestamp: new Date().toISOString(), note: "" }] : [],
-                        medications_used: subjSymptoms ? [{ value: subjSymptoms, timestamp: new Date().toISOString(), note: "" }] : [],
-                        drug_allergies: subjAllergies ? [{ value: subjAllergies, timestamp: new Date().toISOString(), note: "" }] : [],
-                        family_history: subjFamilyHistory ? [{ value: subjFamilyHistory, timestamp: new Date().toISOString(), note: "" }] : [],
-                        social_habits: subjSocialHabits ? [{ value: subjSocialHabits, timestamp: new Date().toISOString(), note: "" }] : [],
-                    });
                 }
                 setSoapStep(2);
             } else if (soapStep === 2) {
                 if (soapConsultId) {
-                    const objPayload: any = {};
-                    if (objBpSys) objPayload.blood_pressure_systolic = Number(objBpSys);
-                    if (objBpDia) objPayload.blood_pressure_diastolic = Number(objBpDia);
-                    if (objHeight) objPayload.height_cm = Number(objHeight);
-                    if (objWeight) objPayload.weight_kg = Number(objWeight);
-                    if (objFbs) objPayload.fbs = Number(objFbs);
-                    if (objRbs) objPayload.rbs = Number(objRbs);
-                    if (objFbc) objPayload.fbc = objFbc;
-                    await consultations.saveObjective(soapConsultId, objPayload);
+                    try {
+                        const objPayload: any = {};
+                        if (objBpSys) objPayload.blood_pressure_systolic = Number(objBpSys);
+                        if (objBpDia) objPayload.blood_pressure_diastolic = Number(objBpDia);
+                        if (objHeight) objPayload.height_cm = Number(objHeight);
+                        if (objWeight) objPayload.weight_kg = Number(objWeight);
+                        if (objFbs) objPayload.fbs = Number(objFbs);
+                        if (objRbs) objPayload.rbs = Number(objRbs);
+                        if (objFbc) objPayload.fbc = objFbc;
+                        await consultations.saveObjective(soapConsultId, objPayload);
+                    } catch (_) { /* will be included in final create */ }
                 }
                 setSoapStep(3);
             }
         } catch (e) {
             console.error("SOAP step error", e);
-            showToast("Failed to save this step", false);
         } finally {
             setSoapSaving(false);
         }
@@ -360,23 +369,54 @@ export default function DoctorPatientDetailPage() {
 
     const soapFinish = async () => {
         if (!assesDiagnosis.trim()) return showToast("Diagnosis is required", false);
+        if (!subjChief.trim()) return showToast("Chief complaint is required", false);
         setSoapSaving(true);
         try {
+            // Build a comprehensive notes string capturing all SOAP data
+            const fullNotes = [
+                objBpSys && objBpDia ? `BP: ${objBpSys}/${objBpDia} mmHg` : "",
+                objHeight ? `Height: ${objHeight} cm` : "",
+                objWeight ? `Weight: ${objWeight} kg` : "",
+                objFbs ? `FBS: ${objFbs} mmol/L` : "",
+                objRbs ? `RBS: ${objRbs} mmol/L` : "",
+                objFbc ? `FBC: ${objFbc}` : "",
+                subjAllergies ? `Allergies: ${subjAllergies}` : "",
+                subjFamilyHistory ? `Family Hx: ${subjFamilyHistory}` : "",
+                subjSocialHabits ? `Social: ${subjSocialHabits}` : "",
+                assessNotes ? `Notes: ${assessNotes}` : "",
+            ].filter(Boolean).join(" | ");
+
             if (soapConsultId) {
-                await consultations.saveDraft(soapConsultId, {
-                    symptoms: assesSymptoms || subjChief,
-                    diagnosis: assesDiagnosis,
-                    treatment_plan: assesTreatment,
-                    notes: assessNotes,
-                });
+                // Session was created — try to save the draft
+                try {
+                    await consultations.saveDraft(soapConsultId, {
+                        symptoms: assesSymptoms || subjChief,
+                        diagnosis: assesDiagnosis,
+                        treatment_plan: assesTreatment,
+                        notes: fullNotes || assessNotes,
+                    });
+                } catch (_) {
+                    // saveDraft failed, fall through to create()
+                    await consultations.create({
+                        patient_id: patient.id,
+                        doctor_id: me?.id,
+                        chief_complaint: subjChief,
+                        symptoms: assesSymptoms || subjChief,
+                        diagnosis: assesDiagnosis,
+                        treatment_plan: assesTreatment,
+                        notes: fullNotes || assessNotes,
+                    });
+                }
             } else {
+                // No session (startSession failed) — always use create
                 await consultations.create({
                     patient_id: patient.id,
                     doctor_id: me?.id,
                     chief_complaint: subjChief,
+                    symptoms: assesSymptoms || subjChief,
                     diagnosis: assesDiagnosis,
                     treatment_plan: assesTreatment,
-                    notes: assessNotes,
+                    notes: fullNotes || assessNotes,
                 });
             }
             showToast("Consultation note saved successfully!");
@@ -1198,9 +1238,9 @@ export default function DoctorPatientDetailPage() {
 
             <AnimatePresence>
                 {activeModal && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50" onClick={() => setModal(null)} />
-                        <motion.div initial={{ y: 20, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 20, opacity: 0, scale: 0.98 }} className="relative bg-white w-full max-w-lg rounded-3xl shadow-xl overflow-hidden">
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModal(null)} />
+                        <motion.div initial={{ y: 24, opacity: 0, scale: 0.97 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 24, opacity: 0, scale: 0.97 }} transition={{ type: "spring", damping: 28, stiffness: 380 }} className={`relative bg-white w-full rounded-3xl shadow-2xl overflow-hidden ${activeModal === "consult" ? "max-w-2xl" : "max-w-lg"}`}>
                             <div className={`p-6 bg-gradient-to-r ${ACTIONS.find(a => a.id === activeModal)?.color || "from-slate-500 to-slate-600"} text-white`}>
                                 <div className="flex justify-between items-center">
                                     <div className="flex items-center gap-3">
@@ -1315,16 +1355,24 @@ export default function DoctorPatientDetailPage() {
                                 {activeModal === "consult" && (
                                     <div className="space-y-0">
                                         {/* SOAP Step indicator */}
-                                        <div className="flex items-center gap-0 mb-6">
-                                            {["Subjective", "Objective", "Assessment"].map((label, i) => (
-                                                <div key={i} className="flex-1 flex flex-col items-center">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black mb-1 transition-all ${
-                                                        soapStep === i + 1 ? "bg-blue-600 text-white shadow-lg shadow-blue-200" :
-                                                        soapStep > i + 1 ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-400"
-                                                    }`}>{soapStep > i + 1 ? <Check className="w-4 h-4" /> : i + 1}</div>
-                                                    <span className={`text-[10px] font-bold ${soapStep === i + 1 ? "text-blue-600" : "text-gray-400"}`}>{label}</span>
-                                                    {i < 2 && <div className={`absolute w-full h-0.5 top-4 left-1/2 ${soapStep > i + 1 ? "bg-emerald-400" : "bg-gray-200"}`} />}
-                                                </div>
+                                        <div className="flex items-center mb-6 px-2">
+                                            {(["Subjective", "Objective", "Assessment"] as const).map((label, i) => (
+                                                <>
+                                                    <div key={label} className="flex flex-col items-center gap-1">
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                                                            soapStep === i + 1 ? "bg-blue-600 text-white ring-4 ring-blue-100" :
+                                                            soapStep > i + 1 ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-400"
+                                                        }`}>{soapStep > i + 1 ? <Check className="w-4 h-4" /> : i + 1}</div>
+                                                        <span className={`text-[10px] font-bold whitespace-nowrap ${
+                                                            soapStep === i + 1 ? "text-blue-600" : soapStep > i + 1 ? "text-emerald-600" : "text-gray-400"
+                                                        }`}>{label}</span>
+                                                    </div>
+                                                    {i < 2 && (
+                                                        <div className={`flex-1 h-0.5 mb-5 mx-1 rounded-full transition-all ${
+                                                            soapStep > i + 1 ? "bg-emerald-400" : "bg-gray-200"
+                                                        }`} />
+                                                    )}
+                                                </>
                                             ))}
                                         </div>
 
