@@ -9,22 +9,17 @@ export default function DoctorLayout({
     children: React.ReactNode;
 }) {
     return (
-        <>
-            {/*
-             * Mobile: DoctorHeader (compact, app-like) + bottom nav
-             * Desktop: the staff layout's Header + Sidebar handle the chrome
-             */}
-            <div className="md:hidden">
-                <DoctorHeader />
-            </div>
+        <div className="min-h-screen bg-slate-50">
+            {/* Compact top header — notifications, avatar */}
+            <DoctorHeader />
 
-            {/* Content — on mobile no sidebar, just full width */}
-            <div className="pb-36 md:pb-0">
+            {/* Page content — bottom padding for floating nav */}
+            <main className="pt-0">
                 {children}
-            </div>
+            </main>
 
-            {/* Bottom tab bar — mobile only */}
+            {/* Floating bottom tab bar */}
             <DoctorBottomNav />
-        </>
+        </div>
     );
 }
