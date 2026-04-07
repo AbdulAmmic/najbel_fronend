@@ -49,11 +49,11 @@ export default function DoctorHeader() {
     };
 
     const navItems = [
-        { icon: Activity,     label: "Dashboard",      href: "/dashboard/Doctor",          color: "text-blue-600",    bg: "bg-blue-50"    },
-        { icon: CalendarDays, label: "Appointments",   href: "/dashboard/Doctor/appointments", color: "text-indigo-600", bg: "bg-indigo-50" },
-        { icon: Users,        label: "Patients",       href: "/dashboard/Doctor/patients",  color: "text-violet-600",  bg: "bg-violet-50"  },
-        { icon: Stethoscope,  label: "Consultations",  href: "/dashboard/Doctor/consultations", color: "text-teal-600", bg: "bg-teal-50"  },
-        { icon: Settings,     label: "Settings",       href: "/dashboard/settings",         color: "text-slate-600",   bg: "bg-slate-100"  },
+        { icon: Activity,     label: "Dashboard",    href: "/dashboard/Doctor",              color: "text-blue-600",   bg: "bg-blue-50"   },
+        { icon: CalendarDays, label: "Appointments", href: "/dashboard/Doctor/appointments", color: "text-indigo-600", bg: "bg-indigo-50" },
+        { icon: Users,        label: "Patients",     href: "/dashboard/Doctor/patients",     color: "text-violet-600", bg: "bg-violet-50" },
+        { icon: Stethoscope,  label: "Chat",         href: "/dashboard/Doctor/chat",         color: "text-teal-600",   bg: "bg-teal-50"   },
+        { icon: Settings,     label: "Settings",     href: "/dashboard/Doctor/settings",     color: "text-slate-600",  bg: "bg-slate-100" },
     ];
 
     return (
