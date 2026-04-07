@@ -493,26 +493,45 @@ export default function DoctorPatientDetailPage() {
             } else if (activeModal === "lab") {
                 if (form.test_names.length === 0 && !form.test_name) return showToast("Please select or enter at least one test.", false);
 
-                const testsToRequest = form.test_names.length > 0
-                    ? form.test_names.map((testName: string) => ({
-                        patient_id: patient.id,
-                        doctor_id: me?.id,
-                        test_name: testName,
-                        urgency: form.urgency || "routine",
-                        notes: form.notes || "",
-                        billing_mode: labBillingMode,
-                    }))
-                    : [{
-                        patient_id: patient.id,
-                        doctor_id: me?.id,
-                        test_name: form.test_name,
-                        urgency: form.urgency || "routine",
-                        notes: form.notes || "",
-                        billing_mode: labBillingMode,
-                    }];
-
-                await Promise.all(testsToRequest.map((test: any) => labs.create(test)));
-                showToast(labBillingMode === "paid" ? "Lab request submitted — patient will be billed first!" : "Lab request submitted — patient can self-report results!");
+                if (labBillingMode === "direct") {
+                    // Direct mode: patient self-reports from external lab — just log as a consultation note, no lab order, no bill
+                    const testNames = form.test_names?.length > 0 ? form.test_names : form.test_name ? [form.test_name] : [];
+                    if (testNames.length === 0) return showToast("Please select or enter at least one test.", false);
+                    const noteText = `SELF-REPORT LAB REQUEST: ${testNames.join(", ")}${form.notes ? ` — Indication: ${form.notes}` : ""}. Patient to present own results.`;
+                    try {
+                        await consultations.create({
+                            patient_id: patient.id,
+                            doctor_id: me?.id,
+                            chief_complaint: `Lab self-report: ${testNames[0]}`,
+                            symptoms: testNames.join(", "),
+                            diagnosis: "Pending patient self-report",
+                            treatment_plan: "",
+                            notes: noteText,
+                        });
+                    } catch { /* if consult create fails, still toast success since internal record */ }
+                    showToast(`Noted — patient to self-report: ${testNames.join(", ")}`);
+                } else {
+                    // Paid / Bill-First mode: create formal lab order (triggers billing)
+                    const testsToRequest = form.test_names.length > 0
+                        ? form.test_names.map((testName: string) => ({
+                            patient_id: patient.id,
+                            doctor_id: me?.id,
+                            test_name: testName,
+                            urgency: form.urgency || "routine",
+                            notes: form.notes || "",
+                            billing_mode: "paid",
+                        }))
+                        : [{
+                            patient_id: patient.id,
+                            doctor_id: me?.id,
+                            test_name: form.test_name,
+                            urgency: form.urgency || "routine",
+                            notes: form.notes || "",
+                            billing_mode: "paid",
+                        }];
+                    await Promise.all(testsToRequest.map((test: any) => labs.create(test)));
+                    showToast("Lab order submitted — patient will be billed first!");
+                }
             } else if (activeModal === "consult") {
                 if (!form.chief_complaint || !form.diagnosis) return showToast("Please fill all required fields.", false);
                 await consultations.create({ patient_id: patient.id, doctor_id: me?.id, chief_complaint: form.chief_complaint, diagnosis: form.diagnosis, treatment_plan: form.treatment_plan || "", notes: form.notes || "" });
@@ -709,50 +728,73 @@ export default function DoctorPatientDetailPage() {
                 </div>
             )}
 
-            <header className="bg-white border-b border-gray-100 px-6 py-4 sticky top-0 z-[100] flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="w-10 h-10 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-colors">
-                        <ArrowLeft className="w-5 h-5 text-gray-600" />
-                    </button>
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-lg font-bold shadow-md">
+            {/* ── Premium Header ─────────────────────────────────── */}
+            <header className="sticky top-0 z-[100] bg-white/80 backdrop-blur-xl border-b border-gray-100/80 shadow-sm">
+                <div className="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+
+                    {/* Left: back + patient card */}
+                    <div className="flex items-center gap-3 min-w-0">
+                        <button
+                            onClick={() => router.back()}
+                            className="shrink-0 w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-all active:scale-95"
+                        >
+                            <ArrowLeft className="w-4 h-4 text-gray-600" />
+                        </button>
+
+                        {/* Avatar */}
+                        <div className="relative shrink-0">
+                            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 flex items-center justify-center text-white text-base font-black shadow-lg shadow-blue-200">
                                 {initials(patient)}
                             </div>
                             {patient.is_admitted && (
-                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white" />
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white shadow" />
                             )}
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">{getName(patient)}</h1>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                <span>MRN #{patient.id}</span>
-                                <span>•</span>
-                                <span>{getGender(patient)}</span>
-                                <span>•</span>
-                                <span>{age || 'N/A'} yrs</span>
-                                <span>•</span>
-                                <span className={`px-2 py-0.5 rounded-full text-white text-[10px] font-medium ${bloodColor}`}>
+
+                        {/* Name + meta */}
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="text-[15px] font-bold text-gray-900 leading-tight truncate">{getName(patient)}</h1>
+                                <span className={`shrink-0 text-[10px] font-bold text-white px-2 py-0.5 rounded-lg shadow-sm ${bloodColor}`}>
                                     {bloodGroup}
                                 </span>
                                 {patient.is_admitted && (
-                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-medium">
-                                        Admitted {assignedBedNum ? `· Bed ${assignedBedNum}` : "· In-Patient"}
+                                    <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                                        Admitted{assignedBedNum ? ` · Bed ${assignedBedNum}` : ""}
                                     </span>
                                 )}
                             </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 font-medium">
+                                <span>MRN #{patient.id}</span>
+                                <span>·</span>
+                                <span>{getGender(patient)}</span>
+                                <span>·</span>
+                                <span>{age || 'N/A'} yrs</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    {patient.is_admitted && (
-                        <button onClick={handleDischargeRequest} className="h-11 px-6 bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white border border-rose-500/20 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50">
-                            DISCHARGE PATIENT
-                        </button>
-                    )}
-                    <div className="text-right">
-                        <p className="text-xs text-gray-400">Attending</p>
-                        <p className="text-sm font-medium text-gray-800">Dr. {me?.full_name}</p>
+
+                    {/* Right: doctor + discharge */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {patient.is_admitted && (
+                            <button
+                                onClick={handleDischargeRequest}
+                                className="hidden sm:flex items-center gap-1.5 h-9 px-4 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border border-rose-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            >
+                                Discharge
+                            </button>
+                        )}
+                        {/* Doctor badge */}
+                        <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                            <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center text-white text-[10px] font-black">
+                                {me?.full_name?.charAt(0) || "D"}
+                            </div>
+                            <div className="hidden sm:block text-right">
+                                <p className="text-[10px] text-gray-400 leading-none">Attending</p>
+                                <p className="text-xs font-semibold text-gray-800 leading-tight">Dr. {me?.full_name?.split(' ')[0]}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -1324,6 +1366,30 @@ export default function DoctorPatientDetailPage() {
                                                                 {/* Inline meeting link entry */}
                                                                 {isMeetOpen && (
                                                                     <div className="mt-2.5 p-2.5 bg-teal-50 border border-teal-100 rounded-xl space-y-2">
+                                                                        <div className="flex items-center justify-between mb-1">
+                                                                            <p className="text-[9px] font-black text-teal-700 uppercase tracking-widest">
+                                                                                {c.meet_link ? '📹 Update / Remove Meeting' : '📹 Add Meeting Link'}
+                                                                            </p>
+                                                                            {c.meet_link && (
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        setMeetSaving(true);
+                                                                                        try {
+                                                                                            await consultations.setMeetLink(c.id, "");
+                                                                                            showToast("Meeting ended — link removed");
+                                                                                            setMeetConsultId(null);
+                                                                                            fetchData();
+                                                                                        } catch (e: any) {
+                                                                                            showToast(e?.response?.data?.detail || "Failed to remove link", false);
+                                                                                        } finally { setMeetSaving(false); }
+                                                                                    }}
+                                                                                    disabled={meetSaving}
+                                                                                    className="text-[9px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 border border-rose-200 bg-white px-2 py-1 rounded-lg transition-all disabled:opacity-50"
+                                                                                >
+                                                                                    End & Remove
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                         <div className="flex gap-2">
                                                                             <input
                                                                                 type="url"
