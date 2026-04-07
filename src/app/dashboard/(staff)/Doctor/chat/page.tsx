@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, MessageSquare, Loader2, ArrowLeft, Users, Clock, Send, Play, Pause, Check, CheckCheck, Phone } from "lucide-react";
+import {
+    Search, MessageSquare, Loader2, ArrowLeft,
+    Users, Clock, Send, Play, Pause, Check, CheckCheck,
+    Phone, Wifi, WifiOff
+} from "lucide-react";
 import api, { auth, getWsBaseUrl } from "@/services/api";
 
 // ─── Types ───────────────────────────────────────────────
@@ -28,20 +32,14 @@ interface Message {
 // ─── Helpers ──────────────────────────────────────────────
 
 const CACHE_KEY = (pid: number) => `chat_history_p${pid}`;
-
 const getCached = (pid: number): Message[] => {
-    try {
-        const raw = sessionStorage.getItem(CACHE_KEY(pid));
-        return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+    try { const raw = sessionStorage.getItem(CACHE_KEY(pid)); return raw ? JSON.parse(raw) : []; } catch { return []; }
 };
-
 const setCache = (pid: number, msgs: Message[]) => {
     try { sessionStorage.setItem(CACHE_KEY(pid), JSON.stringify(msgs)); } catch { }
 };
 
-const fmt = (iso: string) =>
-    new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const fmt = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
 const fmtDate = (iso: string | null | undefined) => {
     if (!iso) return "";
@@ -51,8 +49,7 @@ const fmtDate = (iso: string | null | undefined) => {
     return d.toLocaleDateString([], { day: "2-digit", month: "short" });
 };
 
-const initials = (name: string) =>
-    name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+const initials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
 const avatarColor = (name: string) => {
     const colors = ["#4f46e5", "#0891b2", "#059669", "#d97706", "#dc2626", "#7c3aed", "#db2777"];
@@ -95,15 +92,17 @@ export default function DoctorChat() {
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [me, setMe] = useState<any>(null);
+    const [wsOnline, setWsOnline] = useState(false);
     const [showChat, setShowChat] = useState(false); // mobile: show chat panel
 
     const wsRef = useRef<WebSocket | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const reconnectRef = useRef<NodeJS.Timeout | null>(null);
     const pollRef = useRef<NodeJS.Timeout | null>(null);
     const mountedRef = useRef(false);
 
-    // ── Boot ─────────────────────────────────────────────
+    // ── Boot ────────────────────────────────────────────
 
     useEffect(() => {
         mountedRef.current = true;
@@ -113,10 +112,7 @@ export default function DoctorChat() {
                     auth.getMe(),
                     api.get("chat/patients/list").then(r => r.data)
                 ]);
-                if (mountedRef.current) {
-                    setMe(meData);
-                    setPatients(patientList);
-                }
+                if (mountedRef.current) { setMe(meData); setPatients(patientList); }
             } catch (e) { console.error("Boot error", e); }
             finally { if (mountedRef.current) setLoading(false); }
         };
@@ -129,15 +125,20 @@ export default function DoctorChat() {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // ── Load history for selected patient ─────────────────
+    // Auto-resize textarea
+    const adjustTextarea = () => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 120) + "px";
+    };
+
+    // ── Load history ────────────────────────────────────
 
     const loadHistory = useCallback(async (patientId: number) => {
-        // 1. Show cached immediately (instant)
         const cached = getCached(patientId);
         if (cached.length > 0) setMessages(cached);
         setHistLoading(cached.length === 0);
-
-        // 2. Fetch fresh from server
         try {
             const res = await api.get(`chat/patient/${patientId}/history`);
             const fresh: Message[] = res.data.map((m: any) => ({
@@ -153,11 +154,10 @@ export default function DoctorChat() {
             }));
             if (mountedRef.current) {
                 setMessages(prev => {
-                    // merge: preserve optimistic sent messages not yet in DB
                     const dbIds = new Set(fresh.map(f => f.id));
                     const pending = prev.filter(m => typeof m.id === "string" && !dbIds.has(m.id));
                     const merged = [...fresh, ...pending];
-                    setCache(patientId, fresh); // cache only confirmed messages
+                    setCache(patientId, fresh);
                     return merged;
                 });
             }
@@ -165,34 +165,31 @@ export default function DoctorChat() {
         finally { if (mountedRef.current) setHistLoading(false); }
     }, []);
 
-    // ── Select patient ─────────────────────────────────────
+    // ── Select patient ──────────────────────────────────
 
     const selectPatient = useCallback((patient: Patient) => {
-        // Close previous WS
         if (reconnectRef.current) clearTimeout(reconnectRef.current);
         if (pollRef.current) clearInterval(pollRef.current);
         if (wsRef.current) try { wsRef.current.close(); } catch { }
         wsRef.current = null;
-
+        setWsOnline(false);
         setSelected(patient);
-        setMessages([]); // reset
+        setMessages([]);
         setShowChat(true);
         loadHistory(patient.patient_id);
         connectWS(patient.patient_id);
     }, [loadHistory]);
 
-    // ── WebSocket ──────────────────────────────────────────
+    // ── WebSocket ────────────────────────────────────────
 
     const connectWS = useCallback((patientId: number) => {
         if (!mountedRef.current) return;
         const wsBase = getWsBaseUrl();
         const token = localStorage.getItem("token") || "";
-        const url = `${wsBase}/ws/patient/${patientId}?role=doctor&token=${token}`;
-        console.log(`[WS] Connecting doctor → patient ${patientId}`);
-
-        const ws = new WebSocket(url);
+        const ws = new WebSocket(`${wsBase}/ws/patient/${patientId}?role=doctor&token=${token}`);
         wsRef.current = ws;
 
+        ws.onopen = () => { if (mountedRef.current) setWsOnline(true); };
         ws.onmessage = (e) => {
             if (!mountedRef.current) return;
             try {
@@ -214,231 +211,206 @@ export default function DoctorChat() {
                 }
             } catch { }
         };
-
         ws.onclose = () => {
             if (!mountedRef.current) return;
-            // Sync every 3s while disconnected
-            pollRef.current = setInterval(() => {
-                if (mountedRef.current) loadHistory(patientId);
-            }, 3000);
-            // Reconnect after 4s
+            setWsOnline(false);
+            pollRef.current = setInterval(() => { if (mountedRef.current) loadHistory(patientId); }, 3000);
             reconnectRef.current = setTimeout(() => {
                 if (pollRef.current) clearInterval(pollRef.current);
                 connectWS(patientId);
             }, 4000);
         };
-
         ws.onerror = () => ws.close();
     }, [loadHistory]);
 
-    // ── Send message ───────────────────────────────────────
+    // ── Send message ─────────────────────────────────────
 
     const sendMessage = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const trimmed = text.trim();
         if (!trimmed || !selected || sending) return;
-
         const tempId = `temp-${Date.now()}`;
         const tempMsg: Message = {
-            id: tempId,
-            sender: me?.full_name || "Doctor",
-            text: trimmed,
+            id: tempId, sender: me?.full_name || "Doctor", text: trimmed,
             time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            isMe: true,
-            status: "sending"
+            isMe: true, status: "sending"
         };
-
         setMessages(prev => [...prev, tempMsg]);
         setText("");
+        if (textareaRef.current) { textareaRef.current.style.height = "auto"; }
         setSending(true);
-
-        // STEP 1: REST (guaranteed DB save)
         try {
             const res = await api.post(`chat/patient/${selected.patient_id}/send`, {
-                message: trimmed,
-                sender_name: me?.full_name || "Doctor",
-                sender_role: "doctor"
+                message: trimmed, sender_name: me?.full_name || "Doctor", sender_role: "doctor"
             });
             const savedId = res.data?.id;
-            setMessages(prev => prev.map(m =>
-                m.id === tempId ? { ...m, id: savedId || tempId, status: "sent" } : m
-            ));
-
-            // Update patient list preview
+            setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: savedId || tempId, status: "sent" } : m));
             setPatients(prev => prev.map(p =>
                 p.patient_id === selected.patient_id
                     ? { ...p, last_message: trimmed, last_timestamp: new Date().toISOString() }
                     : p
             ));
-
-            // STEP 2: WS broadcast for real-time delivery
             if (wsRef.current?.readyState === WebSocket.OPEN) {
-                wsRef.current.send(JSON.stringify({
-                    text: trimmed,
-                    senderName: me?.full_name || "Doctor",
-                    senderRole: "doctor",
-                    type: "message"
-                }));
+                wsRef.current.send(JSON.stringify({ text: trimmed, senderName: me?.full_name || "Doctor", senderRole: "doctor", type: "message" }));
             }
         } catch (err) {
-            console.error("Send failed:", err);
             setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: "sent" } : m));
-        } finally {
-            setSending(false);
-        }
+        } finally { setSending(false); }
     };
 
     const handleKey = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     };
 
-    // ── Filtered patients ──────────────────────────────────
-
-    const filtered = patients.filter(p =>
-        p.patient_name.toLowerCase().includes(search.toLowerCase())
-    );
+    const filtered = patients.filter(p => p.patient_name.toLowerCase().includes(search.toLowerCase()));
 
     // ─── Render ────────────────────────────────────────────
+    // Layout:
+    // - Header: fixed, ~58px (set by DoctorHeader)
+    // - BottomNav: fixed bottom-4, pill ~72px visible + 16px gap = 88px from bottom on mobile
+    // - So on mobile: h = 100dvh - header - bottomnav = 100dvh - 58px - 88px
+    // - On md+: h = 100dvh - header = 100dvh - 58px (no bottom nav)
 
     return (
-        <div className="flex h-[calc(100vh-4rem)] bg-gray-50 overflow-hidden">
-
-            {/* ── Sidebar: Patient List ────────────────── */}
+        <div
+            className="flex overflow-hidden bg-gray-50"
+            style={{
+                height: "calc(100dvh - 58px)",        // subtract header
+                paddingBottom: "env(safe-area-inset-bottom)"
+            }}
+        >
+            {/* ── Sidebar ──────────────────────────────────────── */}
             <div className={`
-                flex flex-col bg-white border-r border-gray-100 shadow-sm
+                flex flex-col bg-white border-r border-gray-100
                 w-full md:w-80 lg:w-96 flex-shrink-0
                 ${showChat ? "hidden md:flex" : "flex"}
-                transition-all duration-300
             `}>
-                {/* Header */}
-                <div className="px-5 pt-6 pb-4 border-b border-gray-100">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
-                            <MessageSquare className="w-5 h-5 text-white" />
+                {/* Sidebar header */}
+                <div className="px-4 pt-5 pb-3 border-b border-gray-100">
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-200 flex-shrink-0">
+                            <MessageSquare className="w-4.5 h-4.5 text-white" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-bold text-gray-900 leading-tight">Clinical Chat</h1>
-                            <p className="text-xs text-gray-400">Patient Messenger</p>
+                            <h1 className="text-[15px] font-black text-gray-900 leading-tight">Clinical Chat</h1>
+                            <p className="text-[10px] text-gray-400 font-medium">Patient Messenger</p>
                         </div>
                     </div>
-                    {/* Search */}
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                         <input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Search patients..."
-                            className="w-full pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                            className="w-full pl-9 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-300 transition-all"
                         />
                     </div>
                 </div>
 
-                {/* Patient list */}
-                <div className="flex-1 overflow-y-auto py-2">
+                {/* Patient list — scrollable, reserve space for bottom nav on mobile */}
+                <div className="flex-1 overflow-y-auto pb-[88px] md:pb-0">
                     {loading ? (
                         <div className="flex items-center justify-center h-32 gap-2 text-gray-400">
                             <Loader2 className="w-5 h-5 animate-spin" />
-                            <span className="text-sm">Loading patients...</span>
+                            <span className="text-sm">Loading...</span>
                         </div>
                     ) : filtered.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-32 text-gray-400">
-                            <Users className="w-8 h-8 mb-2 opacity-40" />
+                            <Users className="w-8 h-8 mb-2 opacity-30" />
                             <p className="text-sm">No patients found</p>
                         </div>
                     ) : (
-                        filtered.map(p => {
-                            const isActive = selected?.patient_id === p.patient_id;
-                            return (
-                                <button
-                                    key={p.patient_id}
-                                    onClick={() => selectPatient(p)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-gray-50 ${isActive ? "bg-indigo-50 border-r-2 border-indigo-600" : ""}`}
-                                >
-                                    {/* Avatar */}
-                                    <div
-                                        className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
-                                        style={{ background: avatarColor(p.patient_name) }}
+                        <div className="py-2 space-y-0.5">
+                            {filtered.map(p => {
+                                const isActive = selected?.patient_id === p.patient_id;
+                                return (
+                                    <button
+                                        key={p.patient_id}
+                                        onClick={() => selectPatient(p)}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all active:scale-[0.98] ${isActive
+                                            ? "bg-indigo-50 border-r-[3px] border-indigo-600"
+                                            : "hover:bg-gray-50/80"
+                                        }`}
                                     >
-                                        {initials(p.patient_name)}
-                                    </div>
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-0.5">
-                                            <span className={`font-semibold text-sm truncate ${isActive ? "text-indigo-700" : "text-gray-900"}`}>
-                                                {p.patient_name}
-                                            </span>
-                                            {p.last_timestamp && (
-                                                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
-                                                    {fmtDate(p.last_timestamp)}
-                                                </span>
-                                            )}
+                                        <div
+                                            className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
+                                            style={{ background: avatarColor(p.patient_name) }}
+                                        >
+                                            {initials(p.patient_name)}
                                         </div>
-                                        <p className="text-xs text-gray-400 truncate">
-                                            {p.last_message || "No messages yet"}
-                                        </p>
-                                    </div>
-                                </button>
-                            );
-                        })
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-0.5">
+                                                <span className={`font-bold text-[13px] truncate ${isActive ? "text-indigo-700" : "text-gray-900"}`}>
+                                                    {p.patient_name}
+                                                </span>
+                                                {p.last_timestamp && (
+                                                    <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">{fmtDate(p.last_timestamp)}</span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-400 truncate leading-relaxed">
+                                                {p.last_message || "No messages yet"}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* ── Chat Panel ───────────────────────────────── */}
-            <div className={`
-                flex flex-col flex-1 min-w-0
-                ${!showChat ? "hidden md:flex" : "flex"}
-            `}>
+            {/* ── Chat Panel ────────────────────────────────────── */}
+            <div className={`flex flex-col flex-1 min-w-0 ${!showChat ? "hidden md:flex" : "flex"}`}>
                 {!selected ? (
                     /* Empty state */
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                        <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-4 shadow-inner">
-                            <MessageSquare className="w-10 h-10 text-indigo-400" />
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 pb-[88px] md:pb-8">
+                        <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-4">
+                            <MessageSquare className="w-10 h-10 text-indigo-300" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Select a Patient</h2>
-                        <p className="text-sm text-gray-400 max-w-xs">
-                            Choose a patient from the list to start chatting. Messages are saved in real-time.
+                        <h2 className="text-lg font-black text-gray-800 mb-2">Select a Patient</h2>
+                        <p className="text-sm text-gray-400 max-w-xs leading-relaxed">
+                            Choose a patient from the list to start a clinical conversation.
                         </p>
                     </div>
                 ) : (
                     <>
                         {/* Chat header */}
-                        <div className="flex items-center gap-4 px-5 py-4 bg-white border-b border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm flex-shrink-0">
                             <button
                                 onClick={() => setShowChat(false)}
-                                className="md:hidden w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors"
+                                className="md:hidden w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors active:scale-95"
                             >
                                 <ArrowLeft className="w-5 h-5" />
                             </button>
                             <div
-                                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0"
+                                className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0"
                                 style={{ background: avatarColor(selected.patient_name) }}
                             >
                                 {initials(selected.patient_name)}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h2 className="font-bold text-gray-900 leading-tight truncate">{selected.patient_name}</h2>
-                                <p className="text-xs text-green-500 font-medium">● Active Patient</p>
+                                <h2 className="font-black text-[14px] text-gray-900 leading-tight truncate">{selected.patient_name}</h2>
+                                <div className="flex items-center gap-1.5">
+                                    {wsOnline
+                                        ? <><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /><span className="text-[10px] text-emerald-600 font-bold">Connected</span></>
+                                        : <><WifiOff className="w-2.5 h-2.5 text-gray-400" /><span className="text-[10px] text-gray-400">Reconnecting...</span></>
+                                    }
+                                </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <button className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-500 transition-colors">
-                                    <Phone className="w-4 h-4" />
-                                </button>
-                            </div>
+                            <button className="w-9 h-9 rounded-xl hover:bg-gray-100 flex items-center justify-center text-gray-400 transition-colors">
+                                <Phone className="w-4 h-4" />
+                            </button>
                         </div>
 
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-gray-50/80">
+                        {/* Messages — takes all remaining space between header and input */}
+                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-[#F0F4FF]/60">
                             {histLoading ? (
                                 <div className="flex items-center justify-center h-24 gap-2 text-gray-400">
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                     <span className="text-sm">Loading messages...</span>
                                 </div>
                             ) : messages.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-32 text-gray-400">
+                                <div className="flex flex-col items-center justify-center h-full min-h-[120px] text-gray-400">
                                     <MessageSquare className="w-8 h-8 mb-2 opacity-30" />
                                     <p className="text-sm">No messages yet. Start the conversation!</p>
                                 </div>
@@ -447,28 +419,26 @@ export default function DoctorChat() {
                                     <div key={`${msg.id}-${i}`} className={`flex ${msg.isMe ? "justify-end" : "justify-start"}`}>
                                         {!msg.isMe && (
                                             <div
-                                                className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold mr-2 flex-shrink-0 self-end"
+                                                className="w-7 h-7 rounded-xl flex items-center justify-center text-white text-[10px] font-bold mr-1.5 flex-shrink-0 self-end mb-1"
                                                 style={{ background: avatarColor(msg.sender) }}
                                             >
                                                 {initials(msg.sender)}
                                             </div>
                                         )}
-                                        <div className={`max-w-[72%] ${msg.isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                                        <div className={`max-w-[75%] flex flex-col gap-0.5 ${msg.isMe ? "items-end" : "items-start"}`}>
                                             {!msg.isMe && (
-                                                <span className="text-xs text-gray-400 px-1">{msg.sender}</span>
+                                                <span className="text-[10px] text-gray-400 px-1">{msg.sender}</span>
                                             )}
-                                            <div className={`px-4 py-2.5 rounded-2xl leading-relaxed text-sm shadow-sm ${
+                                            <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${
                                                 msg.isMe
-                                                    ? "bg-indigo-600 text-white rounded-br-sm"
-                                                    : "bg-white text-gray-800 border border-gray-100 rounded-bl-sm"
-                                            }`}>
+                                                    ? "bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-br-sm"
+                                                    : "bg-white text-gray-800 border border-gray-100/80 rounded-bl-sm shadow-xs"
+                                            } ${msg.status === "sending" ? "opacity-70" : ""}`}>
                                                 {msg.audioUrl ? (
                                                     <AudioPlayer url={msg.audioUrl} isMe={msg.isMe} />
                                                 ) : msg.imageUrl ? (
                                                     <img src={msg.imageUrl} className="max-w-[200px] rounded-xl" alt="img" />
-                                                ) : (
-                                                    msg.text
-                                                )}
+                                                ) : msg.text}
                                             </div>
                                             <div className={`flex items-center gap-1 px-1 ${msg.isMe ? "justify-end" : "justify-start"}`}>
                                                 <span className="text-[10px] text-gray-400">{msg.time}</span>
@@ -487,23 +457,27 @@ export default function DoctorChat() {
                             <div ref={bottomRef} />
                         </div>
 
-                        {/* Input */}
-                        <div className="bg-white border-t border-gray-100 px-4 py-3">
-                            <form onSubmit={sendMessage} className="flex items-end gap-3">
-                                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-400 transition-all">
+                        {/* Input bar — FIXED at bottom, respects bottom nav height on mobile */}
+                        <div className="bg-white border-t border-gray-100 flex-shrink-0
+                                        pb-[env(safe-area-inset-bottom)]
+                                        mb-[88px] md:mb-0">
+                            <form onSubmit={sendMessage} className="flex items-end gap-2.5 px-3 py-2.5">
+                                <div className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-indigo-200 focus-within:border-indigo-300 transition-all">
                                     <textarea
+                                        ref={textareaRef}
                                         value={text}
-                                        onChange={e => setText(e.target.value)}
+                                        onChange={e => { setText(e.target.value); adjustTextarea(); }}
                                         onKeyDown={handleKey}
                                         placeholder="Type a message..."
                                         rows={1}
-                                        className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none leading-relaxed max-h-32"
+                                        className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 resize-none focus:outline-none leading-relaxed"
+                                        style={{ maxHeight: "120px", overflowY: "auto" }}
                                     />
                                 </div>
                                 <button
                                     type="submit"
                                     disabled={!text.trim() || sending}
-                                    className="w-11 h-11 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 transition-all shadow-sm active:scale-95"
+                                    className="w-11 h-11 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center flex-shrink-0 transition-all shadow-md shadow-indigo-200 active:scale-95 self-end"
                                 >
                                     {sending
                                         ? <Loader2 className="w-4 h-4 text-white animate-spin" />
