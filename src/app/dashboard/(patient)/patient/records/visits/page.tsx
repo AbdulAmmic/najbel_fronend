@@ -120,6 +120,19 @@ export default function VisitHistoryPage() {
                                                 <p className="text-xs text-gray-700 leading-relaxed">{visit.symptoms}</p>
                                             </div>
                                         )}
+                                        {/* Facilities / Hospitals visited — parsed from notes */}
+                                        {visit.notes && (() => {
+                                            const m = visit.notes.match(/Facilities?: ([^|]+)/);
+                                            return m ? (
+                                                <div className="flex items-start gap-2 p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                                    <span className="text-base leading-none shrink-0">🏥</span>
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Facilities Previously Visited</p>
+                                                        <p className="text-xs text-indigo-800 font-semibold leading-relaxed">{m[1].trim()}</p>
+                                                    </div>
+                                                </div>
+                                            ) : null;
+                                        })()}
                                         {visit.diagnosis && (
                                             <div>
                                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Diagnosis</p>

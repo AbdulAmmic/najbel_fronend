@@ -97,6 +97,7 @@ export default function DoctorPatientDetailPage() {
     const [assessNotes, setAssessNotes] = useState("");
     // Extra SOAP fields
     const [subjDob, setSubjDob] = useState("");
+    const [subjHospital, setSubjHospital] = useState("");
     // Lab billing mode
     const [labBillingMode, setLabBillingMode] = useState<"direct" | "paid">("direct");
     // Consultation history
@@ -330,6 +331,10 @@ export default function DoctorPatientDetailPage() {
             setSubjChief(existing.chief_complaint || "");
             setSubjSymptoms(existing.symptoms || "");
             setSubjHistory(""); setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits(""); setSubjDob("");
+            // Parse hospital from saved notes
+            const existNotes = existing.notes || "";
+            const hospMatch = existNotes.match(/Facilities?: ([^|]+)/);
+            setSubjHospital(hospMatch ? hospMatch[1].trim() : "");
             setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
             setObjFbs(""); setObjRbs(""); setObjFbc("");
             setAssesSymptoms(existing.symptoms || "");
@@ -340,7 +345,7 @@ export default function DoctorPatientDetailPage() {
             // New consultation
             setEditingConsultId(null);
             setSubjChief(""); setSubjSymptoms(""); setSubjHistory("");
-            setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits(""); setSubjDob("");
+            setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits(""); setSubjDob(""); setSubjHospital("");
             setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
             setObjFbs(""); setObjRbs(""); setObjFbc("");
             setAssesSymptoms(""); setAssesDiagnosis(""); setAssesTreatment(""); setAssessNotes("");
@@ -416,6 +421,7 @@ export default function DoctorPatientDetailPage() {
         try {
             const fullNotes = [
                 subjDob ? `Patient DOB/Age: ${subjDob}` : "",
+                subjHospital ? `Facilities: ${subjHospital}` : "",
                 objBpSys && objBpDia ? `BP: ${objBpSys}/${objBpDia} mmHg` : "",
                 objHeight ? `Height: ${objHeight} cm` : "",
                 objWeight ? `Weight: ${objWeight} kg` : "",
@@ -1453,6 +1459,19 @@ export default function DoctorPatientDetailPage() {
                                                                             <p className="text-xs text-gray-700 leading-relaxed">{c.symptoms}</p>
                                                                         </div>
                                                                     )}
+                                                                    {/* Hospital / Facilities visited — parsed from notes */}
+                                                                    {c.notes && (() => {
+                                                                        const m = c.notes.match(/Facilities?: ([^|]+)/);
+                                                                        return m ? (
+                                                                            <div className="flex items-start gap-2 p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                                                                <span className="text-base leading-none shrink-0">🏥</span>
+                                                                                <div>
+                                                                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Facilities Visited</p>
+                                                                                    <p className="text-xs text-indigo-800 font-semibold leading-relaxed">{m[1].trim()}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : null;
+                                                                    })()}
                                                                     {c.treatment_plan && (
                                                                         <div>
                                                                             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Treatment Plan</p>
@@ -1755,6 +1774,19 @@ export default function DoctorPatientDetailPage() {
                                                     <div className="col-span-2">
                                                         <label className="text-xs font-semibold text-gray-700 mb-1 block">Patient Date of Birth / Age</label>
                                                         <input type="text" placeholder="e.g. 15 Jan 1990 or 34 years" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400" value={subjDob} onChange={e => setSubjDob(e.target.value)} />
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block flex items-center gap-1.5">
+                                                            🏥 Hospitals / Facilities Previously Visited
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. Lagos University Hospital, LUTH, City Clinic..."
+                                                            className="w-full border border-blue-100 bg-blue-50/40 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50"
+                                                            value={subjHospital}
+                                                            onChange={e => setSubjHospital(e.target.value)}
+                                                        />
+                                                        <p className="text-[10px] text-gray-400 mt-1">List any hospitals or clinics the patient has visited for this condition</p>
                                                     </div>
                                                 </div>
                                                 <div>
