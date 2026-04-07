@@ -415,8 +415,7 @@ export default function DoctorPatientDetailPage() {
     };
 
     const soapFinish = async () => {
-        if (!assesDiagnosis.trim()) return showToast("Diagnosis is required", false);
-        if (!editingConsultId && !subjChief.trim()) return showToast("Chief complaint is required", false);
+        // No hard validation — doctors should be able to save partial notes at any time
         setSoapSaving(true);
         try {
             const fullNotes = [

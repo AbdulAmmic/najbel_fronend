@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
     Search, Phone, MessageSquare, ChevronRight,
     Users, UserCheck, BedDouble, X,
-    Stethoscope, SlidersHorizontal
+    Stethoscope, SlidersHorizontal, MapPin, Globe
 } from "lucide-react";
 import { patientService } from "@/services/api";
 
@@ -126,6 +126,12 @@ const PatientCard = ({ patient, onChat, onView }: {
                                 📞 {phone(patient)}
                             </p>
                         )}
+                        {/* State / Country */}
+                        {(patient.state || patient.country) && (
+                            <p className="text-xs text-gray-400 font-medium truncate leading-none mt-0.5">
+                                📍 {[patient.state, patient.country].filter(Boolean).join(", ")}
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -186,6 +192,8 @@ export default function MyPatientsPage() {
     const [search, setSearch] = useState("");
     const [filter, setFilter] = useState<"all" | "admitted" | "outpatient">("all");
     const [showFilter, setShowFilter] = useState(false);
+    const [stateFilter, setStateFilter] = useState("all");
+    const [countryFilter, setCountryFilter] = useState("all");
 
     useEffect(() => {
         patientService.getAll()
@@ -206,13 +214,21 @@ export default function MyPatientsPage() {
     const filtered = patients.filter(p => {
         const n = (p.full_name || "").toLowerCase();
         const ph = (p.phone_number || "").toLowerCase();
-        const matchSearch = !search || n.includes(search.toLowerCase()) || ph.includes(search.toLowerCase());
+        const st = (p.state || "").toLowerCase();
+        const co = (p.country || "").toLowerCase();
+        const matchSearch = !search || n.includes(search.toLowerCase()) || ph.includes(search.toLowerCase()) || st.includes(search.toLowerCase());
         const matchFilter =
             filter === "all" ||
             (filter === "admitted" && p.is_admitted) ||
             (filter === "outpatient" && !p.is_admitted);
-        return matchSearch && matchFilter;
+        const matchState = stateFilter === "all" || p.state === stateFilter;
+        const matchCountry = countryFilter === "all" || p.country === countryFilter;
+        return matchSearch && matchFilter && matchState && matchCountry;
     });
+
+    // Unique states + countries present in data
+    const states = Array.from(new Set(patients.map((p: any) => p.state).filter(Boolean))) as string[];
+    const countries = Array.from(new Set(patients.map((p: any) => p.country).filter(Boolean))) as string[];
 
     const admitted = patients.filter(p => p.is_admitted).length;
     const outpatient = patients.length - admitted;
@@ -266,19 +282,60 @@ export default function MyPatientsPage() {
 
                 {/* Filter pills */}
                 {showFilter && (
-                    <div className="flex gap-2 mt-3">
-                        {FILTER_OPTIONS.map(opt => (
-                            <button
-                                key={opt.key}
-                                onClick={() => setFilter(opt.key)}
-                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${filter === opt.key
-                                    ? "bg-blue-600 text-white shadow-md shadow-blue-200"
-                                    : "bg-white text-gray-500 border border-gray-200"
-                                    }`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
+                    <div className="space-y-2 mt-3">
+                        {/* Status filter */}
+                        <div className="flex gap-2">
+                            {FILTER_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => setFilter(opt.key)}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${filter === opt.key
+                                        ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                                        : "bg-white text-gray-500 border border-gray-200"
+                                        }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                        {/* State filter */}
+                        {states.length > 0 && (
+                            <div className="flex gap-2 items-center">
+                                <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
+                                <select
+                                    value={stateFilter}
+                                    onChange={e => setStateFilter(e.target.value)}
+                                    className="flex-1 text-xs font-semibold border border-gray-200 bg-white rounded-xl px-3 py-1.5 outline-none focus:border-blue-300"
+                                >
+                                    <option value="all">All States</option>
+                                    {states.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                {stateFilter !== "all" && (
+                                    <button onClick={() => setStateFilter("all")} className="text-gray-400 hover:text-gray-600">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {/* Country filter */}
+                        {countries.length > 0 && (
+                            <div className="flex gap-2 items-center">
+                                <Globe className="w-3 h-3 text-gray-400 shrink-0" />
+                                <select
+                                    value={countryFilter}
+                                    onChange={e => setCountryFilter(e.target.value)}
+                                    className="flex-1 text-xs font-semibold border border-gray-200 bg-white rounded-xl px-3 py-1.5 outline-none focus:border-blue-300"
+                                >
+                                    <option value="all">All Countries</option>
+                                    {countries.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                {countryFilter !== "all" && (
+                                    <button onClick={() => setCountryFilter("all")} className="text-gray-400 hover:text-gray-600">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 

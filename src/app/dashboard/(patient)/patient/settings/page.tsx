@@ -1,173 +1,348 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Lock, Camera, CheckCircle2, ShieldCheck, LogOut, Eye, EyeOff } from "lucide-react";
+import {
+    User, Lock, Camera, CheckCircle2, ShieldCheck, LogOut,
+    Eye, EyeOff, Phone, CreditCard, MapPin, Globe,
+    AlertCircle, Loader2, Save, ChevronRight
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import api from "@/services/api";
 
-export default function SettingsPage() {
+const NIGERIAN_STATES = [
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
+    "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara",
+    "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo",
+    "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
+];
+
+const COUNTRIES = [
+    "Nigeria", "Ghana", "Benin Republic", "Togo", "Cameroon", "Niger",
+    "Chad", "Senegal", "United Kingdom", "United States", "Canada",
+    "South Africa", "Kenya", "Ethiopia", "Other"
+];
+
+const Section = ({ title, icon: Icon, iconBg, children }: any) => (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-50">
+            <div className={`w-8 h-8 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}>
+                <Icon className="w-4 h-4" />
+            </div>
+            <h2 className="text-sm font-black text-gray-900">{title}</h2>
+        </div>
+        <div className="px-4 py-4 space-y-4">{children}</div>
+    </div>
+);
+
+const Field = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) => (
+    <div>
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">{label}</label>
+        {children}
+        {hint && <p className="text-[10px] text-gray-400 mt-1">{hint}</p>}
+    </div>
+);
+
+const Input = ({ value, onChange, placeholder, type = "text", readOnly }: any) => (
+    <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none transition-all
+            ${readOnly ? "bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed" : "border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-50 text-gray-900"}`}
+    />
+);
+
+const SelectInput = ({ value, onChange, options, placeholder }: any) => (
+    <select
+        value={value}
+        onChange={onChange}
+        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 text-gray-900 transition-all"
+    >
+        <option value="">{placeholder}</option>
+        {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+    </select>
+);
+
+const Toast = ({ msg, ok }: { msg: string; ok: boolean }) => (
+    <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-xl text-sm font-bold whitespace-nowrap animate-in fade-in slide-in-from-bottom-3
+        ${ok ? "bg-slate-900 text-white" : "bg-rose-600 text-white"}`}>
+        {ok ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <AlertCircle className="w-3.5 h-3.5" />}
+        {msg}
+    </div>
+);
+
+export default function PatientSettingsPage() {
     const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    const [user, setUser] = useState<any>(null);
-    const [showPassword, setShowPassword] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [passSaving, setPassSaving] = useState(false);
+    const [pinSaving, setPinSaving] = useState(false);
+    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+    const [showPass, setShowPass] = useState(false);
+
+    // Profile fields
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [nin, setNin] = useState("");
+    const [state, setState] = useState("");
+    const [country, setCountry] = useState("Nigeria");
+    const [dob, setDob] = useState("");
+    const [gender, setGender] = useState("");
+    const [address, setAddress] = useState("");
+    const [profilePic, setProfilePic] = useState("");
+
+    // Security
+    const [curPass, setCurPass] = useState("");
+    const [newPass, setNewPass] = useState("");
+    const [confirmPass, setConfirmPass] = useState("");
+
+    // PIN
     const [pin, setPin] = useState("");
-    const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-    const [profileData, setProfileData] = useState({ full_name: "", email: "", profile_picture: "" });
-    const [securityData, setSecurityData] = useState({ new_password: "" });
+
+    const showToast = (msg: string, ok = true) => {
+        setToast({ msg, ok });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const res = await api.get("/users/me");
-                setUser(res.data);
-                setProfileData({ full_name: res.data.full_name || "", email: res.data.email || "", profile_picture: res.data.profile_picture || "" });
-            } catch (err) { console.error(err); }
-        };
-        fetchUser();
+        api.get("/users/me").then((res: any) => {
+            const u = res.data;
+            setFullName(u.full_name || "");
+            setEmail(u.email || "");
+            setPhone(u.phone_number || u.phone || "");
+            setNin(u.nin || u.national_id || "");
+            setState(u.state || "");
+            setCountry(u.country || "Nigeria");
+            setDob(u.date_of_birth ? u.date_of_birth.slice(0, 10) : "");
+            setGender(u.gender || "");
+            setAddress(u.address || "");
+            setProfilePic(u.profile_picture || "");
+        }).catch(() => {});
     }, []);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
-            reader.onloadend = () => setProfileData({ ...profileData, profile_picture: reader.result as string });
+            reader.onloadend = () => setProfilePic(reader.result as string);
             reader.readAsDataURL(file);
         }
     };
 
-    const handleUpdate = async () => {
-        setLoading(true);
+    const saveProfile = async () => {
+        setSaving(true);
         try {
-            const payload: any = { full_name: profileData.full_name, email: profileData.email, profile_picture: profileData.profile_picture };
-            if (securityData.new_password) payload.password = securityData.new_password;
-            await api.put("/users/me", payload);
-            setStatus({ type: 'success', message: 'Saved' });
-            setSecurityData({ new_password: "" });
-            setTimeout(() => setStatus(null), 3000);
-        } catch (err) {
-            setStatus({ type: 'error', message: 'Failed' });
-        } finally { setLoading(false); }
+            await api.put("/users/me", {
+                full_name: fullName,
+                phone_number: phone,
+                nin,
+                state,
+                country,
+                date_of_birth: dob || undefined,
+                gender: gender || undefined,
+                address,
+                profile_picture: profilePic || undefined,
+            });
+            showToast("Profile updated successfully!");
+        } catch (e: any) {
+            showToast(e?.response?.data?.detail || "Failed to save", false);
+        } finally { setSaving(false); }
     };
 
-    const handlePinUpdate = async () => {
-        if (!pin || pin.length !== 4) { setStatus({ type: 'error', message: 'Enter 4 digits' }); return; }
-        setLoading(true);
+    const changePassword = async () => {
+        if (!curPass || !newPass) return showToast("Fill all fields", false);
+        if (newPass !== confirmPass) return showToast("Passwords don't match", false);
+        if (newPass.length < 8) return showToast("Min 8 characters", false);
+        setPassSaving(true);
         try {
-            await api.put('/users/me/pin', { pin: pin });
-            setStatus({ type: 'success', message: 'PIN set' }); setPin("");
-            localStorage.setItem('najbel_wallet_pin', 'true');
-            setTimeout(() => setStatus(null), 3000);
-        } catch (err) { setStatus({ type: 'error', message: 'Failed' }); }
-        finally { setLoading(false); }
+            await api.post("/auth/change-password", { current_password: curPass, new_password: newPass });
+            showToast("Password changed!");
+            setCurPass(""); setNewPass(""); setConfirmPass("");
+        } catch (e: any) {
+            showToast(e?.response?.data?.detail || "Incorrect password", false);
+        } finally { setPassSaving(false); }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        router.push("/login");
+    const savePin = async () => {
+        if (pin.length !== 4) return showToast("Enter 4-digit PIN", false);
+        setPinSaving(true);
+        try {
+            await api.put("/users/me/pin", { pin });
+            showToast("PIN set!"); setPin("");
+            localStorage.setItem("najbel_wallet_pin", "true");
+        } catch { showToast("Failed to set PIN", false); }
+        finally { setPinSaving(false); }
     };
+
+    const initials = fullName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "P";
 
     return (
-        <div className="max-w-lg mx-auto pb-8 -mx-1">
-            {/* Header */}
-            <div className="px-1 pt-1 mb-4 flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl font-bold text-gray-900">Settings</h1>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Manage your account</p>
+        <div className="max-w-lg mx-auto px-3 pb-32 pt-2 space-y-4">
+            {toast && <Toast {...toast} />}
+
+            {/* ── Hero Card ─────────────────────────────── */}
+            <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 rounded-3xl p-5 text-white relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full" />
+                <div className="absolute -bottom-8 -left-6 w-24 h-24 bg-white/5 rounded-full" />
+                <div className="flex items-center gap-4 relative">
+                    <div className="relative shrink-0">
+                        <div className="w-16 h-16 rounded-2xl bg-white/20 border border-white/30 overflow-hidden flex items-center justify-center">
+                            {profilePic
+                                ? <img src={profilePic} className="w-full h-full object-cover" alt="Avatar" />
+                                : <span className="text-2xl font-black">{initials}</span>
+                            }
+                        </div>
+                        <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:scale-110 transition-transform">
+                            <Camera className="w-3 h-3 text-gray-600" />
+                            <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+                        </label>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-lg font-black leading-tight truncate">{fullName || "My Profile"}</p>
+                        <p className="text-white/70 text-xs mt-0.5 truncate">{email}</p>
+                        {state && <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-lg mt-1.5 inline-block">📍 {state}, {country}</span>}
+                    </div>
                 </div>
-                <button onClick={handleUpdate} disabled={loading}
-                    className="text-blue-600 font-semibold text-[13px] px-3 py-1.5 hover:bg-blue-50 rounded-lg transition disabled:opacity-50"
+                <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="mt-4 w-full bg-white/20 hover:bg-white/30 border border-white/30 text-white text-xs font-bold py-2 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                    {loading ? "Saving..." : "Save"}
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {saving ? "Saving..." : "Save Profile"}
                 </button>
             </div>
 
-            {/* Profile Photo */}
-            <div className="flex justify-center mb-5">
-                <div className="relative">
-                    <div className="w-20 h-20 rounded-full border-2 border-white shadow-md overflow-hidden bg-gray-100">
-                        {profileData.profile_picture ? (
-                            <img src={profileData.profile_picture} alt="Profile" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                <User className="w-10 h-10" />
-                            </div>
-                        )}
+            {/* ── Personal Details ──────────────────────── */}
+            <Section title="Personal Details" icon={User} iconBg="bg-blue-50 text-blue-600">
+                <Field label="Full Name">
+                    <Input value={fullName} onChange={(e: any) => setFullName(e.target.value)} placeholder="Your full name" />
+                </Field>
+                <Field label="Email Address">
+                    <Input value={email} readOnly />
+                </Field>
+                <Field label="Date of Birth">
+                    <Input type="date" value={dob} onChange={(e: any) => setDob(e.target.value)} />
+                </Field>
+                <Field label="Gender">
+                    <SelectInput value={gender} onChange={(e: any) => setGender(e.target.value)} options={["Male", "Female", "Other"]} placeholder="Select gender" />
+                </Field>
+            </Section>
+
+            {/* ── Contact & Identity ────────────────────── */}
+            <Section title="Contact & Identity" icon={CreditCard} iconBg="bg-indigo-50 text-indigo-600">
+                <Field label="Phone Number" hint="Visible to your doctor and the clinic">
+                    <div className="flex gap-2">
+                        <span className="flex items-center px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 shrink-0">
+                            📞
+                        </span>
+                        <Input value={phone} onChange={(e: any) => setPhone(e.target.value)} placeholder="+234 800 000 0000" />
                     </div>
-                    <label className="absolute bottom-0 right-0 p-1.5 bg-blue-600 rounded-full text-white shadow cursor-pointer active:scale-95 transition">
-                        <Camera className="w-3 h-3" />
-                        <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                    </label>
-                </div>
-            </div>
-
-            {/* Account */}
-            <div className="mx-1 bg-white rounded-xl border border-gray-100/80 p-3 mb-3">
-                <div className="space-y-3">
-                    <div>
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Full Name</label>
-                        <input type="text" value={profileData.full_name} onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
-                            className="w-full px-0 py-1.5 border-b border-gray-100 outline-none focus:border-blue-500 transition text-[13px] font-medium text-gray-900 placeholder:text-gray-300" placeholder="Name"
-                        />
+                </Field>
+                <Field label="NIN (National ID Number)" hint="Used for identity verification — kept confidential">
+                    <div className="flex gap-2">
+                        <span className="flex items-center px-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 shrink-0">
+                            🪪
+                        </span>
+                        <Input value={nin} onChange={(e: any) => setNin(e.target.value)} placeholder="12345678901" />
                     </div>
-                    <div>
-                        <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 block">Email</label>
-                        <input type="email" value={profileData.email} onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                            className="w-full px-0 py-1.5 border-b border-gray-100 outline-none focus:border-blue-500 transition text-[13px] font-medium text-gray-900 placeholder:text-gray-300" placeholder="Email"
-                        />
-                    </div>
-                </div>
-            </div>
+                </Field>
+                <Field label="Home Address">
+                    <Input value={address} onChange={(e: any) => setAddress(e.target.value)} placeholder="Street, Area..." />
+                </Field>
+            </Section>
 
-            {/* Security */}
-            <div className="mx-1 bg-white rounded-xl border border-gray-100/80 p-3 mb-3">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Lock className="w-4 h-4" /></div>
-                    <h2 className="font-semibold text-gray-900 text-[13px]">Security</h2>
-                </div>
-                <div className="relative">
-                    <input type={showPassword ? "text" : "password"} placeholder="New Password (optional)" value={securityData.new_password}
-                        onChange={(e) => setSecurityData({ ...securityData, new_password: e.target.value })}
-                        className="w-full px-0 py-1.5 border-b border-gray-100 outline-none focus:border-blue-500 transition text-[13px] font-medium text-gray-900 placeholder:text-gray-300 pr-8"
-                    />
-                    <button onClick={() => setShowPassword(!showPassword)} className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-gray-400">
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                </div>
-            </div>
-
-            {/* PIN */}
-            <div className="mx-1 bg-white rounded-xl border border-gray-100/80 p-3 mb-3">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><ShieldCheck className="w-4 h-4" /></div>
-                    <h2 className="font-semibold text-gray-900 text-[13px]">Transaction PIN</h2>
-                </div>
-                <div className="flex items-center gap-3">
-                    <input type="password" maxLength={4} placeholder="••••" value={pin}
-                        onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                        className="w-20 text-center py-1.5 border-b-2 border-gray-100 outline-none focus:border-indigo-500 transition font-bold text-lg tracking-[0.4em]"
-                    />
-                    <button onClick={handlePinUpdate} disabled={loading || pin.length !== 4}
-                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[11px] font-semibold disabled:opacity-50 transition"
-                    >Set PIN</button>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">Used for wallet transactions</p>
-            </div>
-
-            {/* Logout */}
-            <div className="mx-1 mt-6">
-                <button onClick={handleLogout} className="w-full py-3 text-red-500 font-semibold bg-red-50 rounded-xl border border-red-100 hover:bg-red-100 transition flex items-center justify-center gap-2 text-[13px]">
-                    <LogOut className="w-4 h-4" /> Sign Out
+            {/* ── Location ──────────────────────────────── */}
+            <Section title="Location" icon={MapPin} iconBg="bg-emerald-50 text-emerald-600">
+                <Field label="State" hint="Helps doctors understand your regional health context">
+                    <SelectInput value={state} onChange={(e: any) => setState(e.target.value)} options={NIGERIAN_STATES} placeholder="Select state" />
+                </Field>
+                <Field label="Country">
+                    <SelectInput value={country} onChange={(e: any) => setCountry(e.target.value)} options={COUNTRIES} placeholder="Select country" />
+                </Field>
+                <button
+                    onClick={saveProfile}
+                    disabled={saving}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {saving ? "Saving..." : "Save Changes"}
                 </button>
-            </div>
+            </Section>
 
-            {/* Toast */}
-            {status && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-900 text-white rounded-xl shadow-xl flex items-center gap-2 z-50">
-                    <CheckCircle2 className={`w-3.5 h-3.5 ${status.type === 'success' ? 'text-green-400' : 'text-red-400'}`} />
-                    <span className="text-[11px] font-semibold">{status.message}</span>
-                </div>
-            )}
+            {/* ── Password ──────────────────────────────── */}
+            <Section title="Change Password" icon={Lock} iconBg="bg-amber-50 text-amber-600">
+                {[
+                    { label: "Current Password", value: curPass, set: setCurPass },
+                    { label: "New Password", value: newPass, set: setNewPass },
+                    { label: "Confirm New Password", value: confirmPass, set: setConfirmPass },
+                ].map(({ label, value, set }) => (
+                    <Field key={label} label={label}>
+                        <div className="relative">
+                            <input
+                                type={showPass ? "text" : "password"}
+                                value={value}
+                                onChange={e => set(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full px-3 py-2.5 pr-10 border border-gray-200 rounded-xl text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-50 text-gray-900 transition-all"
+                            />
+                        </div>
+                    </Field>
+                ))}
+                <button onClick={() => setShowPass(p => !p)} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 -mt-1">
+                    {showPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    {showPass ? "Hide" : "Show"} passwords
+                </button>
+                {newPass && (
+                    <div className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl ${newPass.length >= 8 ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                        {newPass.length >= 8 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                        {newPass.length >= 8 ? "Password strength: Good ✓" : `${8 - newPass.length} more characters needed`}
+                    </div>
+                )}
+                <button
+                    onClick={changePassword}
+                    disabled={passSaving}
+                    className="w-full bg-slate-900 text-white font-bold py-3 rounded-2xl transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                >
+                    {passSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                    {passSaving ? "Updating..." : "Update Password"}
+                </button>
+            </Section>
+
+            {/* ── Transaction PIN ───────────────────────── */}
+            <Section title="Transaction PIN" icon={ShieldCheck} iconBg="bg-violet-50 text-violet-600">
+                <Field label="4-Digit PIN" hint="Used for wallet transactions and payment authorisation">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="password"
+                            maxLength={4}
+                            value={pin}
+                            onChange={e => setPin(e.target.value.replace(/\D/g, ""))}
+                            placeholder="••••"
+                            className="w-24 text-center py-2.5 border border-gray-200 rounded-xl text-lg font-black tracking-[0.5em] outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-50"
+                        />
+                        <button
+                            onClick={savePin}
+                            disabled={pinSaving || pin.length !== 4}
+                            className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold py-2.5 rounded-2xl text-sm transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {pinSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                            {pinSaving ? "Setting..." : "Set PIN"}
+                        </button>
+                    </div>
+                </Field>
+            </Section>
+
+            {/* ── Sign Out ──────────────────────────────── */}
+            <button
+                onClick={() => { localStorage.removeItem("token"); localStorage.removeItem("user"); router.push("/login"); }}
+                className="w-full py-3.5 text-rose-600 font-bold bg-rose-50 rounded-2xl border border-rose-100 hover:bg-rose-100 transition-all flex items-center justify-center gap-2 text-sm active:scale-95"
+            >
+                <LogOut className="w-4 h-4" /> Sign Out
+            </button>
         </div>
     );
 }
