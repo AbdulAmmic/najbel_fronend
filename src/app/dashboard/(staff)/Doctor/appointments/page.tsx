@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import {
     Calendar, Clock, Video, MapPin, Search,
     CheckCircle, XCircle, ChevronRight, RefreshCcw,
-    MessageSquare, Play, X, Users, AlertCircle,
-    Phone, Stethoscope
+    Play, X, AlertCircle, Stethoscope, Save, Check
 } from "lucide-react";
 import { appointments as appointmentsApi } from "@/services/api";
+import api from "@/services/api";
 import { formatDate, formatTime, calculateAge, isValidDate } from "@/utils/date";
 
 // ─── Types ──────────────────────────────────────────────────
@@ -44,12 +44,12 @@ const initials = (name: string) =>
     name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
 const STATUS_STYLES: Record<string, string> = {
-    confirmed:   "bg-blue-100 text-blue-700",
-    pending:     "bg-amber-100 text-amber-700",
-    rescheduled: "bg-orange-100 text-orange-700",
-    completed:   "bg-emerald-100 text-emerald-700",
-    cancelled:   "bg-red-100 text-red-600",
-    "checked-in":"bg-purple-100 text-purple-700",
+    confirmed:    "bg-blue-100 text-blue-700",
+    pending:      "bg-amber-100 text-amber-700",
+    rescheduled:  "bg-orange-100 text-orange-700",
+    completed:    "bg-emerald-100 text-emerald-700",
+    cancelled:    "bg-red-100 text-red-600",
+    "checked-in": "bg-purple-100 text-purple-700",
 };
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -191,12 +191,12 @@ const ApptCard = ({
     );
 };
 
-// ─── Modal/Sheet ────────────────────────────────────────────
+// ─── Bottom Sheet ────────────────────────────────────────────
 
 const BottomSheet = ({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) => (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-t-[32px] max-h-[80vh] overflow-y-auto">
+        <div className="relative bg-white rounded-t-[32px] max-h-[85vh] overflow-y-auto">
             <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
@@ -215,17 +215,35 @@ const BottomSheet = ({ title, children, onClose }: { title: string; children: Re
 
 export default function DoctorAppointments() {
     const router = useRouter();
-    const [appts, setAppts]     = useState<Appointment[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [filter, setFilter]   = useState<FilterType>("All");
-    const [search, setSearch]   = useState("");
+    const [appts, setAppts]       = useState<Appointment[]>([]);
+    const [loading, setLoading]   = useState(true);
+    const [filter, setFilter]     = useState<FilterType>("All");
+    const [search, setSearch]     = useState("");
     const [selected, setSelected] = useState<Appointment | null>(null);
 
-    const [cancelId, setCancelId]       = useState<number | null>(null);
-    const [rescheduleId, setRescheduleId] = useState<number | null>(null);
-    const [actionNote, setActionNote]   = useState("");
-    const [newTime, setNewTime]         = useState("");
+    const [cancelId, setCancelId]           = useState<number | null>(null);
+    const [rescheduleId, setRescheduleId]   = useState<number | null>(null);
+    const [actionNote, setActionNote]       = useState("");
+    const [newTime, setNewTime]             = useState("");
     const [actionLoading, setActionLoading] = useState(false);
+
+    // Meet link
+    const [meetLinks, setMeetLinks]   = useState<Record<number, string>>({});
+    const [meetInput, setMeetInput]   = useState("");
+    const [savingMeet, setSavingMeet] = useState(false);
+    const [meetSaved, setMeetSaved]   = useState(false);
+
+    const handleSaveMeetLink = async (aptId: number) => {
+        if (!meetInput.trim()) return;
+        setSavingMeet(true);
+        try {
+            await api.put(`appointments/${aptId}/meet-link`, { meet_link: meetInput.trim() });
+        } catch { /* ignore — save locally */ }
+        setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
+        setMeetSaved(true);
+        setTimeout(() => setMeetSaved(false), 2500);
+        setSavingMeet(false);
+    };
 
     const fetchAll = async () => {
         setLoading(true);
@@ -293,9 +311,9 @@ export default function DoctorAppointments() {
         else router.push(`/dashboard/Doctor/consultations/${apt.id}`);
     };
 
-    const today = new Date().toDateString();
-    const todayCount     = appts.filter(a => isValidDate(a.fullDate) && new Date(a.fullDate || "").toDateString() === today).length;
-    const pendingCount   = appts.filter(a => a.status === "pending").length;
+    const today        = new Date().toDateString();
+    const todayCount   = appts.filter(a => isValidDate(a.fullDate) && new Date(a.fullDate || "").toDateString() === today).length;
+    const pendingCount = appts.filter(a => a.status === "pending").length;
     const confirmedCount = appts.filter(a => a.status === "confirmed" || a.status === "checked-in").length;
     const completedCount = appts.filter(a => a.status === "completed").length;
 
@@ -313,7 +331,6 @@ export default function DoctorAppointments() {
             {/* ── Sticky header ── */}
             <div className="sticky top-0 z-30 bg-[#F4F6FB]/95 backdrop-blur-lg px-4 pt-4 pb-3">
 
-                {/* Title row */}
                 <div className="flex items-center justify-between mb-3">
                     <div>
                         <h1 className="text-xl font-black text-gray-900">Appointments</h1>
@@ -332,10 +349,10 @@ export default function DoctorAppointments() {
                 {/* Stat pills */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3">
                     {[
-                        { label: `${todayCount} Today`,     color: "text-blue-600",    bg: "bg-blue-50" },
-                        { label: `${pendingCount} Pending`,  color: "text-amber-600",   bg: "bg-amber-50" },
-                        { label: `${confirmedCount} Active`, color: "text-emerald-600", bg: "bg-emerald-50" },
-                        { label: `${completedCount} Done`,   color: "text-gray-600",    bg: "bg-white" },
+                        { label: `${todayCount} Today`,      color: "text-blue-600",    bg: "bg-blue-50"   },
+                        { label: `${pendingCount} Pending`,  color: "text-amber-600",   bg: "bg-amber-50"  },
+                        { label: `${confirmedCount} Active`, color: "text-emerald-600", bg: "bg-emerald-50"},
+                        { label: `${completedCount} Done`,   color: "text-gray-600",    bg: "bg-white"     },
                     ].map(({ label, color, bg }) => (
                         <div key={label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${bg} border border-gray-100 flex-shrink-0`}>
                             <span className={`text-[11px] font-bold ${color}`}>{label}</span>
@@ -422,7 +439,7 @@ export default function DoctorAppointments() {
                             onDecline={id => { setCancelId(id); setActionNote(""); }}
                             onReschedule={id => { setRescheduleId(id); setActionNote(""); setNewTime(""); }}
                             onStart={handleStart}
-                            onSelect={setSelected}
+                            onSelect={(a) => { setSelected(a); setMeetInput(meetLinks[a.id] || ""); }}
                         />
                     ))
                 )}
@@ -439,15 +456,16 @@ export default function DoctorAppointments() {
                         onChange={e => setActionNote(e.target.value)}
                     />
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setCancelId(null)}
-                            className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm"
-                        >Go Back</button>
+                        <button onClick={() => setCancelId(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm">
+                            Go Back
+                        </button>
                         <button
                             disabled={actionLoading}
                             onClick={submitCancel}
                             className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-bold text-sm shadow-md shadow-red-200 disabled:opacity-50"
-                        >{actionLoading ? "Cancelling…" : "Confirm Cancel"}</button>
+                        >
+                            {actionLoading ? "Cancelling…" : "Confirm Cancel"}
+                        </button>
                     </div>
                 </BottomSheet>
             )}
@@ -457,7 +475,7 @@ export default function DoctorAppointments() {
                 <BottomSheet title="Reschedule Appointment" onClose={() => setRescheduleId(null)}>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">New Date & Time</label>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">New Date &amp; Time</label>
                             <input
                                 type="datetime-local"
                                 className="w-full border border-gray-200 rounded-2xl p-3.5 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
@@ -482,7 +500,9 @@ export default function DoctorAppointments() {
                                 disabled={actionLoading || !newTime}
                                 onClick={submitReschedule}
                                 className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm shadow-md shadow-blue-200 disabled:opacity-50"
-                            >{actionLoading ? "Updating…" : "Confirm Reschedule"}</button>
+                            >
+                                {actionLoading ? "Updating…" : "Confirm Reschedule"}
+                            </button>
                         </div>
                     </div>
                 </BottomSheet>
@@ -492,6 +512,7 @@ export default function DoctorAppointments() {
             {selected && (
                 <BottomSheet title="Appointment Details" onClose={() => setSelected(null)}>
                     <div className="space-y-4">
+
                         {/* Patient card */}
                         <div className={`rounded-3xl p-4 bg-gradient-to-br ${avatarGrad(selected.patient.name)} text-white`}>
                             <div className="flex items-center gap-3">
@@ -500,7 +521,9 @@ export default function DoctorAppointments() {
                                 </div>
                                 <div>
                                     <p className="font-black text-base">{selected.patient.name}</p>
-                                    {selected.patient.age ? <p className="text-white/80 text-xs mt-0.5">{selected.patient.age}y · {selected.patient.gender}</p> : null}
+                                    {selected.patient.age ? (
+                                        <p className="text-white/80 text-xs mt-0.5">{selected.patient.age}y · {selected.patient.gender}</p>
+                                    ) : null}
                                 </div>
                             </div>
                         </div>
@@ -508,10 +531,10 @@ export default function DoctorAppointments() {
                         {/* Details grid */}
                         <div className="grid grid-cols-2 gap-2.5">
                             {[
-                                { label: "Date", value: selected.date, icon: Calendar },
-                                { label: "Time", value: selected.time, icon: Clock },
-                                { label: "Type", value: selected.type === "virtual" ? "Video Call" : "In-Person", icon: selected.type === "virtual" ? Video : MapPin },
-                                { label: "Priority", value: selected.priority, icon: AlertCircle },
+                                { label: "Date",     value: selected.date,                                                icon: Calendar    },
+                                { label: "Time",     value: selected.time,                                                icon: Clock       },
+                                { label: "Type",     value: selected.type === "virtual" ? "Video Call" : "In-Person",   icon: selected.type === "virtual" ? Video : MapPin },
+                                { label: "Priority", value: selected.priority,                                           icon: AlertCircle },
                             ].map(({ label, value, icon: Icon }) => (
                                 <div key={label} className="bg-gray-50 rounded-2xl p-3.5">
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
@@ -529,8 +552,59 @@ export default function DoctorAppointments() {
                             <p className="text-sm font-semibold text-blue-900">{selected.reason}</p>
                         </div>
 
+                        {/* Google Meet Link */}
+                        <div className="bg-slate-900 rounded-2xl p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                                    <Video className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-white text-sm font-bold leading-none">Google Meet Link</p>
+                                    <p className="text-slate-400 text-[10px] mt-0.5">
+                                        {meetLinks[selected.id] ? "Link set — tap Join to attend" : "Paste your meet link for this appointment"}
+                                    </p>
+                                </div>
+                                {meetLinks[selected.id] && (
+                                    <a
+                                        href={meetLinks[selected.id]}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1.5 bg-emerald-500 text-white text-[11px] font-black px-3 py-1.5 rounded-xl shrink-0"
+                                    >
+                                        <Video className="w-3.5 h-3.5" /> Join
+                                    </a>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    value={meetInput}
+                                    onChange={e => setMeetInput(e.target.value)}
+                                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                                    className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all min-w-0"
+                                />
+                                <button
+                                    onClick={() => handleSaveMeetLink(selected.id)}
+                                    disabled={savingMeet || !meetInput.trim()}
+                                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+                                        meetSaved
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40"
+                                    }`}
+                                >
+                                    {savingMeet ? (
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : meetSaved ? (
+                                        <Check className="w-4 h-4" />
+                                    ) : (
+                                        <Save className="w-4 h-4" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Actions */}
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2 pt-1">
                             {(selected.status === "confirmed" || selected.status === "checked-in") && (
                                 <button
                                     onClick={() => { handleStart(selected); setSelected(null); }}
