@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   HeartPulse, Stethoscope, Leaf,
   ArrowRight, Phone, Mail, MapPin, Menu, X,
@@ -94,7 +95,7 @@ export default function HomePage() {
         }`}>
 
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-2.5 group">
-            <img src="/logo.png" alt="Najbel Clinic" className="w-9 h-9 rounded-xl object-cover group-hover:scale-105 transition-transform" />
+            <Image src="/logo.png" alt="Najbel Clinic" width={36} height={36} className="rounded-xl object-cover group-hover:scale-105 transition-transform" priority />
             <div className="leading-none">
               <p className="text-[15px] font-black text-slate-900 tracking-tight">Najbel</p>
               <p className="text-[10px] font-semibold text-blue-500 tracking-wider uppercase">Nursing Home</p>
@@ -185,12 +186,15 @@ export default function HomePage() {
                 <div
                   key={i}
                   className="absolute inset-0 transition-opacity duration-1000"
-                  style={{ opacity: slide === i ? 1 : 0 }}
+                  style={{ opacity: slide === i ? 1 : 0, pointerEvents: slide === i ? 'auto' : 'none' }}
                 >
-                  <img
+                  <Image
                     src={s.image}
                     alt={s.label}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    priority={i === 0}
+                    sizes="(max-width: 768px) 100vw, 50vw"
                   />
                   {/* Gradient overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
@@ -328,7 +332,7 @@ export default function HomePage() {
               {/* Portal card */}
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white">
                 <div className="flex items-center gap-3 mb-3">
-                  <img src="/logo.png" alt="Najbel" className="w-9 h-9 rounded-xl object-cover" />
+                  <Image src="/logo.png" alt="Najbel" width={36} height={36} className="rounded-xl object-cover" />
                   <div>
                     <p className="text-[13px] font-black">Najbel Portal</p>
                     <p className="text-[11px] text-slate-400">Secure access for all users</p>
@@ -359,7 +363,7 @@ export default function HomePage() {
           <div className="relative py-16 md:py-20 px-8">
             <div className="flex justify-center mb-7">
               <div className="w-14 h-14 rounded-2xl overflow-hidden ring-2 ring-white/20">
-                <img src="/logo.png" alt="Najbel" className="w-full h-full object-cover" />
+                <Image src="/logo.png" alt="Najbel" width={56} height={56} className="w-full h-full object-cover" />
               </div>
             </div>
 
@@ -395,7 +399,7 @@ export default function HomePage() {
       <footer className="bg-white border-t border-slate-100 py-10">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-5">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Najbel" className="w-8 h-8 rounded-xl object-cover" />
+            <Image src="/logo.png" alt="Najbel" width={32} height={32} className="rounded-xl object-cover" />
             <div>
               <p className="text-[14px] font-black text-slate-900 leading-tight">Najbel Nursing Home</p>
               <p className="text-[11px] text-slate-400">© 2026 · All rights reserved</p>

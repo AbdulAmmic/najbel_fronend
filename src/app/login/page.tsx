@@ -84,12 +84,7 @@ export default function NajbelLoginPage() {
 
         <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay"></div>
 
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10 w-full max-w-md"
-        >
+        <div className="relative z-10 w-full max-w-md">
           <div className="mb-8 inline-block">
             <div className="p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl">
               <FaHospital className="w-10 h-10 text-white" />
@@ -118,7 +113,7 @@ export default function NajbelLoginPage() {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* ================= RIGHT FORM PANE ================= */}
@@ -131,12 +126,7 @@ export default function NajbelLoginPage() {
           <FaArrowLeft size={12} /> Back to Origin
         </button>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="w-full max-w-md mx-auto"
-        >
+        <div className="w-full max-w-md mx-auto">
           {/* Form Header */}
           <div className="mb-10">
             <h2 className="text-3xl font-black text-gray-900 tracking-tight">Welcome back</h2>
@@ -276,7 +266,7 @@ export default function NajbelLoginPage() {
           <p className="mt-8 text-center text-[11px] text-gray-400 font-medium tracking-wide">
             Secured and Encrypted Pipeline via <span className="text-gray-900 font-bold">AmmicX Systems</span>
           </p>
-        </motion.div>
+          </div>
       </div>
 
     </div>

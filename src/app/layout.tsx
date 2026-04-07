@@ -4,10 +4,9 @@ import "./globals.css";
 
 const nunito = Nunito({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
-  display: "swap",      // render immediately with fallback; don't block
-  preload: false,       // skip blocking preload on every route
-  fallback: ["Inter", "system-ui", "sans-serif"],
+  weight: ["600", "700", "800", "900"],
+  display: "swap",
+  fallback: ["system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {
