@@ -1,19 +1,23 @@
 from typing import Any, List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.user import User, UserRole, Patient, Doctor
 from app.models.lab_result import LabResult
 from app.schemas.lab_result import LabResultCreate, LabResultUpdate, LabResult as LabResultSchema
-from app.models.invoice import Invoice, InvoiceItem, InvoiceStatus
+from app.models.invoice import Invoice, InvoiceItem, InvoiceStatus, InvoiceType, InvoiceItemType
+from app.models.lab_test_catalog import LabTestCatalog
+from app.models.notification import NotificationType
+from app.services.notification_service import create_notification
 from app.core.email import (
     send_email_background,
     generate_lab_tech_notification_email,
     generate_lab_payment_request_email
 )
 import uuid
+import os
 import random
 import string
 import json
@@ -253,3 +257,230 @@ def update_lab_result(
     db.commit()
     db.refresh(lab_result)
     return lab_result
+
+
+# ─── NEW: Doctor requests lab test from consultation (PAID / FREE logic) ──────
+
+@router.post("/request")
+def request_lab_test(
+    data: dict,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Doctor requests a lab test during consultation.
+    - FREE test: patient notified to upload result in-app (no payment)
+    - PAID test: creates/updates consultation invoice, patient must pay
+    """
+    if current_user.role != UserRole.DOCTOR:
+        raise HTTPException(status_code=403, detail="Only doctors can request lab tests")
+
+    doctor = db.exec(select(Doctor).where(Doctor.user_id == current_user.id)).first()
+    if not doctor:
+        raise HTTPException(status_code=403, detail="Doctor profile not found")
+
+    consultation_id = data.get("consultation_id")
+    catalog_id = data.get("catalog_id")
+    priority = data.get("priority", "normal")
+
+    if not consultation_id or not catalog_id:
+        raise HTTPException(status_code=422, detail="consultation_id and catalog_id are required")
+
+    from app.models.consultation import Consultation, ConsultationStatus
+    consultation = db.get(Consultation, consultation_id)
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Consultation not found")
+    if consultation.status == ConsultationStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Consultation is locked")
+
+    catalog = db.get(LabTestCatalog, catalog_id)
+    if not catalog:
+        raise HTTPException(status_code=404, detail="Lab test not found in catalog")
+
+    test_type = catalog.test_type if hasattr(catalog, 'test_type') else 'PAID'
+    is_free = str(test_type).upper() == "FREE"
+
+    # Generate short_id
+    def _short():
+        return ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    short_id = _short()
+    while db.exec(select(LabResult).where(LabResult.short_id == short_id)).first():
+        short_id = _short()
+
+    # Pre-populate result_data from template if available
+    result_data = None
+    test_upper = catalog.name.upper()
+    template_key = next((k for k in LAB_TEMPLATES if k.upper() in test_upper), None)
+    if template_key:
+        result_data = json.dumps(LAB_TEMPLATES[template_key])
+
+    lab_result = LabResult(
+        patient_id=consultation.patient_id,
+        doctor_id=doctor.id,
+        consultation_id=consultation_id,
+        test_name=catalog.name,
+        test_type="FREE" if is_free else "PAID",
+        payment_status="not_required" if is_free else "pending",
+        status="requested",
+        priority=priority,
+        short_id=short_id,
+        result="See details" if result_data else "Pending",
+        result_data=result_data,
+    )
+    db.add(lab_result)
+    db.flush()
+
+    # Resolve patient user for notifications
+    patient = db.get(Patient, consultation.patient_id)
+    patient_user = db.get(User, patient.user_id) if patient else None
+
+    if is_free:
+        # FREE: notify patient to upload result
+        if patient_user:
+            create_notification(
+                db, patient_user.id,
+                "Upload Lab Result Required",
+                f"Your doctor has requested a {catalog.name} test. Please upload your result in the app.",
+                NotificationType.RESULT_UPLOAD_REQUIRED,
+            )
+        db.commit()
+        db.refresh(lab_result)
+        return {
+            "lab_result_id": lab_result.id,
+            "test_type": "FREE",
+            "message": "Patient notified to upload result",
+        }
+    else:
+        # PAID: add to consultation invoice or create new invoice
+        from app.models.consultation import Consultation
+        inv_num = f"INV-{uuid.uuid4().hex[:8].upper()}"
+        invoice = Invoice(
+            invoice_number=inv_num,
+            patient_id=consultation.patient_id,
+            consultation_id=consultation_id,
+            amount=catalog.price,
+            status=InvoiceStatus.PENDING,
+            invoice_type=InvoiceType.LAB_TEST,
+            due_date=datetime.utcnow() + timedelta(hours=48),
+        )
+        db.add(invoice)
+        db.flush()
+
+        item = InvoiceItem(
+            invoice_id=invoice.id,
+            description=f"Lab Test: {catalog.name}",
+            amount=catalog.price,
+            quantity=1,
+            item_type=InvoiceItemType.LAB_TEST,
+            reference_id=lab_result.id,
+        )
+        db.add(item)
+        lab_result.invoice_id = invoice.id
+        db.add(lab_result)
+        db.commit()
+        db.refresh(lab_result)
+
+        # Notify patient
+        if patient_user:
+            create_notification(
+                db, patient_user.id,
+                "Lab Test Payment Required",
+                f"Pay ₦{catalog.price:,.0f} for {catalog.name} test. After payment, proceed to hospital for sample.",
+                NotificationType.PAYMENT_REQUIRED,
+            )
+
+        return {
+            "lab_result_id": lab_result.id,
+            "invoice_id": invoice.id,
+            "invoice_number": inv_num,
+            "amount": catalog.price,
+            "test_type": "PAID",
+            "message": "Invoice created. Patient must pay to proceed.",
+        }
+
+
+# ─── NEW: Patient uploads lab result file (FREE tests — local disk) ───────────
+
+@router.post("/{id}/upload-result")
+async def upload_lab_result_file(
+    id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Patient uploads result file for FREE lab tests."""
+    if current_user.role != UserRole.PATIENT:
+        raise HTTPException(status_code=403, detail="Only patients can upload results")
+
+    lab_result = db.get(LabResult, id)
+    if not lab_result:
+        raise HTTPException(status_code=404, detail="Lab result not found")
+
+    patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+    if not patient or lab_result.patient_id != patient.id:
+        raise HTTPException(status_code=403, detail="Not your lab result")
+
+    if str(lab_result.test_type).upper() != "FREE":
+        raise HTTPException(status_code=400, detail="This test requires in-app payment, not file upload")
+
+    # Save file locally
+    upload_dir = "/tmp/uploads/lab_results"
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = os.path.splitext(file.filename or "result")[-1] or ".pdf"
+    filename = f"lab_{id}_{uuid.uuid4().hex[:8]}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:  # 10 MB limit
+        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    lab_result.patient_file_url = filepath
+    lab_result.status = "completed"
+    db.add(lab_result)
+    db.commit()
+
+    return {"message": "Result uploaded successfully", "file_path": filepath, "lab_result_id": id}
+
+
+# ─── NEW: Patient's pending lab actions ───────────────────────────────────────
+
+@router.get("/my-pending")
+def get_my_pending_labs(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Patient sees all pending lab actions (unpaid PAID tests + unuploaded FREE tests)."""
+    if current_user.role != UserRole.PATIENT:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    patient = db.exec(select(Patient).where(Patient.user_id == current_user.id)).first()
+    if not patient:
+        return {"pending_payment": [], "pending_upload": []}
+
+    pending_payment = db.exec(
+        select(LabResult)
+        .where(LabResult.patient_id == patient.id)
+        .where(LabResult.test_type == "PAID")
+        .where(LabResult.payment_status == "pending")
+    ).all()
+
+    pending_upload = db.exec(
+        select(LabResult)
+        .where(LabResult.patient_id == patient.id)
+        .where(LabResult.test_type == "FREE")
+        .where(LabResult.patient_file_url == None)
+    ).all()
+
+    return {
+        "pending_payment": [
+            {"lab_result_id": lr.id, "test_name": lr.test_name, "invoice_id": lr.invoice_id}
+            for lr in pending_payment
+        ],
+        "pending_upload": [
+            {"lab_result_id": lr.id, "test_name": lr.test_name}
+            for lr in pending_upload
+        ],
+    }

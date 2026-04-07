@@ -9,8 +9,12 @@ from .bed import Bed, BedStatus
 
 # Clinical Operations - Core
 from .appointment import Appointment, AppointmentType, AppointmentStatus
-from .consultation import Consultation
+from .consultation import Consultation, ConsultationStatus
 from .attendance import AttendanceLog
+
+# Clinical Phase Data (Consultation Module)
+from .subjective_data import SubjectiveData
+from .objective_data import ObjectiveData
 
 # Clinical Records & Documentation
 from .medical_record import MedicalRecord
@@ -26,12 +30,12 @@ from .drug_order import DrugOrder, DrugOrderItem, OrderStatus
 
 # Labs & Radiology
 from .lab_result import LabResult
-from .lab_test_catalog import LabTestCatalog
+from .lab_test_catalog import LabTestCatalog, LabTestType
 from .radiology import RadiologyScan
 
 # Financials & Inventory
 from .wallet import Wallet
-from .invoice import Invoice, InvoiceItem, InvoiceStatus
+from .invoice import Invoice, InvoiceItem, InvoiceStatus, InvoiceType, InvoiceItemType
 from .transaction import Transaction, TransactionType, TransactionStatus, PaymentMethod
 from .bank import Bank
 from .gafiapay_log import GafiapayLog

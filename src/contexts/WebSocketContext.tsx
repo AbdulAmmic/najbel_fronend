@@ -31,7 +31,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // Using relative path or env var would be better        console.log('Initializing WebSocket Context...');
         
         // Connect securely to the deployed backend WebSocket
-        const socket = new WebSocket('wss://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/ws');
+        const socket = new WebSocket('wss://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev/api/v1/ws');
 
         socket.onopen = () => {
             console.log('WebSocket Connected');

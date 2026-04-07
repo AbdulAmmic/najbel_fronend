@@ -10,6 +10,15 @@ class NotificationType(str, Enum):
     SYSTEM = "system"
     ALARM = "alarm"
     CHAT = "chat"
+    # Consultation-specific
+    INVOICE_CREATED = "invoice_created"
+    PAYMENT_REQUIRED = "payment_required"
+    PAYMENT_SUCCESS = "payment_success"
+    LAB_TEST_REQUESTED = "lab_test_requested"
+    RESULT_UPLOAD_REQUIRED = "result_upload_required"
+    CONSULTATION_ACTIVE = "consultation_active"
+    CONSULTATION_COMPLETED = "consultation_completed"
+    SAMPLE_SUBMISSION_REQUIRED = "sample_submission_required"
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"

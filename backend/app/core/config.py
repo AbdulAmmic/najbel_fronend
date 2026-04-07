@@ -22,7 +22,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",
-        "https://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev",
+        "https://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev",
         "*"
     ]
 

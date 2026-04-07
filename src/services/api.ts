@@ -1,27 +1,16 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
 
-const getBaseUrl = () => {
-    if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:8000/api/v1';
-        }
-    }
-    // Deployed backend directly
-    return 'https://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1';
-};
+// Always use the production backend.
+// On localhost, override via NEXT_PUBLIC_API_URL in .env.local
+const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    'https://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev/api/v1';
 
-const API_URL = getBaseUrl();
 
 export const getWsBaseUrl = () => {
     if (typeof window === 'undefined') return '';
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const hostname = window.location.hostname;
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
-        return `${protocol}//localhost:8000/api/v1/chat`;
-    }
-    return `${protocol}//najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/chat`;
+    return process.env.NEXT_PUBLIC_WS_URL ||
+        'wss://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev/api/v1/chat';
 };
 
 const api: AxiosInstance = axios.create({
@@ -618,13 +607,13 @@ const isLocal = typeof window !== 'undefined' &&
 
 export const API_BASE_URL = isLocal
   ? 'http://localhost:8000/api/v1'
-  : 'https://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1';
+  : 'https://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev/api/v1';
 
 export const subscribeToNotifications = (onMessage: (data: any) => void) => {
     if (typeof window === 'undefined') return null;
     
     // Globally routing WebSockets to the secure production backend 
-    const wsUrl = 'wss://najbelbackend-connectorstech7925-mmd9cjji.leapcell.dev/api/v1/ws';
+    const wsUrl = 'wss://najbelbackend-ammicsystems4174-umj4fvky.leapcell.dev/api/v1/ws';
 
     console.log(`Connecting to notification WebSocket: ${wsUrl}`);
     const socket = new WebSocket(wsUrl);

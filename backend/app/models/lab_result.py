@@ -14,6 +14,13 @@ class LabResultBase(SQLModel):
     priority: str = Field(default="normal") # normal, urgent
     sample_id: Optional[str] = None
     
+    # NEW: test type from catalog
+    test_type: str = Field(default="PAID")  # PAID or FREE
+    # NEW: patient uploaded file path (local disk) for FREE tests
+    patient_file_url: Optional[str] = Field(default=None, nullable=True)
+    # NEW: payment status for PAID tests
+    payment_status: str = Field(default="pending")  # pending, paid, not_required
+    
     recorded_at: datetime = Field(default_factory=datetime.utcnow)
     collected_at: Optional[datetime] = None
     processed_at: Optional[datetime] = None

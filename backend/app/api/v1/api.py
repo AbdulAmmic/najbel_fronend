@@ -3,8 +3,9 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     users, auth, appointments, attendance, dashboard, dashboard_patients,
     prescriptions, medical_records, vitals, labs, billing, websockets,
-    consultations, beds, referrals, chat, pharmacy, departments, patients, alerts,
-    radiology, shifts, notifications, rooms, wards, lab_catalog, nurses, directives
+    consultations, consultation_clinical, beds, referrals, chat, pharmacy, 
+    departments, patients, alerts, radiology, shifts, notifications, 
+    rooms, wards, lab_catalog, nurses, directives
 )
 
 api_router = APIRouter()
@@ -22,6 +23,7 @@ api_router.include_router(labs.router, prefix="/labs", tags=["labs"])
 api_router.include_router(lab_catalog.router, prefix="/lab-catalog", tags=["lab-catalog"])
 api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(consultations.router, prefix="/consultations", tags=["consultations"])
+api_router.include_router(consultation_clinical.router, prefix="/consultations", tags=["consultations"])
 api_router.include_router(beds.router, prefix="/beds", tags=["beds"])
 api_router.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
 api_router.include_router(wards.router, prefix="/wards", tags=["wards"])

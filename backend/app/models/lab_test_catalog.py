@@ -2,6 +2,12 @@ from typing import Optional
 from sqlmodel import SQLModel, Field, Column
 from sqlalchemy import Text
 from datetime import datetime
+from enum import Enum
+
+
+class LabTestType(str, Enum):
+    PAID = "PAID"
+    FREE = "FREE"
 
 
 class LabTestCatalog(SQLModel, table=True):
@@ -21,6 +27,8 @@ class LabTestCatalog(SQLModel, table=True):
         sa_column=Column(Text, nullable=True),
         description="JSON array of test parameter columns"
     )
+    # PAID = patient must pay; FREE = patient uploads result themselves
+    test_type: LabTestType = Field(default=LabTestType.PAID, description="PAID or FREE test")
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

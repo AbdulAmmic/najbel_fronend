@@ -57,8 +57,17 @@ export default function NajbelLoginPage() {
         router.push("/dashboard/overview");
       }
     } catch (err: any) {
-      console.error("Login failed", err);
-      setError("Invalid email or password");
+      console.error("Login failed:", err?.response?.status, err?.response?.data);
+      const detail = err?.response?.data?.detail;
+      if (typeof detail === "string") {
+        setError(detail);
+      } else if (err?.response?.status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (!err?.response) {
+        setError("Cannot reach server. Please check your connection.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -249,7 +258,7 @@ export default function NajbelLoginPage() {
                   <span className="relative z-10">Authenticating...</span>
                 </>
               ) : (
-                <span className="relative z-10">Authorize Local Access</span>
+                <span className="relative z-10">Login</span>
               )}
             </motion.button>
           </form>

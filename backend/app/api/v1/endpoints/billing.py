@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlmodel import Session, select
 from app.api import deps
 from app.models.user import User, UserRole, Patient
-from app.models.invoice import Invoice, InvoiceStatus, InvoiceItem
+from app.models.invoice import Invoice, InvoiceStatus, InvoiceItem, InvoiceType
 from app.schemas import finance as finance_schemas
 from app.models.wallet import Wallet
 from app.models.transaction import Transaction, TransactionType, TransactionStatus, PaymentMethod
@@ -12,7 +12,9 @@ from app.core.websockets import manager
 from app.models.gafiapay_log import GafiapayLog
 from app.models.bank import Bank
 from app.models.action_otp import ActionOTP
+from app.models.notification import NotificationType
 from app.core.email import send_email_background, generate_wallet_alert_email, generate_otp_email
+from app.services.notification_service import create_notification
 from datetime import datetime, timedelta
 import random
 from app.core import security
@@ -207,12 +209,56 @@ def pay_invoice(
                 prescription.status = "sent_to_pharmacy"
                 db.add(prescription)
                 
-            # Update linked LabResult status to 'paid' so lab techs know it's cleared
+            # Update linked LabResult payment_status to 'paid' so lab techs know it's cleared
             from app.models.lab_result import LabResult
             lab_result = db.exec(select(LabResult).where(LabResult.invoice_id == invoice.id)).first()
-            if lab_result and lab_result.status == "requested":
-                lab_result.status = "paid"
+            if lab_result:
+                lab_result.payment_status = "paid"
+                if lab_result.status == "requested":
+                    lab_result.status = "paid"
                 db.add(lab_result)
+                # Notify patient to submit sample
+                patient_rec = db.get(Patient, invoice.patient_id)
+                if patient_rec:
+                    user_rec = db.get(User, patient_rec.user_id)
+                    if user_rec:
+                        create_notification(
+                            db, user_rec.id,
+                            "Sample Submission Required",
+                            f"Lab test paid. Please proceed to Najbel hospital for sample submission.",
+                            NotificationType.SAMPLE_SUBMISSION_REQUIRED,
+                        )
+
+            # ── CONSULTATION UNLOCK ──
+            # If this invoice was the consultation fee, activate the consultation
+            from app.models.consultation import Consultation, ConsultationStatus
+            if invoice.invoice_type == InvoiceType.CONSULTATION_FEE or invoice.consultation_id:
+                consultation = None
+                if invoice.consultation_id:
+                    consultation = db.get(Consultation, invoice.consultation_id)
+                else:
+                    # Try linking via fee_invoice_id
+                    consultation = db.exec(
+                        select(Consultation)
+                        .where(Consultation.consultation_fee_invoice_id == invoice.id)
+                    ).first()
+
+                if consultation and consultation.status == ConsultationStatus.DRAFT:
+                    consultation.status = ConsultationStatus.ACTIVE
+                    consultation.updated_at = datetime.utcnow()
+                    db.add(consultation)
+
+                    # Notify patient consultation is now active
+                    patient_rec = db.get(Patient, invoice.patient_id)
+                    if patient_rec:
+                        user_rec = db.get(User, patient_rec.user_id)
+                        if user_rec:
+                            create_notification(
+                                db, user_rec.id,
+                                "Consultation Active!",
+                                "Payment confirmed. Your consultation is now active. Join via chat or Google Meet.",
+                                NotificationType.CONSULTATION_ACTIVE,
+                            )
 
             db.commit()
         except Exception as side_effect_err:
@@ -787,3 +833,56 @@ def delete_service_template(
         db.add(template)
         db.commit()
     return {"message": "Template deactivated"}
+
+
+# ─── NEW: Get all invoices for a consultation ───────────────────────────────
+
+@router.get("/invoices/consultation/{consultation_id}")
+def get_consultation_invoices(
+    consultation_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Get all invoices linked to a specific consultation."""
+    invoices = db.exec(
+        select(Invoice).where(Invoice.consultation_id == consultation_id)
+    ).all()
+    results = []
+    for inv in invoices:
+        results.append({
+            "id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "amount": inv.amount,
+            "status": inv.status,
+            "invoice_type": getattr(inv, 'invoice_type', 'composite'),
+            "due_date": inv.due_date,
+            "created_at": inv.created_at,
+            "items": [{"id": i.id, "description": i.description, "amount": i.amount, "item_type": getattr(i, 'item_type', 'consultation_fee')} for i in inv.items],
+        })
+    return results
+
+
+# ─── NEW: Patient notification — payment success (for use after in-app payment) ──
+
+@router.post("/invoices/{id}/notify-paid")
+def notify_payment_success(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Send payment success notification (called after successful payment)."""
+    invoice = db.get(Invoice, id)
+    if not invoice or invoice.status != InvoiceStatus.PAID:
+        raise HTTPException(status_code=400, detail="Invoice not found or not paid")
+    
+    patient = db.get(Patient, invoice.patient_id)
+    if patient:
+        user_rec = db.get(User, patient.user_id)
+        if user_rec:
+            create_notification(
+                db, user_rec.id,
+                "Payment Successful",
+                f"Payment of ₦{invoice.amount:,.0f} for invoice {invoice.invoice_number} was successful.",
+                NotificationType.PAYMENT_SUCCESS,
+            )
+    return {"message": "Notification sent"}
