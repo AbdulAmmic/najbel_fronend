@@ -262,7 +262,19 @@ export const consultations = {
     saveObjective: async (id: number, data: any) => {
         const response = await api.put(`consultations/${id}/objective`, data);
         return response.data;
-    }
+    },
+    getByPatient: async (patientId: number) => {
+        const response = await api.get(`consultations/?patient_id=${patientId}`);
+        return response.data;
+    },
+    update: async (id: number, data: any) => {
+        const response = await api.patch(`consultations/${id}/`, data);
+        return response.data;
+    },
+    toggleVisibility: async (id: number, visible: boolean) => {
+        const response = await api.patch(`consultations/${id}/`, { is_visible_to_patient: visible });
+        return response.data;
+    },
 }
 
 export const medicalRecords = {
@@ -430,7 +442,16 @@ export const labs = {
     getResultsByPatient: async (patientId: number) => {
         const response = await api.get(`labs/?patient_id=${patientId}`);
         return response.data;
-    }
+    },
+    uploadResult: async (labId: number, file?: File, resultNote?: string) => {
+        const formData = new FormData();
+        if (file) formData.append('file', file);
+        if (resultNote) formData.append('patient_result_note', resultNote);
+        const response = await api.post(`labs/${labId}/patient-submit/`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
 }
 
 export const wards = {

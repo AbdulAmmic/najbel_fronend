@@ -10,7 +10,8 @@ import {
     ChevronRight, ChevronDown, ChevronUp, Check,
     X, UserCheck, AlertCircle, MessageSquare,
     TrendingUp, Search, MoreHorizontal, FileSearch,
-    Download, Share2, Printer, ClipboardList, Send, User, User2, Badge, BadgeCheck, CheckCircle2, Stethoscope, Bed, Package, HeartPulse, AlertTriangle, Zap, MessageCircle
+    Download, Share2, Printer, ClipboardList, Send, User, User2, Badge, BadgeCheck, CheckCircle2, Stethoscope, Bed, Package, HeartPulse, AlertTriangle, Zap, MessageCircle,
+    Edit2, Eye, EyeOff, CreditCard, Upload, History
 } from "lucide-react";
 import ChatBox from "@/components/chat/ChatBox";
 import {
@@ -20,7 +21,7 @@ import {
 } from "@/services/api";
 
 type ModalType = "prescribe" | "lab" | "consult" | "admit" | "refer" | "directive" | "discharge" | null;
-type TabType = "info" | "rx" | "labs" | "refs" | "nursing" | "vitals" | "chats";
+type TabType = "info" | "rx" | "labs" | "refs" | "nursing" | "vitals" | "chats" | "history";
 
 const getName = (p: any) => p?.user?.full_name || p?.full_name || "Unknown Patient";
 const getEmail = (p: any) => p?.user?.email || p?.email || "—";
@@ -94,6 +95,14 @@ export default function DoctorPatientDetailPage() {
     const [assesDiagnosis, setAssesDiagnosis] = useState("");
     const [assesTreatment, setAssesTreatment] = useState("");
     const [assessNotes, setAssessNotes] = useState("");
+    // Extra SOAP fields
+    const [subjDob, setSubjDob] = useState("");
+    // Lab billing mode
+    const [labBillingMode, setLabBillingMode] = useState<"direct" | "paid">("direct");
+    // Consultation history
+    const [consultHistory, setConsultHistory] = useState<any[]>([]);
+    const [expandedConsult, setExpandedConsult] = useState<number | null>(null);
+    const [editingConsultId, setEditingConsultId] = useState<number | null>(null);
 
     useEffect(() => {
         if (labList.length > 0 && !expandedLab) {
@@ -285,6 +294,19 @@ export default function DoctorPatientDetailPage() {
                 setAssignedBedId(patientBed.id);
                 setAssignedBedNum(patientBed.bed_number);
             }
+
+            // Load consultation history for this patient
+            try {
+                const histData = await consultations.getByPatient(pId);
+                setConsultHistory(Array.isArray(histData) ? histData.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []);
+            } catch {
+                // Fallback: use doctor's own history and filter by patient
+                try {
+                    const allHist = await consultations.getMyHistory();
+                    const filtered = (Array.isArray(allHist) ? allHist : []).filter((c: any) => c.patient_id === pId);
+                    setConsultHistory(filtered.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+                } catch { setConsultHistory([]); }
+            }
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     };
@@ -295,14 +317,30 @@ export default function DoctorPatientDetailPage() {
 
 
     // ── SOAP Consultation handlers ────────────────────────────
-    const openConsultModal = () => {
+    const openConsultModal = (existing?: any) => {
         setSoapStep(1);
         setSoapConsultId(null);
-        setSubjChief(""); setSubjSymptoms(""); setSubjHistory("");
-        setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits("");
-        setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
-        setObjFbs(""); setObjRbs(""); setObjFbc("");
-        setAssesSymptoms(""); setAssesDiagnosis(""); setAssesTreatment(""); setAssessNotes("");
+        if (existing) {
+            // Edit mode — pre-fill all SOAP fields
+            setEditingConsultId(existing.id);
+            setSubjChief(existing.chief_complaint || "");
+            setSubjSymptoms(existing.symptoms || "");
+            setSubjHistory(""); setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits(""); setSubjDob("");
+            setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
+            setObjFbs(""); setObjRbs(""); setObjFbc("");
+            setAssesSymptoms(existing.symptoms || "");
+            setAssesDiagnosis(existing.diagnosis || "");
+            setAssesTreatment(existing.treatment_plan || "");
+            setAssessNotes(existing.notes || "");
+        } else {
+            // New consultation
+            setEditingConsultId(null);
+            setSubjChief(""); setSubjSymptoms(""); setSubjHistory("");
+            setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits(""); setSubjDob("");
+            setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
+            setObjFbs(""); setObjRbs(""); setObjFbc("");
+            setAssesSymptoms(""); setAssesDiagnosis(""); setAssesTreatment(""); setAssessNotes("");
+        }
         setModal("consult");
     };
 
@@ -369,11 +407,11 @@ export default function DoctorPatientDetailPage() {
 
     const soapFinish = async () => {
         if (!assesDiagnosis.trim()) return showToast("Diagnosis is required", false);
-        if (!subjChief.trim()) return showToast("Chief complaint is required", false);
+        if (!editingConsultId && !subjChief.trim()) return showToast("Chief complaint is required", false);
         setSoapSaving(true);
         try {
-            // Build a comprehensive notes string capturing all SOAP data
             const fullNotes = [
+                subjDob ? `Patient DOB/Age: ${subjDob}` : "",
                 objBpSys && objBpDia ? `BP: ${objBpSys}/${objBpDia} mmHg` : "",
                 objHeight ? `Height: ${objHeight} cm` : "",
                 objWeight ? `Weight: ${objWeight} kg` : "",
@@ -386,8 +424,18 @@ export default function DoctorPatientDetailPage() {
                 assessNotes ? `Notes: ${assessNotes}` : "",
             ].filter(Boolean).join(" | ");
 
-            if (soapConsultId) {
-                // Session was created — try to save the draft
+            if (editingConsultId) {
+                // Edit mode — update the existing consultation
+                await consultations.update(editingConsultId, {
+                    chief_complaint: subjChief,
+                    symptoms: assesSymptoms || subjChief,
+                    diagnosis: assesDiagnosis,
+                    treatment_plan: assesTreatment,
+                    notes: fullNotes || assessNotes,
+                });
+                showToast("Consultation updated!");
+            } else if (soapConsultId) {
+                // Session-linked — try saveDraft, fallback to create
                 try {
                     await consultations.saveDraft(soapConsultId, {
                         symptoms: assesSymptoms || subjChief,
@@ -396,32 +444,26 @@ export default function DoctorPatientDetailPage() {
                         notes: fullNotes || assessNotes,
                     });
                 } catch (_) {
-                    // saveDraft failed, fall through to create()
                     await consultations.create({
-                        patient_id: patient.id,
-                        doctor_id: me?.id,
-                        chief_complaint: subjChief,
-                        symptoms: assesSymptoms || subjChief,
-                        diagnosis: assesDiagnosis,
-                        treatment_plan: assesTreatment,
+                        patient_id: patient.id, doctor_id: me?.id,
+                        chief_complaint: subjChief, symptoms: assesSymptoms || subjChief,
+                        diagnosis: assesDiagnosis, treatment_plan: assesTreatment,
                         notes: fullNotes || assessNotes,
                     });
                 }
+                showToast("Consultation note saved successfully!");
             } else {
-                // No session (startSession failed) — always use create
                 await consultations.create({
-                    patient_id: patient.id,
-                    doctor_id: me?.id,
-                    chief_complaint: subjChief,
-                    symptoms: assesSymptoms || subjChief,
-                    diagnosis: assesDiagnosis,
-                    treatment_plan: assesTreatment,
+                    patient_id: patient.id, doctor_id: me?.id,
+                    chief_complaint: subjChief, symptoms: assesSymptoms || subjChief,
+                    diagnosis: assesDiagnosis, treatment_plan: assesTreatment,
                     notes: fullNotes || assessNotes,
                 });
+                showToast("Consultation note saved successfully!");
             }
-            showToast("Consultation note saved successfully!");
             fetchData();
             setModal(null);
+            setEditingConsultId(null);
         } catch (e: any) {
             showToast(e?.response?.data?.detail || "Failed to save consultation", false);
         } finally {
@@ -453,18 +495,20 @@ export default function DoctorPatientDetailPage() {
                         doctor_id: me?.id,
                         test_name: testName,
                         urgency: form.urgency || "routine",
-                        notes: form.notes || ""
+                        notes: form.notes || "",
+                        billing_mode: labBillingMode,
                     }))
                     : [{
                         patient_id: patient.id,
                         doctor_id: me?.id,
                         test_name: form.test_name,
                         urgency: form.urgency || "routine",
-                        notes: form.notes || ""
+                        notes: form.notes || "",
+                        billing_mode: labBillingMode,
                     }];
 
                 await Promise.all(testsToRequest.map((test: any) => labs.create(test)));
-                showToast("Lab request(s) submitted!");
+                showToast(labBillingMode === "paid" ? "Lab request submitted — patient will be billed first!" : "Lab request submitted — patient can self-report results!");
             } else if (activeModal === "consult") {
                 if (!form.chief_complaint || !form.diagnosis) return showToast("Please fill all required fields.", false);
                 await consultations.create({ patient_id: patient.id, doctor_id: me?.id, chief_complaint: form.chief_complaint, diagnosis: form.diagnosis, treatment_plan: form.treatment_plan || "", notes: form.notes || "" });
@@ -738,6 +782,7 @@ export default function DoctorPatientDetailPage() {
                                 { id: "labs", label: "Labs", icon: FlaskConical },
                                 { id: "nursing", label: "Notes", icon: FileText },
                                 { id: "refs", label: "Referrals", icon: UserCheck },
+                                { id: "history", label: "History", icon: History },
                                 { id: "chats", label: "Chat", icon: MessageCircle },
                             ] as const).map((tab) => (
                                 <button
@@ -1145,6 +1190,142 @@ export default function DoctorPatientDetailPage() {
                                 </div>
                             )}
 
+                            {activeTab === "history" && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h2 className="text-xl font-black text-slate-900 tracking-tight">Consultation History</h2>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-1">{consultHistory.length} record{consultHistory.length !== 1 ? 's' : ''} — {getName(patient)}</p>
+                                        </div>
+                                        <button onClick={() => openConsultModal()} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-2xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200">
+                                            <Plus className="w-3.5 h-3.5" /> New Consultation
+                                        </button>
+                                    </div>
+
+                                    {consultHistory.length === 0 ? (
+                                        <div className="flex flex-col items-center py-20 gap-4 bg-white rounded-3xl border border-gray-100">
+                                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
+                                                <History className="w-8 h-8 text-blue-300" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-gray-500">No consultation records yet</p>
+                                                <p className="text-xs text-gray-400 mt-1">Create a new consultation to get started</p>
+                                            </div>
+                                        </div>
+                                    ) : consultHistory.map((c: any) => {
+                                        const isEdited = c.updated_at && c.created_at &&
+                                            (new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()) > 60000;
+                                        const isExpanded = expandedConsult === c.id;
+                                        return (
+                                            <div key={c.id} className={`bg-white rounded-3xl border shadow-sm overflow-hidden transition-all ${isEdited ? 'border-amber-100' : 'border-gray-100'}`}>
+                                                <div className="px-6 py-5">
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                                                                <Stethoscope className="w-5 h-5 text-blue-500" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                                    <p className="text-sm font-bold text-gray-900 leading-snug">{c.chief_complaint || "Consultation"}</p>
+                                                                    {isEdited && (
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                                            <Edit2 className="w-2.5 h-2.5" /> EDITED
+                                                                        </span>
+                                                                    )}
+                                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                                                        c.is_visible_to_patient ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                                                                    }`}>
+                                                                        {c.is_visible_to_patient ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                                                        {c.is_visible_to_patient ? 'Patient View On' : 'Private'}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[10px] text-gray-400">
+                                                                    {c.created_at ? new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                                    {isEdited && c.updated_at && (
+                                                                        <span className="ml-2 text-amber-500">· Edited {new Date(c.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                            <button
+                                                                onClick={() => openConsultModal(c)}
+                                                                className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white hover:bg-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-xl transition-all"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" /> Edit
+                                                            </button>
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const newVis = !c.is_visible_to_patient;
+                                                                        await consultations.toggleVisibility(c.id, newVis);
+                                                                        showToast(newVis ? "Consultation unveiled to patient!" : "Hidden from patient");
+                                                                        fetchData();
+                                                                    } catch (e: any) {
+                                                                        showToast(e?.response?.data?.detail || "Failed to update", false);
+                                                                    }
+                                                                }}
+                                                                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
+                                                                    c.is_visible_to_patient
+                                                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                                }`}
+                                                            >
+                                                                {c.is_visible_to_patient ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                                                {c.is_visible_to_patient ? 'Unveiled' : 'Unveil'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setExpandedConsult(isExpanded ? null : c.id)}
+                                                                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
+                                                            >
+                                                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {c.diagnosis && (
+                                                        <div className="ml-13 flex items-start gap-2 pl-0">
+                                                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest w-20 shrink-0 pt-0.5">Dx</span>
+                                                            <span className="text-sm text-gray-800 font-semibold">{c.diagnosis}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {isExpanded && (
+                                                    <div className="border-t border-gray-50 px-6 pb-5 pt-4 space-y-4 bg-gray-50/50">
+                                                        {c.symptoms && (
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Symptoms / History</p>
+                                                                <p className="text-sm text-gray-700 leading-relaxed">{c.symptoms}</p>
+                                                            </div>
+                                                        )}
+                                                        {c.treatment_plan && (
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Treatment Plan</p>
+                                                                <p className="text-sm text-gray-700 leading-relaxed">{c.treatment_plan}</p>
+                                                            </div>
+                                                        )}
+                                                        {c.notes && (
+                                                            <div>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Clinical Notes</p>
+                                                                <p className="text-sm text-gray-600 leading-relaxed">{c.notes}</p>
+                                                            </div>
+                                                        )}
+                                                        {isEdited && (
+                                                            <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2">
+                                                                <Edit2 className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                                                <div>
+                                                                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Amended Record</p>
+                                                                    <p className="text-xs text-amber-600 mt-0.5">This consultation was edited after initial creation on {new Date(c.updated_at).toLocaleString()}</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
                             {activeTab === "chats" && (
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
@@ -1332,8 +1513,28 @@ export default function DoctorPatientDetailPage() {
                                 {activeModal === "lab" && (
                                     <div className="space-y-4">
                                         <div>
+                                            {/* Billing mode selector */}
+                                            <p className="text-xs font-semibold text-gray-700 mb-2">Lab Order Mode</p>
+                                            <div className="grid grid-cols-2 gap-2 mb-4">
+                                                <button
+                                                    onClick={() => setLabBillingMode("direct")}
+                                                    className={`p-3 rounded-2xl border text-left transition-all ${labBillingMode === "direct" ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-blue-200"}`}
+                                                >
+                                                    <p className="text-xs font-bold">📋 Direct Order</p>
+                                                    <p className={`text-[10px] mt-0.5 ${labBillingMode === "direct" ? "text-blue-100" : "text-gray-400"}`}>Patient self-reports results</p>
+                                                </button>
+                                                <button
+                                                    onClick={() => setLabBillingMode("paid")}
+                                                    className={`p-3 rounded-2xl border text-left transition-all ${labBillingMode === "paid" ? "bg-amber-500 border-amber-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-amber-200"}`}
+                                                >
+                                                    <p className="text-xs font-bold">🧾 Bill First</p>
+                                                    <p className={`text-[10px] mt-0.5 ${labBillingMode === "paid" ? "text-amber-100" : "text-gray-400"}`}>Patient must pay to proceed</p>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div>
                                             <p className="text-xs font-medium text-gray-500 mb-2">Select Tests</p>
-                                            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                                            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                                                 {catalog.map(c => (
                                                     <button key={c.id} onClick={() => { const cur = form.test_names || []; sf("test_names", cur.includes(c.name) ? cur.filter((n: string) => n !== c.name) : [...cur, c.name]); }} className={`p-3 rounded-xl border text-xs font-medium transition-all text-center ${form.test_names?.includes(c.name) ? "bg-amber-600 border-amber-600 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-amber-200"}`}>
                                                         {c.name}
@@ -1380,11 +1581,17 @@ export default function DoctorPatientDetailPage() {
                                         {soapStep === 1 && (
                                             <div className="space-y-4">
                                                 <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
-                                                    <p className="text-xs font-bold text-blue-700">📋 Phase 1: Subjective — Patient-reported symptoms and history</p>
+                                                    <p className="text-xs font-bold text-blue-700">{editingConsultId ? '✏️ Editing existing consultation — update the fields below' : '📋 Phase 1: Subjective — Patient-reported symptoms and history'}</p>
                                                 </div>
-                                                <div>
-                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Chief Complaint *</label>
-                                                    <input type="text" placeholder="e.g. Severe headache for 3 days" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50" value={subjChief} onChange={e => setSubjChief(e.target.value)} />
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="col-span-2">
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Chief Complaint {!editingConsultId && '*'}</label>
+                                                        <input type="text" placeholder="e.g. Severe headache for 3 days" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50" value={subjChief} onChange={e => setSubjChief(e.target.value)} />
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Patient Date of Birth / Age</label>
+                                                        <input type="text" placeholder="e.g. 15 Jan 1990 or 34 years" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400" value={subjDob} onChange={e => setSubjDob(e.target.value)} />
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <label className="text-xs font-semibold text-gray-700 mb-1 block">Current Symptoms & Observations</label>
