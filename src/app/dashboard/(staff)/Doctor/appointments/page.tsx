@@ -214,129 +214,104 @@ const ApptCard = ({
 }) => {
     const grad = avatarGrad(apt.patient.name);
     const isToday = apt.date === "Today";
+    const statusStyle = STATUS_STYLES[apt.status] || "bg-gray-100 text-gray-600";
 
     return (
-        <div
-            className={`bg-white rounded-3xl border overflow-hidden shadow-sm active:scale-[0.99] transition-transform
-                ${isToday ? "border-blue-100" : "border-gray-100"}`}
+        <div className={`bg-white rounded-2xl border overflow-hidden active:scale-[0.99] transition-all shadow-sm
+            ${isToday ? "border-blue-100 ring-1 ring-blue-50" : "border-gray-100"}`}
         >
-            {isToday && <div className="h-0.5 bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-400" />}
+            {/* Today stripe */}
+            {isToday && (
+                <div className="h-0.5 bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-400" />
+            )}
 
-            <div className="p-4">
-                {/* Patient row */}
-                <div className="flex items-center gap-3 mb-3">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-md bg-gradient-to-br ${grad}`}>
+            <div className="px-3.5 py-3">
+                {/* Row 1: Avatar + Name + Status + Chevron */}
+                <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-xs flex-shrink-0 bg-gradient-to-br ${grad}`}>
                         {initials(apt.patient.name)}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-gray-900 text-[15px] leading-tight truncate">{apt.patient.name}</h3>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${STATUS_STYLES[apt.status] || "bg-gray-100 text-gray-600"}`}>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-bold text-gray-900 text-[14px] leading-tight truncate">{apt.patient.name}</h3>
+                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full capitalize ${statusStyle}`}>
                                 {apt.status}
                             </span>
                         </div>
-                        <p className="text-xs text-gray-400 font-medium mt-0.5">
-                            {apt.patient.age ? `${apt.patient.age}y` : ""}{apt.patient.gender ? ` · ${apt.patient.gender}` : ""}
-                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5 truncate leading-none">{apt.reason}</p>
                     </div>
                     <button
                         onClick={() => onSelect(apt)}
-                        className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center flex-shrink-0"
+                        className="w-7 h-7 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center flex-shrink-0 transition-colors"
                     >
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                     </button>
                 </div>
 
-                {/* Reason box */}
-                <div className="bg-gray-50 rounded-2xl px-3 py-2.5 mb-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Reason</p>
-                    <p className="text-sm font-semibold text-gray-800 leading-snug">{apt.reason}</p>
-                </div>
-
-                {/* Time + meta row */}
-                <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center gap-1.5">
-                        <div className={`w-2 h-2 rounded-full ${PRIORITY_DOT[apt.priority] || "bg-gray-300"}`} />
-                        <span className="text-[11px] text-gray-500 font-semibold capitalize">{apt.priority}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-500">
-                        <Clock className="w-3 h-3" />
-                        <span className="text-[11px] font-semibold">{apt.time}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-gray-500">
-                        <Calendar className="w-3 h-3" />
-                        <span className="text-[11px] font-semibold">{apt.date}</span>
-                    </div>
-                    <div className="ml-auto flex items-center gap-1">
+                {/* Row 2: Time / Date / Type — single compact bar */}
+                <div className="flex items-center gap-3 mb-2.5 text-[11px] text-gray-500 font-semibold">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRIORITY_DOT[apt.priority] || "bg-gray-300"}`} />
+                    <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-300" />{apt.time}
+                    </span>
+                    <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-gray-300" />{apt.date}
+                    </span>
+                    <span className="ml-auto flex items-center gap-1">
                         {apt.type === "virtual"
-                            ? <><Video className="w-3 h-3 text-purple-500" /><span className="text-[11px] text-purple-500 font-bold">Virtual</span></>
-                            : <><MapPin className="w-3 h-3 text-blue-500" /><span className="text-[11px] text-blue-500 font-bold">In-Person</span></>
+                            ? <><Video className="w-3 h-3 text-purple-400" /><span className="text-purple-500">Virtual</span></>
+                            : <><MapPin className="w-3 h-3 text-blue-400" /><span className="text-blue-500">In-Person</span></>
                         }
-                    </div>
+                    </span>
                 </div>
 
-                {/* Meet link status banner — virtual only */}
+                {/* Virtual meet status — ultra-compact */}
                 {apt.type === "virtual" && (
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl mb-3 ${
-                        hasMeetLink
-                            ? "bg-emerald-50 border border-emerald-100"
-                            : "bg-amber-50 border border-amber-100"
-                    }`}>
-                        <Video className={`w-3.5 h-3.5 shrink-0 ${hasMeetLink ? "text-emerald-500" : "text-amber-500"}`} />
-                        <span className={`text-[11px] font-bold flex-1 ${hasMeetLink ? "text-emerald-700" : "text-amber-700"}`}>
-                            {hasMeetLink ? "✓ Meet link ready" : "⚠ No meet link — tap details to add"}
-                        </span>
-                        {hasMeetLink && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                    <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl mb-2.5 text-[10px] font-bold
+                        ${hasMeetLink ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+                    >
+                        <Video className="w-3 h-3 shrink-0" />
+                        {hasMeetLink ? "✓ Meet link ready" : "⚠ No meet link — tap › to add"}
                     </div>
                 )}
 
                 {/* Actions */}
                 {apt.status === "pending" && (
-                    <div className="grid grid-cols-3 gap-2">
-                        <button
-                            onClick={() => onAccept(apt.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-emerald-600 text-white text-xs font-bold active:scale-95 transition-transform shadow-sm shadow-emerald-200"
-                        >
-                            <CheckCircle className="w-3.5 h-3.5" /> Accept
+                    <div className="grid grid-cols-3 gap-1.5">
+                        <button onClick={() => onAccept(apt.id)}
+                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-emerald-600 text-white text-[11px] font-bold active:scale-95 transition-transform">
+                            <CheckCircle className="w-3 h-3" /> Accept
                         </button>
-                        <button
-                            onClick={() => onReschedule(apt.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-blue-50 text-blue-700 text-xs font-bold active:scale-95 transition-transform"
-                        >
-                            <RefreshCcw className="w-3.5 h-3.5" /> Reschedule
+                        <button onClick={() => onReschedule(apt.id)}
+                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-blue-50 text-blue-700 text-[11px] font-bold active:scale-95 transition-transform">
+                            <RefreshCcw className="w-3 h-3" /> Move
                         </button>
-                        <button
-                            onClick={() => onDecline(apt.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-red-50 text-red-600 text-xs font-bold active:scale-95 transition-transform"
-                        >
-                            <XCircle className="w-3.5 h-3.5" /> Decline
+                        <button onClick={() => onDecline(apt.id)}
+                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-red-50 text-red-600 text-[11px] font-bold active:scale-95 transition-transform">
+                            <XCircle className="w-3 h-3" /> Decline
                         </button>
                     </div>
                 )}
                 {(apt.status === "confirmed" || apt.status === "checked-in") && (
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            onClick={() => onStart(apt)}
-                            className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-blue-600 text-white text-xs font-bold active:scale-95 transition-transform shadow-md shadow-blue-200"
-                        >
-                            {apt.type === "virtual" ? <Video className="w-3.5 h-3.5" /> : <Stethoscope className="w-3.5 h-3.5" />}
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <button onClick={() => onStart(apt)}
+                            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 text-white text-[11px] font-bold active:scale-95 transition-transform shadow-sm shadow-blue-200">
+                            {apt.type === "virtual" ? <Video className="w-3 h-3" /> : <Stethoscope className="w-3 h-3" />}
                             {apt.type === "virtual" ? "Join Video" : "Start Consult"}
                         </button>
-                        <button
-                            onClick={() => onDecline(apt.id)}
-                            className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-gray-100 text-gray-600 text-xs font-bold active:scale-95 transition-transform"
-                        >
-                            <XCircle className="w-3.5 h-3.5" /> Cancel
+                        <button onClick={() => onDecline(apt.id)}
+                            className="flex items-center justify-center gap-1 py-2 rounded-xl bg-gray-100 text-gray-600 text-[11px] font-bold active:scale-95 transition-transform">
+                            <XCircle className="w-3 h-3" /> Cancel
                         </button>
                     </div>
                 )}
                 {apt.status === "rescheduled" && (
-                    <div className="flex items-center gap-2">
-                        <span className="flex-1 text-center text-[11px] font-bold text-orange-600 bg-orange-50 py-2 rounded-2xl">
+                    <div className="flex items-center gap-1.5">
+                        <span className="flex-1 text-center text-[10px] font-bold text-orange-600 bg-orange-50 py-1.5 rounded-xl">
                             ⏳ Awaiting patient confirmation
                         </span>
-                        <button onClick={() => onDecline(apt.id)} className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center">
-                            <XCircle className="w-4 h-4 text-red-500" />
+                        <button onClick={() => onDecline(apt.id)} className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                            <XCircle className="w-3.5 h-3.5 text-red-500" />
                         </button>
                     </div>
                 )}

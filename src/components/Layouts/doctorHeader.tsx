@@ -62,29 +62,25 @@ export default function DoctorHeader() {
             <header className="fixed top-3 left-3 right-3 z-50 bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.10)] border border-gray-100/80">
                 <div className="px-4 h-[54px] flex items-center justify-between gap-3">
 
-                    {/* Left: Brand + greeting */}
-                    <div className="flex items-center gap-3 min-w-0">
-                        {/* Brand dot cluster */}
+                    {/* Left: Logo + Live badge */}
+                    <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative shrink-0">
-                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-300/40">
-                                <Stethoscope className="w-4.5 h-4.5 text-white" />
-                            </div>
+                            <img
+                                src="/logo.png"
+                                alt="Najbel Clinic"
+                                className="w-9 h-9 rounded-2xl object-cover shadow-md"
+                            />
                             {/* Live dot */}
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-white rounded-full" />
                         </div>
 
                         <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                                    Najbel Clinic
-                                </p>
+                            <p className="text-[13px] font-black text-slate-900 leading-tight truncate">Najbel Clinic</p>
+                            <div className="flex items-center gap-1">
                                 <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">
                                     <Wifi className="w-2.5 h-2.5" /> Live
                                 </span>
                             </div>
-                            <h1 className="text-[15px] font-black text-slate-900 leading-tight -mt-px truncate">
-                                {greeting()}, Dr. {user?.full_name?.split(" ")[0] || "Doctor"} 👋
-                            </h1>
                         </div>
                     </div>
 

@@ -11,8 +11,13 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Najbel Systems",
-  description: "Software Developed by: Abdul Ammic",
+  title: "Najbel Clinic",
+  description: "Clinical Management System — Najbel Nursing Home",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
