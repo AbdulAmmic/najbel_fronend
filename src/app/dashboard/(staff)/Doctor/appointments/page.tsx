@@ -534,11 +534,13 @@ export default function DoctorAppointments() {
         if (!meetInput.trim()) return;
         setSavingMeet(true);
         try {
-            await api.put(`appointments/${aptId}/meet-link`, { meet_link: meetInput.trim() });
+            await appointmentsApi.saveMeetLink(aptId, meetInput.trim());
             setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
             setMeetSaved(true);
             setTimeout(() => setMeetSaved(false), 2500);
-        } catch {
+        } catch (e) {
+            console.error("Failed to save meet link to backend:", e);
+            // Still update local state so doctor can use it in this session
             setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
             setMeetSaved(true);
             setTimeout(() => setMeetSaved(false), 2500);
@@ -570,6 +572,16 @@ export default function DoctorAppointments() {
                 duration: "30 min",
                 priority: (a.priority || "medium").toLowerCase() as Appointment["priority"],
             })) : [];
+
+            // Seed meet links from backend data
+            const linksFromServer: Record<number, string> = {};
+            if (Array.isArray(data)) {
+                data.forEach((a: any) => {
+                    if (a.meet_link) linksFromServer[a.id] = a.meet_link;
+                });
+            }
+            setMeetLinks(prev => ({ ...linksFromServer, ...prev }));
+
             setAppts(list.sort((a, b) =>
                 new Date(a.fullDate || 0).getTime() - new Date(b.fullDate || 0).getTime()
             ));

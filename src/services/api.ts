@@ -135,6 +135,10 @@ export const appointments = {
         const response = await api.put(`appointments/${id}/`, data);
         return response.data;
     },
+    saveMeetLink: async (id: number, meet_link: string) => {
+        const response = await api.put(`appointments/${id}/`, { meet_link });
+        return response.data;
+    },
     getById: async (id: number) => {
         const response = await api.get(`appointments/${id}/`);
         return response.data;

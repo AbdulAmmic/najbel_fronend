@@ -39,6 +39,7 @@ export default function PatientAppointmentsPage() {
         status: apt.status,
         notes: apt.notes,
         reschedule_note: apt.reschedule_note,
+        meet_link: apt.meet_link || null,
       }));
       setAppointmentsList(mapped);
     } catch (err) { console.error("Failed to fetch appointments", err); }
@@ -175,14 +176,22 @@ export default function PatientAppointmentsPage() {
                 </div>
               </div>
               {(apt.status === 'confirmed' || apt.status === 'checked-in') && (apt.type === 'online' || apt.type === 'virtual') && (
-                <button
-                  onClick={() => router.push(`/dashboard/meeting/${apt.id}`)}
-                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md shadow-blue-200"
-                >
-                  <Video className="w-3.5 h-3.5" />
-                  Join Video Call
-                  <span className="ml-auto text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded-md">In-App</span>
-                </button>
+                <div className="space-y-2">
+                  {apt.meet_link && (
+                    <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+                      <Video className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <p className="text-[11px] text-indigo-700 font-semibold flex-1 truncate">{apt.meet_link}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => router.push(`/dashboard/meeting/${apt.id}`)}
+                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md shadow-blue-200"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    Join Video Call
+                    <span className="ml-auto text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded-md">In-App</span>
+                  </button>
+                </div>
               )}
               {apt.status === 'in-consultation' && (
                 <div className="flex gap-2">
