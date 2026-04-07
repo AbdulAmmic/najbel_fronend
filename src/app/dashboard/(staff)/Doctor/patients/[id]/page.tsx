@@ -11,7 +11,7 @@ import {
     X, UserCheck, AlertCircle, MessageSquare,
     TrendingUp, Search, MoreHorizontal, FileSearch,
     Download, Share2, Printer, ClipboardList, Send, User, User2, Badge, BadgeCheck, CheckCircle2, Stethoscope, Bed, Package, HeartPulse, AlertTriangle, Zap, MessageCircle,
-    Edit2, Eye, EyeOff, CreditCard, Upload, History
+    Edit2, Eye, EyeOff, CreditCard, Upload, History, Video
 } from "lucide-react";
 import ChatBox from "@/components/chat/ChatBox";
 import {
@@ -1195,213 +1195,210 @@ export default function DoctorPatientDetailPage() {
                             )}
 
                             {activeTab === "history" && (
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
+                                <div className="space-y-3">
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between mb-1">
                                         <div>
-                                            <h2 className="text-xl font-black text-slate-900 tracking-tight">Consultation History</h2>
-                                            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-1">{consultHistory.length} record{consultHistory.length !== 1 ? 's' : ''} — {getName(patient)}</p>
+                                            <h2 className="text-base font-bold text-gray-900">Consultation History</h2>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{consultHistory.length} record{consultHistory.length !== 1 ? 's' : ''}</p>
                                         </div>
-                                        <button onClick={() => openConsultModal()} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-2xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-lg shadow-blue-200">
-                                            <Plus className="w-3.5 h-3.5" /> New Consultation
+                                        <button onClick={() => openConsultModal()} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-sm">
+                                            <Plus className="w-3.5 h-3.5" /> New
                                         </button>
                                     </div>
 
                                     {consultHistory.length === 0 ? (
-                                        <div className="flex flex-col items-center py-20 gap-4 bg-white rounded-3xl border border-gray-100">
-                                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
-                                                <History className="w-8 h-8 text-blue-300" />
+                                        <div className="flex flex-col items-center py-12 gap-3 bg-white rounded-2xl border border-gray-100">
+                                            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                                                <History className="w-6 h-6 text-blue-300" />
                                             </div>
-                                            <div className="text-center">
-                                                <p className="text-sm font-bold text-gray-500">No consultation records yet</p>
-                                                <p className="text-xs text-gray-400 mt-1">Create a new consultation to get started</p>
-                                            </div>
+                                            <p className="text-sm font-semibold text-gray-400">No consultations yet</p>
                                         </div>
-                                    ) : consultHistory.map((c: any) => {
-                                        const isEdited = c.updated_at && c.created_at &&
-                                            (new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()) > 60000;
-                                        const isExpanded = expandedConsult === c.id;
-                                        const isMeetOpen = meetConsultId === c.id;
-                                        return (
-                                            <div key={c.id} className={`bg-white rounded-3xl border shadow-sm overflow-hidden transition-all ${isEdited ? 'border-amber-100' : 'border-gray-100'}`}>
-                                                <div className="px-6 py-5">
-                                                    <div className="flex items-start justify-between mb-3">
-                                                        <div className="flex items-start gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-                                                                <Stethoscope className="w-5 h-5 text-blue-500" />
+                                    ) : (
+                                        <div className="relative space-y-2 pl-5 before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-blue-200 before:via-indigo-100 before:to-transparent before:rounded-full">
+                                            {consultHistory.map((c: any, idx: number) => {
+                                                const isEdited = c.updated_at && c.created_at &&
+                                                    (new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()) > 60000;
+                                                const isExpanded = expandedConsult === c.id;
+                                                const isMeetOpen = meetConsultId === c.id;
+                                                return (
+                                                    <div key={c.id} className="relative">
+                                                        {/* Timeline dot */}
+                                                        <div className={`absolute -left-5 top-3.5 w-3 h-3 rounded-full border-2 border-white shadow ${idx === 0 ? 'bg-blue-500' : 'bg-gray-300'}`} />
+
+                                                        <div className={`bg-white rounded-2xl border overflow-hidden transition-all duration-200 ${isEdited ? 'border-l-2 border-l-amber-400 border-gray-100' : 'border-gray-100'} ${c.is_visible_to_patient ? 'border-l-2 border-l-emerald-400' : ''}`}>
+
+                                                            {/* Card header */}
+                                                            <div className="px-3.5 pt-3 pb-2.5">
+                                                                <div className="flex items-start gap-2.5">
+                                                                    {/* Info block */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                                                            <p className="text-[13px] font-semibold text-gray-900 leading-snug truncate max-w-[180px] sm:max-w-none">
+                                                                                {c.chief_complaint || `Consultation #${c.id}`}
+                                                                            </p>
+                                                                            {isEdited && (
+                                                                                <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full">
+                                                                                    <Edit2 className="w-2 h-2" /> edited
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        {c.diagnosis && (
+                                                                            <p className="text-xs text-indigo-600 font-medium truncate">Dx: {c.diagnosis}</p>
+                                                                        )}
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <p className="text-[10px] text-gray-400">
+                                                                                {c.created_at ? new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                                            </p>
+                                                                            {/* Visibility pill */}
+                                                                            <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${c.is_visible_to_patient ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                                                {c.is_visible_to_patient ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
+                                                                                {c.is_visible_to_patient ? 'Shared' : 'Private'}
+                                                                            </span>
+                                                                            {c.meet_link && (
+                                                                                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-full">
+                                                                                    📹 Meeting
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Action icon-buttons */}
+                                                                    <div className="flex items-center gap-1 shrink-0">
+                                                                        {/* Join meeting (if link exists) */}
+                                                                        {c.meet_link && (
+                                                                            <a href={c.meet_link} target="_blank" rel="noopener noreferrer"
+                                                                                className="p-1.5 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all"
+                                                                                title="Join Meeting"
+                                                                            >
+                                                                                <span className="text-[11px]">📹</span>
+                                                                            </a>
+                                                                        )}
+                                                                        {/* Meeting link toggle */}
+                                                                        <button
+                                                                            onClick={() => { setMeetConsultId(isMeetOpen ? null : c.id); setMeetLinkDraft(c.meet_link || ""); }}
+                                                                            title={c.meet_link ? "Update Meeting Link" : "Add Meeting Link"}
+                                                                            className={`p-1.5 rounded-lg transition-all ${isMeetOpen ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-600 hover:bg-teal-100'}`}
+                                                                        >
+                                                                            <Video className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        {/* Edit */}
+                                                                        <button
+                                                                            onClick={() => openConsultModal(c)}
+                                                                            title="Edit"
+                                                                            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all"
+                                                                        >
+                                                                            <Edit2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                        {/* Unveil toggle */}
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                try {
+                                                                                    const newVis = !c.is_visible_to_patient;
+                                                                                    await consultations.toggleVisibility(c.id, newVis);
+                                                                                    showToast(newVis ? "Shared with patient!" : "Hidden from patient");
+                                                                                    fetchData();
+                                                                                } catch (e: any) {
+                                                                                    if (e?.response?.status === 403) {
+                                                                                        showToast("Backend unveil not supported yet — contact admin", false);
+                                                                                    } else {
+                                                                                        showToast(e?.response?.data?.detail || "Failed", false);
+                                                                                    }
+                                                                                }
+                                                                            }}
+                                                                            title={c.is_visible_to_patient ? "Hide from patient" : "Share with patient"}
+                                                                            className={`p-1.5 rounded-lg transition-all ${c.is_visible_to_patient ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                                                        >
+                                                                            {c.is_visible_to_patient ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                                        </button>
+                                                                        {/* Expand */}
+                                                                        <button
+                                                                            onClick={() => setExpandedConsult(isExpanded ? null : c.id)}
+                                                                            className="p-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                                                        >
+                                                                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Inline meeting link entry */}
+                                                                {isMeetOpen && (
+                                                                    <div className="mt-2.5 p-2.5 bg-teal-50 border border-teal-100 rounded-xl space-y-2">
+                                                                        <div className="flex gap-2">
+                                                                            <input
+                                                                                type="url"
+                                                                                placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                                                                                className="flex-1 border border-teal-200 rounded-lg px-2.5 py-2 text-xs outline-none focus:border-teal-400 bg-white"
+                                                                                value={meetLinkDraft}
+                                                                                onChange={e => setMeetLinkDraft(e.target.value)}
+                                                                                autoFocus
+                                                                            />
+                                                                            <button
+                                                                                onClick={async () => {
+                                                                                    setMeetSaving(true);
+                                                                                    try {
+                                                                                        await consultations.setMeetLink(c.id, meetLinkDraft);
+                                                                                        showToast("Meeting link saved!");
+                                                                                        setMeetConsultId(null);
+                                                                                        fetchData();
+                                                                                    } catch (e: any) {
+                                                                                        showToast(e?.response?.data?.detail || "Failed to save meeting link", false);
+                                                                                    } finally { setMeetSaving(false); }
+                                                                                }}
+                                                                                disabled={meetSaving || !meetLinkDraft.trim()}
+                                                                                className="px-3 py-2 bg-teal-600 text-white rounded-lg text-xs font-bold hover:bg-teal-700 disabled:opacity-50 transition-all"
+                                                                            >
+                                                                                {meetSaving ? '...' : 'Save'}
+                                                                            </button>
+                                                                        </div>
+                                                                        <p className="text-[9px] text-teal-500">Paste a Google Meet, Zoom, or Teams link</p>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            <div>
-                                                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                                    <p className="text-sm font-bold text-gray-900 leading-snug">{c.chief_complaint || "Consultation"}</p>
+
+                                                            {/* Expanded detail panel */}
+                                                            {isExpanded && (
+                                                                <div className="border-t border-gray-50 px-3.5 py-3 bg-gray-50/60 space-y-2.5">
+                                                                    {c.symptoms && (
+                                                                        <div>
+                                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Symptoms</p>
+                                                                            <p className="text-xs text-gray-700 leading-relaxed">{c.symptoms}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {c.treatment_plan && (
+                                                                        <div>
+                                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Treatment Plan</p>
+                                                                            <p className="text-xs text-gray-700 leading-relaxed">{c.treatment_plan}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {c.notes && (
+                                                                        <div>
+                                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Notes</p>
+                                                                            <p className="text-xs text-gray-500 leading-relaxed">{c.notes}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {c.meet_link && (
+                                                                        <div className="flex items-center justify-between p-2 bg-teal-50 border border-teal-100 rounded-xl">
+                                                                            <p className="text-xs text-teal-600 font-medium truncate max-w-[200px]">{c.meet_link}</p>
+                                                                            <a href={c.meet_link} target="_blank" rel="noopener noreferrer" className="ml-2 flex-shrink-0 text-xs font-bold text-white bg-teal-600 px-3 py-1 rounded-lg hover:bg-teal-700 transition-all">
+                                                                                Join
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
                                                                     {isEdited && (
-                                                                        <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                                                            <Edit2 className="w-2.5 h-2.5" /> EDITED
-                                                                        </span>
+                                                                        <div className="flex items-center gap-1.5 p-2 bg-amber-50 border border-amber-100 rounded-xl">
+                                                                            <Edit2 className="w-3 h-3 text-amber-500 shrink-0" />
+                                                                            <p className="text-[10px] text-amber-600">Amended on {new Date(c.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                                                        </div>
                                                                     )}
-                                                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                                                        c.is_visible_to_patient ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                                                                    }`}>
-                                                                        {c.is_visible_to_patient ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5" />}
-                                                                        {c.is_visible_to_patient ? 'Patient View On' : 'Private'}
-                                                                    </span>
                                                                 </div>
-                                                                <p className="text-[10px] text-gray-400">
-                                                                    {c.created_at ? new Date(c.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                                                    {isEdited && c.updated_at && (
-                                                                        <span className="ml-2 text-amber-500">· Edited {new Date(c.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                                                    )}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 shrink-0 ml-2 flex-wrap justify-end">
-                                                            {/* Meet link join button */}
-                                                            {c.meet_link && (
-                                                                <a
-                                                                    href={c.meet_link}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-xl transition-all shadow-md shadow-emerald-200 animate-pulse"
-                                                                >
-                                                                    <span>📹</span> Join Meeting
-                                                                </a>
                                                             )}
-                                                            {/* Add/edit meet link button */}
-                                                            <button
-                                                                onClick={() => {
-                                                                    setMeetConsultId(isMeetOpen ? null : c.id);
-                                                                    setMeetLinkDraft(c.meet_link || "");
-                                                                }}
-                                                                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
-                                                                    isMeetOpen ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
-                                                                }`}
-                                                            >
-                                                                <span>📹</span> {c.meet_link ? 'Update Link' : 'Meeting'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => openConsultModal(c)}
-                                                                className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white hover:bg-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-xl transition-all"
-                                                            >
-                                                                <Edit2 className="w-3 h-3" /> Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={async () => {
-                                                                    try {
-                                                                        const newVis = !c.is_visible_to_patient;
-                                                                        await consultations.toggleVisibility(c.id, newVis);
-                                                                        showToast(newVis ? "Consultation unveiled to patient!" : "Hidden from patient");
-                                                                        fetchData();
-                                                                    } catch (e: any) {
-                                                                        const msg = e?.response?.data?.detail || e?.message || "";
-                                                                        if (e?.response?.status === 403) {
-                                                                            showToast("Backend doesn't allow this yet — ask your admin to add the unveil endpoint", false);
-                                                                        } else {
-                                                                            showToast(msg || "Failed to update visibility", false);
-                                                                        }
-                                                                    }
-                                                                }}
-                                                                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
-                                                                    c.is_visible_to_patient
-                                                                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                                }`}
-                                                            >
-                                                                {c.is_visible_to_patient ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                                                {c.is_visible_to_patient ? 'Unveiled' : 'Unveil'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setExpandedConsult(isExpanded ? null : c.id)}
-                                                                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-all"
-                                                            >
-                                                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                                            </button>
                                                         </div>
                                                     </div>
-
-                                                    {/* Inline meeting link input */}
-                                                    {isMeetOpen && (
-                                                        <div className="mt-3 p-4 bg-teal-50 border border-teal-100 rounded-2xl space-y-3">
-                                                            <p className="text-[10px] font-black text-teal-700 uppercase tracking-widest">📹 Meeting Link for this Consultation</p>
-                                                            <div className="flex gap-2">
-                                                                <input
-                                                                    type="url"
-                                                                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                                                                    className="flex-1 border border-teal-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-400 bg-white"
-                                                                    value={meetLinkDraft}
-                                                                    onChange={e => setMeetLinkDraft(e.target.value)}
-                                                                />
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        setMeetSaving(true);
-                                                                        try {
-                                                                            await consultations.setMeetLink(c.id, meetLinkDraft);
-                                                                            showToast("Meeting link saved!");
-                                                                            setMeetConsultId(null);
-                                                                            fetchData();
-                                                                        } catch (e: any) {
-                                                                            showToast(e?.response?.data?.detail || "Failed to save meeting link", false);
-                                                                        } finally { setMeetSaving(false); }
-                                                                    }}
-                                                                    disabled={meetSaving || !meetLinkDraft.trim()}
-                                                                    className="px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-all disabled:opacity-50"
-                                                                >
-                                                                    {meetSaving ? '...' : 'Save'}
-                                                                </button>
-                                                            </div>
-                                                            <p className="text-[10px] text-teal-600">Paste your Google Meet, Zoom, or Teams link. The patient can join from their portal when you unveil this consultation.</p>
-                                                        </div>
-                                                    )}
-
-                                                    {c.diagnosis && (
-                                                        <div className="flex items-start gap-2">
-                                                            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest w-20 shrink-0 pt-0.5">Dx</span>
-                                                            <span className="text-sm text-gray-800 font-semibold">{c.diagnosis}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {isExpanded && (
-                                                    <div className="border-t border-gray-50 px-6 pb-5 pt-4 space-y-4 bg-gray-50/50">
-                                                        {c.symptoms && (
-                                                            <div>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Symptoms / History</p>
-                                                                <p className="text-sm text-gray-700 leading-relaxed">{c.symptoms}</p>
-                                                            </div>
-                                                        )}
-                                                        {c.treatment_plan && (
-                                                            <div>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Treatment Plan</p>
-                                                                <p className="text-sm text-gray-700 leading-relaxed">{c.treatment_plan}</p>
-                                                            </div>
-                                                        )}
-                                                        {c.notes && (
-                                                            <div>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Clinical Notes</p>
-                                                                <p className="text-sm text-gray-600 leading-relaxed">{c.notes}</p>
-                                                            </div>
-                                                        )}
-                                                        {c.meet_link && (
-                                                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-3">
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-teal-700 uppercase tracking-widest">Meeting Link</p>
-                                                                    <p className="text-xs text-teal-600 truncate max-w-[180px]">{c.meet_link}</p>
-                                                                </div>
-                                                                <a href={c.meet_link} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition-all">
-                                                                    Join
-                                                                </a>
-                                                            </div>
-                                                        )}
-                                                        {isEdited && (
-                                                            <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2">
-                                                                <Edit2 className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                                                                <div>
-                                                                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Amended Record</p>
-                                                                    <p className="text-xs text-amber-600 mt-0.5">This consultation was edited after initial creation on {new Date(c.updated_at).toLocaleString()}</p>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
