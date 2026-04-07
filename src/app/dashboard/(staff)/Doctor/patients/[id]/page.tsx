@@ -70,6 +70,31 @@ export default function DoctorPatientDetailPage() {
     const [myDoctorId, setMyDoctorId] = useState<number | null>(null);
     const [activeChatId, setActiveChatId] = useState<number | null>(null);
 
+    // ── SOAP Consultation state ──────────────────────────────
+    const [soapStep, setSoapStep] = useState<1 | 2 | 3>(1);
+    const [soapConsultId, setSoapConsultId] = useState<number | null>(null);
+    const [soapSaving, setSoapSaving] = useState(false);
+    // Step 1 — Subjective
+    const [subjChief, setSubjChief] = useState("");
+    const [subjSymptoms, setSubjSymptoms] = useState("");
+    const [subjHistory, setSubjHistory] = useState("");
+    const [subjAllergies, setSubjAllergies] = useState("");
+    const [subjFamilyHistory, setSubjFamilyHistory] = useState("");
+    const [subjSocialHabits, setSubjSocialHabits] = useState("");
+    // Step 2 — Objective
+    const [objBpSys, setObjBpSys] = useState("");
+    const [objBpDia, setObjBpDia] = useState("");
+    const [objHeight, setObjHeight] = useState("");
+    const [objWeight, setObjWeight] = useState("");
+    const [objFbs, setObjFbs] = useState("");
+    const [objRbs, setObjRbs] = useState("");
+    const [objFbc, setObjFbc] = useState("");
+    // Step 3 — Assessment & Plan
+    const [assesSymptoms, setAssesSymptoms] = useState("");
+    const [assesDiagnosis, setAssesDiagnosis] = useState("");
+    const [assesTreatment, setAssesTreatment] = useState("");
+    const [assessNotes, setAssessNotes] = useState("");
+
     useEffect(() => {
         if (labList.length > 0 && !expandedLab) {
             const mostRecent = labList.find((l: any) => l.status === 'validated' || l.status === 'completed');
@@ -267,6 +292,102 @@ export default function DoctorPatientDetailPage() {
     useEffect(() => {
         fetchData();
     }, [id]);
+
+
+    // ── SOAP Consultation handlers ────────────────────────────
+    const openConsultModal = () => {
+        setSoapStep(1);
+        setSoapConsultId(null);
+        setSubjChief(""); setSubjSymptoms(""); setSubjHistory("");
+        setSubjAllergies(""); setSubjFamilyHistory(""); setSubjSocialHabits("");
+        setObjBpSys(""); setObjBpDia(""); setObjHeight(""); setObjWeight("");
+        setObjFbs(""); setObjRbs(""); setObjFbc("");
+        setAssesSymptoms(""); setAssesDiagnosis(""); setAssesTreatment(""); setAssessNotes("");
+        setModal("consult");
+    };
+
+    const soapNext = async () => {
+        setSoapSaving(true);
+        try {
+            if (soapStep === 1) {
+                // Create or get the consultation session to get consultation_id
+                let consultId = soapConsultId;
+                if (!consultId) {
+                    const appts = await appointments.getAll();
+                    const patientAppts = (Array.isArray(appts) ? appts : []).filter((a: any) =>
+                        a.patient_id === patient.id &&
+                        ['confirmed', 'checked-in', 'in-consultation'].includes(a.status)
+                    );
+                    const latestAppt = patientAppts[0];
+                    if (latestAppt) {
+                        const session = await consultations.startSession(latestAppt.id);
+                        consultId = session.consultation_id;
+                        setSoapConsultId(consultId);
+                    }
+                }
+                if (consultId) {
+                    await consultations.saveSubjective(consultId, {
+                        chief_complaint: subjChief,
+                        past_medical_history: subjHistory ? [{ value: subjHistory, timestamp: new Date().toISOString(), note: "" }] : [],
+                        medications_used: subjSymptoms ? [{ value: subjSymptoms, timestamp: new Date().toISOString(), note: "" }] : [],
+                        drug_allergies: subjAllergies ? [{ value: subjAllergies, timestamp: new Date().toISOString(), note: "" }] : [],
+                        family_history: subjFamilyHistory ? [{ value: subjFamilyHistory, timestamp: new Date().toISOString(), note: "" }] : [],
+                        social_habits: subjSocialHabits ? [{ value: subjSocialHabits, timestamp: new Date().toISOString(), note: "" }] : [],
+                    });
+                }
+                setSoapStep(2);
+            } else if (soapStep === 2) {
+                if (soapConsultId) {
+                    const objPayload: any = {};
+                    if (objBpSys) objPayload.blood_pressure_systolic = Number(objBpSys);
+                    if (objBpDia) objPayload.blood_pressure_diastolic = Number(objBpDia);
+                    if (objHeight) objPayload.height_cm = Number(objHeight);
+                    if (objWeight) objPayload.weight_kg = Number(objWeight);
+                    if (objFbs) objPayload.fbs = Number(objFbs);
+                    if (objRbs) objPayload.rbs = Number(objRbs);
+                    if (objFbc) objPayload.fbc = objFbc;
+                    await consultations.saveObjective(soapConsultId, objPayload);
+                }
+                setSoapStep(3);
+            }
+        } catch (e) {
+            console.error("SOAP step error", e);
+            showToast("Failed to save this step", false);
+        } finally {
+            setSoapSaving(false);
+        }
+    };
+
+    const soapFinish = async () => {
+        if (!assesDiagnosis.trim()) return showToast("Diagnosis is required", false);
+        setSoapSaving(true);
+        try {
+            if (soapConsultId) {
+                await consultations.saveDraft(soapConsultId, {
+                    symptoms: assesSymptoms || subjChief,
+                    diagnosis: assesDiagnosis,
+                    treatment_plan: assesTreatment,
+                    notes: assessNotes,
+                });
+            } else {
+                await consultations.create({
+                    patient_id: patient.id,
+                    doctor_id: me?.id,
+                    chief_complaint: subjChief,
+                    diagnosis: assesDiagnosis,
+                    treatment_plan: assesTreatment,
+                    notes: assessNotes,
+                });
+            }
+            showToast("Consultation note saved successfully!");
+            fetchData();
+            setModal(null);
+        } catch (e: any) {
+            showToast(e?.response?.data?.detail || "Failed to save consultation", false);
+        } finally {
+            setSoapSaving(false);
+        }
+    };
 
     const sf = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 
@@ -550,42 +671,45 @@ export default function DoctorPatientDetailPage() {
 
             <div className="flex-1 flex overflow-hidden">
                 <main className="flex-1 overflow-y-auto bg-[#F8FAFC]">
-                    <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+                    <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-8">
 
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 md:gap-4">
                             {ACTIONS.map((action) => (
                                 <button
                                     key={action.id}
-                                    onClick={() => { setForm({}); setModal(action.id as ModalType); }}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all group"
+                                    onClick={() => {
+                                        if (action.id === "consult") { openConsultModal(); return; }
+                                        setForm({}); setModal(action.id as ModalType);
+                                    }}
+                                    className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-3 px-2 sm:px-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all group"
                                 >
                                     <div className={`w-8 h-8 rounded-xl ${action.bg} ${action.text} flex items-center justify-center group-hover:scale-105 transition-transform`}>
                                         <action.icon className="w-4 h-4" />
                                     </div>
-                                    <span className="text-xs font-semibold text-gray-700">{action.label}</span>
+                                    <span className="text-[10px] sm:text-xs font-semibold text-gray-700">{action.label}</span>
                                 </button>
                             ))}
                         </div>
 
-                        <div className="flex gap-1 bg-white p-1 rounded-2xl border border-gray-100 w-fit">
+                        <div className="flex gap-1 bg-white p-1 rounded-2xl border border-gray-100 overflow-x-auto no-scrollbar">
                             {([
                                 { id: "info", label: "Profile", icon: User },
-                                { id: "rx", label: "Medications", icon: Pill },
-                                { id: "labs", label: "Investigations", icon: FlaskConical },
-                                { id: "nursing", label: "Clinical Notes", icon: FileText },
+                                { id: "rx", label: "Meds", icon: Pill },
+                                { id: "labs", label: "Labs", icon: FlaskConical },
+                                { id: "nursing", label: "Notes", icon: FileText },
                                 { id: "refs", label: "Referrals", icon: UserCheck },
-                                { id: "chats", label: "Chats", icon: MessageCircle },
+                                { id: "chats", label: "Chat", icon: MessageCircle },
                             ] as const).map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setTab(tab.id as TabType)}
-                                    className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                                    className={`flex-shrink-0 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 sm:gap-2 ${
                                         activeTab === tab.id
                                             ? "bg-gray-900 text-white shadow-sm"
                                             : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                                     }`}
                                 >
-                                    <tab.icon className="w-4 h-4" />
+                                    <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                     <span>{tab.label}</span>
                                     {tab.id === 'rx' && rxList.length > 0 && (
                                         <span className={`text-xs ${activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100'} px-1.5 py-0.5 rounded-full`}>
@@ -1189,19 +1313,119 @@ export default function DoctorPatientDetailPage() {
                                 )}
 
                                 {activeModal === "consult" && (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Chief Complaint *</label>
-                                            <input type="text" placeholder="Primary issue..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.chief_complaint || ""} onChange={e => sf("chief_complaint", e.target.value)} />
+                                    <div className="space-y-0">
+                                        {/* SOAP Step indicator */}
+                                        <div className="flex items-center gap-0 mb-6">
+                                            {["Subjective", "Objective", "Assessment"].map((label, i) => (
+                                                <div key={i} className="flex-1 flex flex-col items-center">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black mb-1 transition-all ${
+                                                        soapStep === i + 1 ? "bg-blue-600 text-white shadow-lg shadow-blue-200" :
+                                                        soapStep > i + 1 ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-400"
+                                                    }`}>{soapStep > i + 1 ? <Check className="w-4 h-4" /> : i + 1}</div>
+                                                    <span className={`text-[10px] font-bold ${soapStep === i + 1 ? "text-blue-600" : "text-gray-400"}`}>{label}</span>
+                                                    {i < 2 && <div className={`absolute w-full h-0.5 top-4 left-1/2 ${soapStep > i + 1 ? "bg-emerald-400" : "bg-gray-200"}`} />}
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Diagnosis *</label>
-                                            <textarea rows={2} placeholder="Clinical assessment..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.diagnosis || ""} onChange={e => sf("diagnosis", e.target.value)} />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Treatment Plan</label>
-                                            <textarea rows={2} placeholder="Proposed interventions..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.treatment_plan || ""} onChange={e => sf("treatment_plan", e.target.value)} />
-                                        </div>
+
+                                        {/* Step 1 — Subjective Data */}
+                                        {soapStep === 1 && (
+                                            <div className="space-y-4">
+                                                <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
+                                                    <p className="text-xs font-bold text-blue-700">📋 Phase 1: Subjective — Patient-reported symptoms and history</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Chief Complaint *</label>
+                                                    <input type="text" placeholder="e.g. Severe headache for 3 days" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50" value={subjChief} onChange={e => setSubjChief(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Current Symptoms & Observations</label>
+                                                    <textarea rows={2} placeholder="Describe presenting symptoms in detail..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 resize-none" value={subjSymptoms} onChange={e => setSubjSymptoms(e.target.value)} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Past Medical History</label>
+                                                        <textarea rows={2} placeholder="Previous conditions, surgeries..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 resize-none" value={subjHistory} onChange={e => setSubjHistory(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Drug Allergies</label>
+                                                        <textarea rows={2} placeholder="Known drug allergies..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 resize-none" value={subjAllergies} onChange={e => setSubjAllergies(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Family History</label>
+                                                        <input type="text" placeholder="Diabetes, hypertension..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400" value={subjFamilyHistory} onChange={e => setSubjFamilyHistory(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Social Habits</label>
+                                                        <input type="text" placeholder="Smoking, alcohol, occupation..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400" value={subjSocialHabits} onChange={e => setSubjSocialHabits(e.target.value)} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 2 — Objective Data */}
+                                        {soapStep === 2 && (
+                                            <div className="space-y-4">
+                                                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3">
+                                                    <p className="text-xs font-bold text-emerald-700">🩺 Phase 2: Objective — Measured vitals and clinical findings</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-2 block">Blood Pressure (mmHg)</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="number" placeholder="Systolic" className="flex-1 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50" value={objBpSys} onChange={e => setObjBpSys(e.target.value)} />
+                                                        <span className="text-gray-400 font-bold">/</span>
+                                                        <input type="number" placeholder="Diastolic" className="flex-1 border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50" value={objBpDia} onChange={e => setObjBpDia(e.target.value)} />
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Height (cm)</label>
+                                                        <input type="number" placeholder="170" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400" value={objHeight} onChange={e => setObjHeight(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">Weight (kg)</label>
+                                                        <input type="number" placeholder="70" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400" value={objWeight} onChange={e => setObjWeight(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">FBS (mmol/L)</label>
+                                                        <input type="number" step="0.1" placeholder="Fasting blood sugar" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400" value={objFbs} onChange={e => setObjFbs(e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-gray-700 mb-1 block">RBS (mmol/L)</label>
+                                                        <input type="number" step="0.1" placeholder="Random blood sugar" className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400" value={objRbs} onChange={e => setObjRbs(e.target.value)} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Full Blood Count (FBC)</label>
+                                                    <textarea rows={2} placeholder="Haemoglobin, WBC, platelets summary..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-emerald-400 resize-none" value={objFbc} onChange={e => setObjFbc(e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Step 3 — Assessment & Plan */}
+                                        {soapStep === 3 && (
+                                            <div className="space-y-4">
+                                                <div className="bg-violet-50 border border-violet-100 rounded-2xl px-4 py-3">
+                                                    <p className="text-xs font-bold text-violet-700">📝 Phase 3: Assessment & Plan — Doctor's clinical conclusion</p>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Presenting Symptoms Summary</label>
+                                                    <textarea rows={2} placeholder="Summary of key symptoms..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-50 resize-none" value={assesSymptoms} onChange={e => setAssesSymptoms(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Diagnosis *</label>
+                                                    <textarea rows={2} placeholder="Primary and differential diagnoses..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-50 resize-none" value={assesDiagnosis} onChange={e => setAssesDiagnosis(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Treatment Plan</label>
+                                                    <textarea rows={3} placeholder="Medications, procedures, referrals, follow-up..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-50 resize-none" value={assesTreatment} onChange={e => setAssesTreatment(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-semibold text-gray-700 mb-1 block">Additional Notes</label>
+                                                    <textarea rows={2} placeholder="Any other clinical notes..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-violet-400 resize-none" value={assessNotes} onChange={e => setAssessNotes(e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1283,17 +1507,51 @@ export default function DoctorPatientDetailPage() {
                                 )}
                             </div>
 
-                            <div className="p-8 border-t border-slate-50 bg-slate-50 flex gap-4">
-                                <button 
-                                    className="flex-1 bg-slate-900 text-white h-16 rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50" 
-                                    onClick={activeModal === "discharge" ? submitDischarge : handleSubmit} 
-                                    disabled={saving}
-                                >
-                                    {saving ? "Processing..." : activeModal === "discharge" ? "Complete Discharge" : "Submit Request"}
-                                </button>
-                                <button className="px-8 bg-white text-slate-500 h-16 rounded-3xl font-black uppercase tracking-widest text-[11px] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => setModal(null)}>
-                                    Dismiss
-                                </button>
+                            <div className="p-5 border-t border-slate-50 bg-slate-50 flex gap-3">
+                                {activeModal === "consult" ? (
+                                    <>
+                                        {soapStep > 1 && (
+                                            <button
+                                                className="px-5 bg-white text-slate-500 h-12 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-slate-100 transition-all active:scale-95"
+                                                onClick={() => setSoapStep(prev => (prev - 1) as 1 | 2 | 3)}
+                                                disabled={soapSaving}
+                                            >
+                                                ← Back
+                                            </button>
+                                        )}
+                                        {soapStep < 3 ? (
+                                            <button
+                                                className="flex-1 bg-blue-600 text-white h-12 rounded-2xl font-bold text-sm shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                                onClick={soapNext}
+                                                disabled={soapSaving || !subjChief.trim()}
+                                            >
+                                                {soapSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                                                {soapStep === 1 ? "Save Subjective & Next →" : "Save Objective & Next →"}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                className="flex-1 bg-emerald-600 text-white h-12 rounded-2xl font-bold text-sm shadow-lg hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                                                onClick={soapFinish}
+                                                disabled={soapSaving || !assesDiagnosis.trim()}
+                                            >
+                                                {soapSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
+                                                <Check className="w-4 h-4" /> Save Consultation
+                                            </button>
+                                        )}
+                                        <button className="px-5 bg-white text-slate-500 h-12 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => setModal(null)}>Cancel</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            className="flex-1 bg-slate-900 text-white h-14 rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50"
+                                            onClick={activeModal === "discharge" ? submitDischarge : handleSubmit}
+                                            disabled={saving}
+                                        >
+                                            {saving ? "Processing..." : activeModal === "discharge" ? "Complete Discharge" : "Submit Request"}
+                                        </button>
+                                        <button className="px-8 bg-white text-slate-500 h-14 rounded-3xl font-black uppercase tracking-widest text-[11px] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => setModal(null)}>Dismiss</button>
+                                    </>
+                                )}
                             </div>
                         </motion.div>
                     </div>

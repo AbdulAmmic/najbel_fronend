@@ -250,6 +250,18 @@ export const consultations = {
     startSession: async (appointmentId: number) => {
         const response = await api.post(`consultations/start/${appointmentId}`);
         return response.data;
+    },
+    saveDraft: async (id: number, data: any) => {
+        const response = await api.put(`consultations/${id}/save-draft`, data);
+        return response.data;
+    },
+    saveSubjective: async (id: number, data: any) => {
+        const response = await api.put(`consultations/${id}/subjective`, data);
+        return response.data;
+    },
+    saveObjective: async (id: number, data: any) => {
+        const response = await api.put(`consultations/${id}/objective`, data);
+        return response.data;
     }
 }
 
