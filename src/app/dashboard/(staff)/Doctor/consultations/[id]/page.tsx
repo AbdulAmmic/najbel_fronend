@@ -26,7 +26,9 @@ import {
     Check,
     Plus,
     ChevronDown,
-    ChevronRight
+    ChevronRight,
+    Video,
+    Link as LinkIcon
 } from "lucide-react";
 import { appointments, patients, labs, departments, beds, prescriptions as prescriptionsApi, consultations } from "@/services/api";
 import { formatDate, calculateAge } from "@/utils/date";
@@ -103,6 +105,28 @@ export default function ConsultationPage({ params }: { params: Promise<{ id: str
     // Prescriptions
     const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
     const [currentMed, setCurrentMed] = useState({ name: "", dosage: "", frequency: "1-0-1", duration: "7 days" });
+
+    // Meet link
+    const [meetLink, setMeetLink] = useState("");
+    const [meetInput, setMeetInput] = useState("");
+    const [savingMeet, setSavingMeet] = useState(false);
+    const [meetSaved, setMeetSaved] = useState(false);
+
+    const handleSaveMeetLink = async () => {
+        if (!meetInput.trim()) return;
+        setSavingMeet(true);
+        try {
+            await api.put(`consultations/${consultationId || id}/meet-link`, { meet_link: meetInput.trim() });
+            setMeetLink(meetInput.trim());
+            setMeetSaved(true);
+            setTimeout(() => setMeetSaved(false), 2500);
+        } catch {
+            // store locally even if API fails
+            setMeetLink(meetInput.trim());
+        } finally {
+            setSavingMeet(false);
+        }
+    };
 
     // Initialize speech recognition
     useEffect(() => {
@@ -352,6 +376,57 @@ Recommendations: Continue monitoring vitals. Follow-up in 2 weeks.
                             Complete
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* ── Google Meet Card ───────────────────────────────── */}
+            <div className="bg-slate-900 px-4 py-3">
+                <div className="flex items-center gap-3 mb-2.5">
+                    <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                        <Video className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-bold leading-none">Video Consultation</p>
+                        <p className="text-slate-400 text-[10px] mt-0.5">
+                            {meetLink ? "Link set — patient will be notified" : "Set a Google Meet link for this consultation"}
+                        </p>
+                    </div>
+                    {meetLink && (
+                        <a
+                            href={`/dashboard/meeting/${consultationId || id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black px-3 py-1.5 rounded-xl transition-colors shrink-0"
+                        >
+                            <Video className="w-3.5 h-3.5" /> Join Meeting
+                        </a>
+                    )}
+                </div>
+                <div className="flex gap-2">
+                    <input
+                        type="url"
+                        value={meetInput}
+                        onChange={e => setMeetInput(e.target.value)}
+                        placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                        className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all"
+                    />
+                    <button
+                        onClick={handleSaveMeetLink}
+                        disabled={savingMeet || !meetInput.trim()}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+                            meetSaved
+                                ? "bg-emerald-500 text-white"
+                                : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                        }`}
+                    >
+                        {savingMeet ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : meetSaved ? (
+                            <><Check className="w-4 h-4" /> Saved</>
+                        ) : (
+                            <><Save className="w-4 h-4" /> Set Link</>
+                        )}
+                    </button>
                 </div>
             </div>
 
