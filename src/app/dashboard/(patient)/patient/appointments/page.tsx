@@ -39,7 +39,7 @@ export default function PatientAppointmentsPage() {
         status: apt.status,
         notes: apt.notes,
         reschedule_note: apt.reschedule_note,
-        meet_link: apt.meet_link || null,
+        meet_link: apt.meeting_link || null,
       }));
       setAppointmentsList(mapped);
     } catch (err) { console.error("Failed to fetch appointments", err); }

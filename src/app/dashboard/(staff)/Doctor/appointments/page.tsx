@@ -375,6 +375,7 @@ const AppointmentDetailSheet = ({
     savingMeet,
     meetSaved,
     onSaveMeetLink,
+    onClearMeetLink,
     onStart,
     onAccept,
     onClose,
@@ -387,6 +388,7 @@ const AppointmentDetailSheet = ({
     savingMeet: boolean;
     meetSaved: boolean;
     onSaveMeetLink: (id: number) => void;
+    onClearMeetLink: (id: number) => void;
     onStart: (apt: Appointment) => void;
     onAccept: (id: number) => void;
     onClose: () => void;
@@ -462,68 +464,82 @@ const AppointmentDetailSheet = ({
                     <p className="text-sm font-semibold text-blue-900 leading-relaxed">{apt.reason}</p>
                 </div>
 
-                {/* ── Google Meet Panel ── */}
-                <div className="bg-slate-900 rounded-2xl overflow-hidden">
-                    {/* Header */}
-                    <div className="px-4 pt-4 pb-3 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-                            <Video className="w-5 h-5 text-white" />
+                {/* ── Google Meet Panel — only for virtual, non-cancelled ── */}
+                {isVirtual && apt.status !== "cancelled" && (
+                    <div className="bg-slate-900 rounded-2xl overflow-hidden">
+                        {/* Header */}
+                        <div className="px-4 pt-4 pb-3 flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                                <Video className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-white text-sm font-bold">Google Meet Link</p>
+                                <p className="text-slate-400 text-[11px] mt-0.5">
+                                    {hasMeetLink ? "✓ Link saved — patient can join in-app" : "Paste a Meet link to enable video call"}
+                                </p>
+                            </div>
+                            {/* Edit button to allow re-entering a saved link */}
+                            {hasMeetLink && (
+                                <button
+                                    onClick={() => {
+                                        setMeetInput(meetLinks[apt.id] || "");
+                                        onClearMeetLink(apt.id);
+                                    }}
+                                    className="text-[10px] text-slate-400 border border-white/10 px-2.5 py-1 rounded-lg hover:text-white hover:border-white/30 transition shrink-0"
+                                >
+                                    Edit
+                                </button>
+                            )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-bold">Google Meet Link</p>
-                            <p className="text-slate-400 text-[11px] mt-0.5">
-                                {hasMeetLink ? "✓ Link is set — patient can join in-app" : "Paste the Meet link to enable video call"}
-                            </p>
-                        </div>
-                    </div>
 
-                    {/* Link display / input */}
-                    {hasMeetLink ? (
-                        <div className="px-4 pb-3">
-                            <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
-                                <LinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                <p className="text-xs text-slate-300 truncate flex-1">{meetLinks[apt.id]}</p>
+                        {/* Link display / input */}
+                        {hasMeetLink ? (
+                            <div className="px-4 pb-3">
+                                <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                                    <LinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <p className="text-xs text-slate-300 truncate flex-1">{meetLinks[apt.id]}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="px-4 pb-3 flex gap-2">
+                                <input
+                                    type="url"
+                                    value={meetInput}
+                                    onChange={e => setMeetInput(e.target.value)}
+                                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                                    className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all min-w-0"
+                                />
+                                <button
+                                    onClick={() => onSaveMeetLink(apt.id)}
+                                    disabled={savingMeet || !meetInput.trim()}
+                                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+                                        meetSaved
+                                            ? "bg-emerald-500 text-white"
+                                            : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40"
+                                    }`}
+                                >
+                                    {savingMeet ? (
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : meetSaved ? (
+                                        <Check className="w-4 h-4" />
+                                    ) : (
+                                        <Save className="w-4 h-4" />
+                                    )}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Warning note */}
+                        <div className="px-4 pb-4">
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-amber-300 leading-relaxed">
+                                    <span className="font-bold">Doctor:</span> Clicking "Join Video" will open Google Meet in your browser. The patient connects in-app via webview.
+                                </p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="px-4 pb-3 flex gap-2">
-                            <input
-                                type="url"
-                                value={meetInput}
-                                onChange={e => setMeetInput(e.target.value)}
-                                placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                                className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all min-w-0"
-                            />
-                            <button
-                                onClick={() => onSaveMeetLink(apt.id)}
-                                disabled={savingMeet || !meetInput.trim()}
-                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
-                                    meetSaved
-                                        ? "bg-emerald-500 text-white"
-                                        : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40"
-                                }`}
-                            >
-                                {savingMeet ? (
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : meetSaved ? (
-                                    <Check className="w-4 h-4" />
-                                ) : (
-                                    <Save className="w-4 h-4" />
-                                )}
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Warning note */}
-                    <div className="px-4 pb-4">
-                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 flex items-start gap-2">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                            <p className="text-[11px] text-amber-300 leading-relaxed">
-                                <span className="font-bold">Doctor:</span> Clicking "Join Video" will open Google Meet in your browser and show a confirmation. The patient connects in-app via webview.
-                            </p>
-                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* ── Action Buttons ── */}
                 <div className="space-y-2.5 pt-1">
@@ -634,14 +650,15 @@ export default function DoctorAppointments() {
                 priority: (a.priority || "medium").toLowerCase() as Appointment["priority"],
             })) : [];
 
-            // Seed meet links from backend data
+            // Seed meet links from backend data (backend field is 'meeting_link' on Appointment model)
             const linksFromServer: Record<number, string> = {};
             if (Array.isArray(data)) {
                 data.forEach((a: any) => {
-                    if (a.meet_link) linksFromServer[a.id] = a.meet_link;
+                    if (a.meeting_link) linksFromServer[a.id] = a.meeting_link;
                 });
             }
-            setMeetLinks(prev => ({ ...linksFromServer, ...prev }));
+            // Server data always wins — replace local state entirely on fresh fetch
+            setMeetLinks(linksFromServer);
 
             setAppts(list.sort((a, b) =>
                 new Date(a.fullDate || 0).getTime() - new Date(b.fullDate || 0).getTime()
@@ -900,6 +917,7 @@ export default function DoctorAppointments() {
                     savingMeet={savingMeet}
                     meetSaved={meetSaved}
                     onSaveMeetLink={handleSaveMeetLink}
+                    onClearMeetLink={(id) => setMeetLinks(prev => { const n = { ...prev }; delete n[id]; return n; })}
                     onStart={handleStart}
                     onAccept={handleAccept}
                     onClose={() => setSelected(null)}

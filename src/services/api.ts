@@ -135,8 +135,9 @@ export const appointments = {
         const response = await api.put(`appointments/${id}/`, data);
         return response.data;
     },
-    saveMeetLink: async (id: number, meet_link: string) => {
-        const response = await api.patch(`appointments/${id}/`, { meet_link });
+    saveMeetLink: async (id: number, meeting_link: string) => {
+        // Backend appointment model uses 'meeting_link' field via PUT /{id}/
+        const response = await api.put(`appointments/${id}/`, { meeting_link });
         return response.data;
     },
     getById: async (id: number) => {
