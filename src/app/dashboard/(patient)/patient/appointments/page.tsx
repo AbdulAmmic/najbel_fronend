@@ -183,14 +183,24 @@ export default function PatientAppointmentsPage() {
                       <p className="text-[11px] text-indigo-700 font-semibold flex-1 truncate">{apt.meet_link}</p>
                     </div>
                   )}
-                  <button
-                    onClick={() => router.push(`/dashboard/meeting/${apt.id}`)}
-                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md shadow-blue-200"
-                  >
-                    <Video className="w-3.5 h-3.5" />
-                    Join Video Call
-                    <span className="ml-auto text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded-md">In-App</span>
-                  </button>
+                  {apt.meet_link ? (
+                    <button
+                      onClick={() => {
+                        const url = apt.meet_link!.startsWith("http") ? apt.meet_link! : "https://" + apt.meet_link!;
+                        window.open(url, "_blank", "noopener,noreferrer");
+                      }}
+                      className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md shadow-blue-200"
+                    >
+                      <Video className="w-3.5 h-3.5" />
+                      Join Video Call
+                      <span className="ml-auto text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded-md">Opens Meet</span>
+                    </button>
+                  ) : (
+                    <div className="w-full py-2.5 bg-gray-100 text-gray-400 rounded-xl text-[12px] font-bold flex items-center justify-center gap-2">
+                      <Video className="w-3.5 h-3.5" />
+                      Waiting for doctor to set link...
+                    </div>
+                  )}
                 </div>
               )}
               {apt.status === 'in-consultation' && (
