@@ -103,6 +103,10 @@ export default function DoctorPatientDetailPage() {
     const [consultHistory, setConsultHistory] = useState<any[]>([]);
     const [expandedConsult, setExpandedConsult] = useState<number | null>(null);
     const [editingConsultId, setEditingConsultId] = useState<number | null>(null);
+    // Meeting link UI
+    const [meetConsultId, setMeetConsultId] = useState<number | null>(null);
+    const [meetLinkDraft, setMeetLinkDraft] = useState("");
+    const [meetSaving, setMeetSaving] = useState(false);
 
     useEffect(() => {
         if (labList.length > 0 && !expandedLab) {
@@ -1216,6 +1220,7 @@ export default function DoctorPatientDetailPage() {
                                         const isEdited = c.updated_at && c.created_at &&
                                             (new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()) > 60000;
                                         const isExpanded = expandedConsult === c.id;
+                                        const isMeetOpen = meetConsultId === c.id;
                                         return (
                                             <div key={c.id} className={`bg-white rounded-3xl border shadow-sm overflow-hidden transition-all ${isEdited ? 'border-amber-100' : 'border-gray-100'}`}>
                                                 <div className="px-6 py-5">
@@ -1247,7 +1252,30 @@ export default function DoctorPatientDetailPage() {
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                        <div className="flex items-center gap-1.5 shrink-0 ml-2 flex-wrap justify-end">
+                                                            {/* Meet link join button */}
+                                                            {c.meet_link && (
+                                                                <a
+                                                                    href={c.meet_link}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 px-3 py-1.5 rounded-xl transition-all shadow-md shadow-emerald-200 animate-pulse"
+                                                                >
+                                                                    <span>📹</span> Join Meeting
+                                                                </a>
+                                                            )}
+                                                            {/* Add/edit meet link button */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setMeetConsultId(isMeetOpen ? null : c.id);
+                                                                    setMeetLinkDraft(c.meet_link || "");
+                                                                }}
+                                                                className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
+                                                                    isMeetOpen ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 hover:bg-teal-100'
+                                                                }`}
+                                                            >
+                                                                <span>📹</span> {c.meet_link ? 'Update Link' : 'Meeting'}
+                                                            </button>
                                                             <button
                                                                 onClick={() => openConsultModal(c)}
                                                                 className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white hover:bg-indigo-600 px-3 py-1.5 bg-indigo-50 rounded-xl transition-all"
@@ -1262,7 +1290,12 @@ export default function DoctorPatientDetailPage() {
                                                                         showToast(newVis ? "Consultation unveiled to patient!" : "Hidden from patient");
                                                                         fetchData();
                                                                     } catch (e: any) {
-                                                                        showToast(e?.response?.data?.detail || "Failed to update", false);
+                                                                        const msg = e?.response?.data?.detail || e?.message || "";
+                                                                        if (e?.response?.status === 403) {
+                                                                            showToast("Backend doesn't allow this yet — ask your admin to add the unveil endpoint", false);
+                                                                        } else {
+                                                                            showToast(msg || "Failed to update visibility", false);
+                                                                        }
                                                                     }
                                                                 }}
                                                                 className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
@@ -1282,8 +1315,43 @@ export default function DoctorPatientDetailPage() {
                                                             </button>
                                                         </div>
                                                     </div>
+
+                                                    {/* Inline meeting link input */}
+                                                    {isMeetOpen && (
+                                                        <div className="mt-3 p-4 bg-teal-50 border border-teal-100 rounded-2xl space-y-3">
+                                                            <p className="text-[10px] font-black text-teal-700 uppercase tracking-widest">📹 Meeting Link for this Consultation</p>
+                                                            <div className="flex gap-2">
+                                                                <input
+                                                                    type="url"
+                                                                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                                                                    className="flex-1 border border-teal-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-teal-400 bg-white"
+                                                                    value={meetLinkDraft}
+                                                                    onChange={e => setMeetLinkDraft(e.target.value)}
+                                                                />
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        setMeetSaving(true);
+                                                                        try {
+                                                                            await consultations.setMeetLink(c.id, meetLinkDraft);
+                                                                            showToast("Meeting link saved!");
+                                                                            setMeetConsultId(null);
+                                                                            fetchData();
+                                                                        } catch (e: any) {
+                                                                            showToast(e?.response?.data?.detail || "Failed to save meeting link", false);
+                                                                        } finally { setMeetSaving(false); }
+                                                                    }}
+                                                                    disabled={meetSaving || !meetLinkDraft.trim()}
+                                                                    className="px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-all disabled:opacity-50"
+                                                                >
+                                                                    {meetSaving ? '...' : 'Save'}
+                                                                </button>
+                                                            </div>
+                                                            <p className="text-[10px] text-teal-600">Paste your Google Meet, Zoom, or Teams link. The patient can join from their portal when you unveil this consultation.</p>
+                                                        </div>
+                                                    )}
+
                                                     {c.diagnosis && (
-                                                        <div className="ml-13 flex items-start gap-2 pl-0">
+                                                        <div className="flex items-start gap-2">
                                                             <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest w-20 shrink-0 pt-0.5">Dx</span>
                                                             <span className="text-sm text-gray-800 font-semibold">{c.diagnosis}</span>
                                                         </div>
@@ -1307,6 +1375,17 @@ export default function DoctorPatientDetailPage() {
                                                             <div>
                                                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Clinical Notes</p>
                                                                 <p className="text-sm text-gray-600 leading-relaxed">{c.notes}</p>
+                                                            </div>
+                                                        )}
+                                                        {c.meet_link && (
+                                                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-teal-700 uppercase tracking-widest">Meeting Link</p>
+                                                                    <p className="text-xs text-teal-600 truncate max-w-[180px]">{c.meet_link}</p>
+                                                                </div>
+                                                                <a href={c.meet_link} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-xl hover:bg-teal-700 transition-all">
+                                                                    Join
+                                                                </a>
                                                             </div>
                                                         )}
                                                         {isEdited && (

@@ -268,12 +268,46 @@ export const consultations = {
         return response.data;
     },
     update: async (id: number, data: any) => {
-        const response = await api.patch(`consultations/${id}/`, data);
-        return response.data;
+        // Try the save-draft PUT (known working endpoint) first;
+        // then fall back to a direct PUT on the resource
+        try {
+            const res = await api.put(`consultations/${id}/save-draft`, data);
+            return res.data;
+        } catch {
+            const res = await api.put(`consultations/${id}/`, data);
+            return res.data;
+        }
     },
     toggleVisibility: async (id: number, visible: boolean) => {
-        const response = await api.patch(`consultations/${id}/`, { is_visible_to_patient: visible });
-        return response.data;
+        // Try a dedicated unveil endpoint, then fall back to save-draft with the flag
+        const payload = { is_visible_to_patient: visible };
+        try {
+            const res = await api.post(`consultations/${id}/unveil/`, payload);
+            return res.data;
+        } catch {
+            try {
+                const res = await api.put(`consultations/${id}/save-draft`, payload);
+                return res.data;
+            } catch {
+                try {
+                    const res = await api.put(`consultations/${id}/`, payload);
+                    return res.data;
+                } catch {
+                    // Last resort: PATCH
+                    const res = await api.patch(`consultations/${id}/`, payload);
+                    return res.data;
+                }
+            }
+        }
+    },
+    setMeetLink: async (id: number, meetLink: string) => {
+        try {
+            const res = await api.put(`consultations/${id}/save-draft`, { meet_link: meetLink });
+            return res.data;
+        } catch {
+            const res = await api.put(`consultations/${id}/`, { meet_link: meetLink });
+            return res.data;
+        }
     },
 }
 
