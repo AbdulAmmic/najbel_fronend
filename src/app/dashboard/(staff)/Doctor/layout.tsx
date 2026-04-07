@@ -10,11 +10,11 @@ export default function DoctorLayout({
 }) {
     return (
         <div className="min-h-screen bg-slate-50">
-            {/* Compact top header — notifications, avatar */}
+            {/* Floating rounded top header */}
             <DoctorHeader />
 
-            {/* Page content — bottom padding for floating nav */}
-            <main className="pt-0">
+            {/* Page content — pad top for floating header, bottom for floating nav */}
+            <main className="pt-[74px]">
                 {children}
             </main>
 

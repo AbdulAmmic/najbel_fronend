@@ -58,9 +58,9 @@ export default function DoctorHeader() {
 
     return (
         <>
-            {/* ── Premium Glassmorphism Header ─────────────── */}
-            <header className="sticky top-0 z-50 bg-white/85 backdrop-blur-2xl border-b border-slate-100/80">
-                <div className="px-4 h-[58px] flex items-center justify-between gap-3">
+            {/* ── Premium Floating Pill Header ─────────────── */}
+            <header className="fixed top-3 left-3 right-3 z-50 bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.10)] border border-gray-100/80">
+                <div className="px-4 h-[54px] flex items-center justify-between gap-3">
 
                     {/* Left: Brand + greeting */}
                     <div className="flex items-center gap-3 min-w-0">
@@ -115,9 +115,6 @@ export default function DoctorHeader() {
                         </button>
                     </div>
                 </div>
-
-                {/* Bottom gradient glow line */}
-                <div className="h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
             </header>
 
             {/* ── Profile Bottom Sheet ─────────────────────────── */}

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    LayoutDashboard, Calendar, Users,
-    MessageSquare, Stethoscope,
+    LayoutDashboard, Calendar, Users, MessageSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -12,7 +11,6 @@ const navItems = [
     { name: "Patients", href: "/dashboard/Doctor/patients",     icon: Users },
     { name: "Chat",     href: "/dashboard/Doctor/chat",         icon: MessageSquare },
     { name: "Appts",    href: "/dashboard/Doctor/appointments", icon: Calendar },
-    { name: "Consults", href: "/dashboard/consultations",       icon: Stethoscope },
 ];
 
 export default function DoctorBottomNav() {

@@ -275,7 +275,7 @@ export default function DoctorChat() {
         <div
             className="flex overflow-hidden bg-gray-50"
             style={{
-                height: "calc(100dvh - 58px)",        // subtract header
+                height: "calc(100dvh - 74px)",        // subtract floating pill header
                 paddingBottom: "env(safe-area-inset-bottom)"
             }}
         >
