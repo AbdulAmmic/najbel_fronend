@@ -81,83 +81,128 @@ const MeetingWarningDialog = ({
     meetLink: string;
     onConfirm: () => void;
     onCancel: () => void;
-}) => (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Warning stripe */}
-            <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
+}) => {
+    const hasLink = !!meetLink?.trim();
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
 
-            <div className="p-6">
-                {/* Icon */}
-                <div className="flex items-center justify-center mb-4">
-                    <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
-                        <AlertTriangle className="w-8 h-8 text-amber-500" />
-                    </div>
-                </div>
+                {/* Top stripe */}
+                <div className={`h-1.5 bg-gradient-to-r ${hasLink
+                    ? "from-amber-400 via-orange-500 to-amber-400"
+                    : "from-red-400 via-rose-500 to-red-400"
+                }`} />
 
-                {/* Title */}
-                <h2 className="text-xl font-black text-gray-900 text-center mb-1">
-                    Starting Video Consultation
-                </h2>
-                <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
-                    You are about to join a Google Meet session with{" "}
-                    <span className="font-bold text-gray-800">{apt.patient.name}</span>.
-                    This will open in your browser.
-                </p>
-
-                {/* Info cards */}
-                <div className="space-y-2.5 mb-6">
-                    <div className="flex items-center gap-3 bg-blue-50 rounded-2xl px-4 py-3">
-                        <Users className="w-4 h-4 text-blue-500 shrink-0" />
-                        <div>
-                            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Patient</p>
-                            <p className="text-sm font-bold text-blue-900">{apt.patient.name}</p>
+                <div className="p-6">
+                    {/* Icon */}
+                    <div className="flex items-center justify-center mb-4">
+                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+                            hasLink ? "bg-amber-50 border border-amber-100" : "bg-red-50 border border-red-100"
+                        }`}>
+                            {hasLink
+                                ? <AlertTriangle className="w-8 h-8 text-amber-500" />
+                                : <Video className="w-8 h-8 text-red-400" />
+                            }
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 bg-purple-50 rounded-2xl px-4 py-3">
-                        <Video className="w-4 h-4 text-purple-500 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                            <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Meet Link</p>
-                            <p className="text-xs font-semibold text-purple-800 truncate">{meetLink}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 bg-emerald-50 rounded-2xl px-4 py-3">
-                        <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <p className="text-xs text-emerald-700 font-medium">
-                            Patient will join from inside the app via an embedded webview.
-                        </p>
-                    </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex gap-2.5">
-                    <button
-                        onClick={onCancel}
-                        className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-transform"
-                    >
-                        Cancel
-                    </button>
-                    <a
-                        href={meetLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={onConfirm}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-lg shadow-blue-200"
-                    >
-                        <ExternalLink className="w-4 h-4" />
-                        Open Meet
-                    </a>
+                    {hasLink ? (
+                        <>
+                            <h2 className="text-xl font-black text-gray-900 text-center mb-1">
+                                Starting Video Consultation
+                            </h2>
+                            <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+                                You are about to join a Google Meet session with{" "}
+                                <span className="font-bold text-gray-800">{apt.patient.name}</span>.
+                                This will open in your browser.
+                            </p>
+
+                            <div className="space-y-2.5 mb-6">
+                                <div className="flex items-center gap-3 bg-blue-50 rounded-2xl px-4 py-3">
+                                    <Users className="w-4 h-4 text-blue-500 shrink-0" />
+                                    <div>
+                                        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Patient</p>
+                                        <p className="text-sm font-bold text-blue-900">{apt.patient.name}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 bg-purple-50 rounded-2xl px-4 py-3">
+                                    <Video className="w-4 h-4 text-purple-500 shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Meet Link</p>
+                                        <p className="text-xs font-semibold text-purple-800 truncate">{meetLink}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 bg-emerald-50 rounded-2xl px-4 py-3">
+                                    <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+                                    <p className="text-xs text-emerald-700 font-medium">
+                                        Patient will join from inside the app via an embedded webview.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2.5">
+                                <button
+                                    onClick={onCancel}
+                                    className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-transform"
+                                >
+                                    Cancel
+                                </button>
+                                <a
+                                    href={meetLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={onConfirm}
+                                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-lg shadow-blue-200"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    Open Meet
+                                </a>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-xl font-black text-gray-900 text-center mb-1">
+                                No Meet Link Set
+                            </h2>
+                            <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+                                You need to add a Google Meet link for{" "}
+                                <span className="font-bold text-gray-800">{apt.patient.name}</span>{" "}
+                                before starting this video call.
+                            </p>
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 mb-6 flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    Tap <span className="font-bold">View Details</span> to open the appointment panel where you can paste and save your Google Meet link.
+                                </p>
+                            </div>
+                            <div className="flex gap-2.5">
+                                <button
+                                    onClick={onCancel}
+                                    className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-transform"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={onCancel}
+                                    className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-md shadow-blue-200"
+                                >
+                                    View Details
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
+
 
 // ─── Appointment Card ────────────────────────────────────────
 
 const ApptCard = ({
-    apt, onAccept, onDecline, onReschedule, onStart, onSelect
+    apt, onAccept, onDecline, onReschedule, onStart, onSelect, hasMeetLink
 }: {
     apt: Appointment;
     onAccept: (id: number) => void;
@@ -165,6 +210,7 @@ const ApptCard = ({
     onReschedule: (id: number) => void;
     onStart: (apt: Appointment) => void;
     onSelect: (apt: Appointment) => void;
+    hasMeetLink: boolean;
 }) => {
     const grad = avatarGrad(apt.patient.name);
     const isToday = apt.date === "Today";
@@ -228,6 +274,21 @@ const ApptCard = ({
                         }
                     </div>
                 </div>
+
+                {/* Meet link status banner — virtual only */}
+                {apt.type === "virtual" && (
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl mb-3 ${
+                        hasMeetLink
+                            ? "bg-emerald-50 border border-emerald-100"
+                            : "bg-amber-50 border border-amber-100"
+                    }`}>
+                        <Video className={`w-3.5 h-3.5 shrink-0 ${hasMeetLink ? "text-emerald-500" : "text-amber-500"}`} />
+                        <span className={`text-[11px] font-bold flex-1 ${hasMeetLink ? "text-emerald-700" : "text-amber-700"}`}>
+                            {hasMeetLink ? "✓ Meet link ready" : "⚠ No meet link — tap details to add"}
+                        </span>
+                        {hasMeetLink && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                    </div>
+                )}
 
                 {/* Actions */}
                 {apt.status === "pending" && (
@@ -622,7 +683,9 @@ export default function DoctorAppointments() {
 
     const handleStart = (apt: Appointment) => {
         if (apt.type === "virtual") {
-            // Doctor: show warning, then open Google Meet externally
+            // Ensure selected is set so warning dialog can render
+            setSelected(apt);
+            setMeetInput(meetLinks[apt.id] || "");
             setShowMeetWarning(true);
         } else {
             router.push(`/dashboard/Doctor/consultations/${apt.id}`);
@@ -754,6 +817,7 @@ export default function DoctorAppointments() {
                         <ApptCard
                             key={apt.id}
                             apt={apt}
+                            hasMeetLink={!!meetLinks[apt.id]}
                             onAccept={handleAccept}
                             onDecline={id => { setCancelId(id); setActionNote(""); }}
                             onReschedule={id => { setRescheduleId(id); setActionNote(""); setNewTime(""); }}
@@ -844,15 +908,19 @@ export default function DoctorAppointments() {
             )}
 
             {/* ── Doctor Meeting Warning Dialog ── */}
-            {showMeetWarning && selected && meetLinks[selected.id] && (
+            {showMeetWarning && selected && (
                 <MeetingWarningDialog
                     apt={selected}
-                    meetLink={meetLinks[selected.id]}
+                    meetLink={meetLinks[selected.id] || ""}
                     onConfirm={() => {
                         setShowMeetWarning(false);
                         setSelected(null);
                     }}
-                    onCancel={() => setShowMeetWarning(false)}
+                    onCancel={() => {
+                        setShowMeetWarning(false);
+                        // If no link, keep detail sheet open so doc can add it
+                        if (!meetLinks[selected?.id ?? 0]) setSelected(selected);
+                    }}
                 />
             )}
         </div>
