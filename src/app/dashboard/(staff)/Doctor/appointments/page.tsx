@@ -609,16 +609,22 @@ export default function DoctorAppointments() {
 
     const handleSaveMeetLink = async (aptId: number) => {
         if (!meetInput.trim()) return;
+        // Normalize: ensure URL starts with https:// so it's not treated as a relative path
+        let normalizedLink = meetInput.trim();
+        if (!normalizedLink.startsWith("http://") && !normalizedLink.startsWith("https://")) {
+            normalizedLink = "https://" + normalizedLink;
+        }
         setSavingMeet(true);
         try {
-            await appointmentsApi.saveMeetLink(aptId, meetInput.trim());
-            setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
+            await appointmentsApi.saveMeetLink(aptId, normalizedLink);
+            setMeetLinks(prev => ({ ...prev, [aptId]: normalizedLink }));
+            setMeetInput(normalizedLink); // show the corrected URL to the doctor
             setMeetSaved(true);
             setTimeout(() => setMeetSaved(false), 2500);
         } catch (e) {
             console.error("Failed to save meet link to backend:", e);
             // Still update local state so doctor can use it in this session
-            setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
+            setMeetLinks(prev => ({ ...prev, [aptId]: normalizedLink }));
             setMeetSaved(true);
             setTimeout(() => setMeetSaved(false), 2500);
         } finally {
@@ -651,10 +657,12 @@ export default function DoctorAppointments() {
             })) : [];
 
             // Seed meet links from backend data (backend field is 'meeting_link' on Appointment model)
+            const normalizeUrl = (url: string) =>
+                url && !url.startsWith("http") ? "https://" + url : url;
             const linksFromServer: Record<number, string> = {};
             if (Array.isArray(data)) {
                 data.forEach((a: any) => {
-                    if (a.meeting_link) linksFromServer[a.id] = a.meeting_link;
+                    if (a.meeting_link) linksFromServer[a.id] = normalizeUrl(a.meeting_link);
                 });
             }
             // Server data always wins — replace local state entirely on fresh fetch

@@ -114,15 +114,21 @@ export default function ConsultationPage({ params }: { params: Promise<{ id: str
 
     const handleSaveMeetLink = async () => {
         if (!meetInput.trim()) return;
+        // Normalize: ensure URL starts with https:// so it's not treated as a relative path
+        let normalizedLink = meetInput.trim();
+        if (!normalizedLink.startsWith("http://") && !normalizedLink.startsWith("https://")) {
+            normalizedLink = "https://" + normalizedLink;
+        }
         setSavingMeet(true);
         try {
-            await api.put(`consultations/${consultationId || id}/meet-link`, { meet_link: meetInput.trim() });
-            setMeetLink(meetInput.trim());
+            await api.put(`consultations/${consultationId || id}/meet-link`, { meet_link: normalizedLink });
+            setMeetLink(normalizedLink);
+            setMeetInput(normalizedLink);
             setMeetSaved(true);
             setTimeout(() => setMeetSaved(false), 2500);
         } catch {
             // store locally even if API fails
-            setMeetLink(meetInput.trim());
+            setMeetLink(normalizedLink);
         } finally {
             setSavingMeet(false);
         }
