@@ -108,6 +108,9 @@ export default function DoctorPatientDetailPage() {
     const [meetConsultId, setMeetConsultId] = useState<number | null>(null);
     const [meetLinkDraft, setMeetLinkDraft] = useState("");
     const [meetSaving, setMeetSaving] = useState(false);
+    // Referral confirmation
+    const [referralSent, setReferralSent] = useState(false);
+    const [referralDoctorName, setReferralDoctorName] = useState("");
 
     useEffect(() => {
         if (labList.length > 0 && !expandedLab) {
@@ -548,9 +551,9 @@ export default function DoctorPatientDetailPage() {
             } else if (activeModal === "refer") {
                 if (!form.referred_doctor_id || !form.reason) return showToast("Fill all required fields.", false);
                 
-                // Aligning with backend Referral model fields: from_doctor_id, to_doctor_id
-                // Note: Urgency 'stat' and 'urgent' both map to backend Enums
                 const urgency = form.urgency === "stat" ? "emergency" : (form.urgency || "routine");
+                const toDoc = otherDocs.find((d: any) => String(d.id) === String(form.referred_doctor_id));
+                const toDocName = toDoc?.name || toDoc?.full_name || "the selected doctor";
                 
                 await referrals.create({ 
                     patient_id: patient.id, 
@@ -560,7 +563,11 @@ export default function DoctorPatientDetailPage() {
                     urgency: urgency, 
                     notes: form.notes || "" 
                 });
-                showToast("Referral sent!");
+                // Show confirmation instead of closing
+                setReferralDoctorName(toDocName);
+                setReferralSent(true);
+                fetchData();
+                return; // don't close modal yet — let user see confirmation
             } else if (activeModal === "directive") {
                 if (!form.instruction) return showToast("Instruction is required.", false);
                 await directiveService.create({
@@ -578,6 +585,13 @@ export default function DoctorPatientDetailPage() {
             console.error(e);
             showToast(e?.response?.data?.detail || "Failed to process request", false);
         } finally { setSaving(false); }
+    };
+
+    const closeReferralConfirmation = () => {
+        setReferralSent(false);
+        setReferralDoctorName("");
+        setModal(null);
+        setForm({});
     };
     const handleAcceptReferral = async (refId: number) => {
         try {
@@ -1007,7 +1021,13 @@ export default function DoctorPatientDetailPage() {
                             )}
 
                             {activeTab === "labs" && (
-                                <div className="space-y-4">
+                                <div className="space-y-3">
+                                    {/* History header */}
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-1 h-4 bg-amber-500 rounded-full" />
+                                        <h3 className="text-sm font-bold text-gray-800">Lab Test History</h3>
+                                        <span className="text-[10px] text-gray-400 font-medium ml-1">{labList.length} record{labList.length !== 1 ? 's' : ''}</span>
+                                    </div>
                                     {labList.length === 0 ? (
                                         <div className="flex flex-col items-center py-16 gap-3 text-gray-300 bg-white rounded-3xl border border-gray-100">
                                             <FlaskConical className="w-10 h-10" />
@@ -1015,33 +1035,38 @@ export default function DoctorPatientDetailPage() {
                                         </div>
                                     ) : labList.map((l: any) => (
                                         <div key={l.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                                            <div className="px-5 py-4 flex items-center justify-between">
+                                            <div className="px-4 py-3 flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                                                        <FlaskConical className="w-5 h-5 text-amber-600" />
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                                        ['validated', 'completed'].includes(l.status) ? 'bg-emerald-50' :
+                                                        l.status === 'cancelled' ? 'bg-red-50' : 'bg-amber-50'
+                                                    }`}>
+                                                        <FlaskConical className={`w-4.5 h-4.5 ${
+                                                            ['validated', 'completed'].includes(l.status) ? 'text-emerald-600' :
+                                                            l.status === 'cancelled' ? 'text-red-400' : 'text-amber-600'
+                                                        }`} />
                                                     </div>
-                                                    <div>
-                                                        <p className="font-semibold text-gray-900">
-                                                            <span className="text-blue-600 mr-2">#{l.short_id}</span>
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-gray-900 text-sm truncate">
                                                             {l.test_name}
                                                         </p>
-                                                        <p className="text-xs text-gray-500 capitalize">{l.urgency} · {l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}</p>
+                                                        <p className="text-[11px] text-gray-400 capitalize">
+                                                            {l.urgency} · {l.created_at ? new Date(l.created_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
+                                                        </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${
-                                                        ['validated', 'completed'].includes(l.status) ? "bg-emerald-100 text-emerald-700" :
-                                                        l.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full capitalize ${
+                                                        ['validated', 'completed'].includes(l.status) ? 'bg-emerald-100 text-emerald-700' :
+                                                        l.status === 'cancelled' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700'
                                                     }`}>
                                                         {l.status}
                                                     </span>
-                                                    {(l.result || l.result_data) && (
-                                                        <button onClick={() => setExpandedLab(expandedLab === l.id ? null : l.id)} className="p-2 text-gray-400 hover:text-gray-600">
-                                                            {expandedLab === l.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                                        </button>
-                                                    )}
+                                                    <button onClick={() => setExpandedLab(expandedLab === l.id ? null : l.id)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                                                        {expandedLab === l.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                                    </button>
                                                     {l.status === "requested" && (
-                                                        <button onClick={() => handleCancelLab(l.id)} className="text-xs font-medium text-red-500 hover:text-red-700">
+                                                        <button onClick={() => handleCancelLab(l.id)} className="text-[10px] font-bold text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded-lg transition-colors">
                                                             Cancel
                                                         </button>
                                                     )}
@@ -1050,7 +1075,7 @@ export default function DoctorPatientDetailPage() {
 
                                             <AnimatePresence>
                                                 {expandedLab === l.id && (l.result || l.result_data) && (
-                                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-gray-50">
+                                                    <motion.div key={`lab-result-${l.id}`} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-gray-50">
                                                         <div className="p-5 bg-gray-50/30">
                                                             <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                                                                 <div className="bg-gray-50 px-5 py-3 flex justify-between items-center border-b border-gray-100">
@@ -1135,7 +1160,23 @@ export default function DoctorPatientDetailPage() {
                                                         </div>
                                                     </motion.div>
                                                 )}
+                                                {expandedLab === l.id && !l.result && !l.result_data && (
+                                                    <motion.div key={`lab-pending-${l.id}`} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-gray-50">
+                                                        <div className="px-4 py-4 bg-amber-50/30 text-center">
+                                                            <FlaskConical className="w-6 h-6 text-amber-300 mx-auto mb-2" />
+                                                            <p className="text-xs font-semibold text-amber-600">Results pending</p>
+                                                            <p className="text-[10px] text-gray-400 mt-0.5">Lab has not yet submitted results for this test.</p>
+                                                            {l.notes && (
+                                                                <div className="mt-3 bg-white rounded-xl px-3 py-2 border border-amber-100 text-left">
+                                                                    <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wide mb-1">Clinical Indication</p>
+                                                                    <p className="text-xs text-gray-700">{l.notes}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
                                             </AnimatePresence>
+
                                         </div>
                                     ))}
                                 </div>
@@ -1891,25 +1932,64 @@ export default function DoctorPatientDetailPage() {
 
                                 {activeModal === "refer" && (
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Refer To *</label>
-                                            <select className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.referred_doctor_id || ""} onChange={e => sf("referred_doctor_id", e.target.value)}>
-                                                <option value="">Select Doctor</option>
-                                                {otherDocs.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Urgency</label>
-                                            <select className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.urgency || "routine"} onChange={e => sf("urgency", e.target.value)}>
-                                                <option value="routine">Routine</option>
-                                                <option value="urgent">Urgent</option>
-                                                <option value="emergency">Emergency</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-medium text-gray-500 mb-1 block">Reason *</label>
-                                            <textarea rows={2} placeholder="Clinical grounds..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.reason || ""} onChange={e => sf("reason", e.target.value)} />
-                                        </div>
+                                        {referralSent ? (
+                                            /* ── Referral Success Screen ── */
+                                            <div className="py-6 flex flex-col items-center gap-5 text-center">
+                                                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-xl shadow-emerald-200">
+                                                    <CheckCircle2 className="w-10 h-10 text-white" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-gray-900 mb-1">Referral Sent!</h3>
+                                                    <p className="text-sm text-gray-500 leading-relaxed">
+                                                        <span className="font-bold text-gray-800">{getName(patient)}</span> has been referred to
+                                                    </p>
+                                                    <div className="mt-3 inline-flex items-center gap-2 bg-indigo-50 border border-indigo-100 px-4 py-2.5 rounded-2xl">
+                                                        <div className="w-7 h-7 rounded-xl bg-indigo-100 flex items-center justify-center">
+                                                            <User2 className="w-4 h-4 text-indigo-600" />
+                                                        </div>
+                                                        <p className="text-sm font-black text-indigo-800">{referralDoctorName}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full bg-slate-50 rounded-2xl px-5 py-4 text-left">
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Referral Note</p>
+                                                    <p className="text-sm font-semibold text-slate-700 italic">"{form.reason}"</p>
+                                                    <div className="flex items-center gap-2 mt-3">
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                                                            (form.urgency || 'routine') === 'emergency' ? 'bg-red-100 text-red-600' :
+                                                            (form.urgency || 'routine') === 'urgent' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'
+                                                        } capitalize`}>{form.urgency || 'Routine'}</span>
+                                                        <span className="text-[10px] text-gray-400">· {new Date().toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* ── Referral Form ── */
+                                            <>
+                                                <div>
+                                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Refer To *</label>
+                                                    <select className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.referred_doctor_id || ""} onChange={e => sf("referred_doctor_id", e.target.value)}>
+                                                        <option value="">Select Doctor</option>
+                                                        {otherDocs.map(d => <option key={d.id} value={d.id}>{d.name || d.full_name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Urgency</label>
+                                                    <select className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.urgency || "routine"} onChange={e => sf("urgency", e.target.value)}>
+                                                        <option value="routine">Routine</option>
+                                                        <option value="urgent">Urgent</option>
+                                                        <option value="emergency">Emergency</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Reason *</label>
+                                                    <textarea rows={2} placeholder="Clinical grounds..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.reason || ""} onChange={e => sf("reason", e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Additional Notes</label>
+                                                    <textarea rows={2} placeholder="Any extra clinical context..." className="w-full border border-gray-200 rounded-xl p-3 text-sm outline-none focus:border-indigo-300" value={form.notes || ""} onChange={e => sf("notes", e.target.value)} />
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 )}
 
@@ -1982,7 +2062,7 @@ export default function DoctorPatientDetailPage() {
                                             <button
                                                 className="flex-1 bg-emerald-600 text-white h-12 rounded-2xl font-bold text-sm shadow-lg hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                                                 onClick={soapFinish}
-                                                disabled={soapSaving || !assesDiagnosis.trim()}
+                                                disabled={soapSaving}
                                             >
                                                 {soapSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : null}
                                                 <Check className="w-4 h-4" /> Save Consultation
@@ -1990,6 +2070,13 @@ export default function DoctorPatientDetailPage() {
                                         )}
                                         <button className="px-5 bg-white text-slate-500 h-12 rounded-2xl font-bold text-sm border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => setModal(null)}>Cancel</button>
                                     </>
+                                ) : activeModal === "refer" && referralSent ? (
+                                    <button
+                                        className="flex-1 bg-emerald-600 text-white h-14 rounded-3xl font-black uppercase tracking-widest text-[11px] shadow-xl hover:bg-emerald-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                        onClick={closeReferralConfirmation}
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" /> Done — Close
+                                    </button>
                                 ) : (
                                     <>
                                         <button
@@ -1999,7 +2086,7 @@ export default function DoctorPatientDetailPage() {
                                         >
                                             {saving ? "Processing..." : activeModal === "discharge" ? "Complete Discharge" : "Submit Request"}
                                         </button>
-                                        <button className="px-8 bg-white text-slate-500 h-14 rounded-3xl font-black uppercase tracking-widest text-[11px] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => setModal(null)}>Dismiss</button>
+                                        <button className="px-8 bg-white text-slate-500 h-14 rounded-3xl font-black uppercase tracking-widest text-[11px] border border-slate-200 hover:bg-slate-100 transition-all active:scale-95" onClick={() => { setModal(null); setReferralSent(false); }}>Dismiss</button>
                                     </>
                                 )}
                             </div>
