@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import ChatBox from "@/components/chat/ChatBox";
 import {
-    patientService, prescriptions, consultations, referrals,
+    patientService, prescriptions, consultations, referrals, appointments,
     beds, users, auth, labs, labCatalog, pharmacy, nurseService, directiveService,
     medicalRecords, getDoctors
 } from "@/services/api";
