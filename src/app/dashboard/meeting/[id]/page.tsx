@@ -37,12 +37,75 @@ export default function InAppMeetingRoom() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [userRes, consultRes] = await Promise.all([
+        const [userRes] = await Promise.all([
           api.get("/users/me"),
-          fetch(`${API_BASE}/consultations/${consultationId}`, { headers: authH() }),
         ]);
-        setCurrentUser(userRes.data);
-        if (consultRes.ok) setConsultation(await consultRes.json());
+        const user = userRes.data;
+        setCurrentUser(user);
+
+        // The `id` param could be either an appointment ID or consultation ID.
+        // Strategy: try the consultation endpoint first (works if it's a real consultation ID).
+        // If that fails (404), call the start-session endpoint using it as an appointment ID —
+        // this returns the existing or newly-created consultation with the correct meet_link.
+        let consultationData: any = null;
+
+        // Try direct consultation lookup
+        const directRes = await fetch(`${API_BASE}/consultations/${consultationId}`, { headers: authH() });
+        if (directRes.ok) {
+          const raw = await directRes.json();
+          // The consultation endpoint returns { consultation: {...}, ... }
+          consultationData = raw.consultation || raw;
+        } else {
+          // Fall back: treat id as appointment_id — start/get the consultation session
+          const role = user?.role;
+          if (role === "doctor") {
+            // Doctor: POST /consultations/start/{appointment_id}
+            const startRes = await fetch(`${API_BASE}/consultations/start/${consultationId}`, {
+              method: "POST",
+              headers: authH(),
+            });
+            if (startRes.ok) {
+              const startData = await startRes.json();
+              // startData = { consultation_id, meet_link, ... }
+              // Fetch the full consultation record to get patient info
+              const fullRes = await fetch(`${API_BASE}/consultations/${startData.consultation_id}`, { headers: authH() });
+              if (fullRes.ok) {
+                const full = await fullRes.json();
+                consultationData = full.consultation || full;
+              } else {
+                // Minimal fallback using start response
+                consultationData = { id: startData.consultation_id, meet_link: startData.meet_link };
+              }
+            }
+          } else {
+            // Patient: GET /consultations/active-chat
+            const chatRes = await fetch(`${API_BASE}/consultations/active-chat`, { headers: authH() });
+            if (chatRes.ok) {
+              const chatData = await chatRes.json();
+              if (chatData.active_chat_id) {
+                const fullRes = await fetch(`${API_BASE}/consultations/${chatData.active_chat_id}`, { headers: authH() });
+                if (fullRes.ok) {
+                  const full = await fullRes.json();
+                  consultationData = full.consultation || full;
+                } else {
+                  consultationData = { id: chatData.active_chat_id, meet_link: chatData.meet_link };
+                }
+              }
+            }
+          }
+
+          // Last resort: try to get meet_link from the appointment record itself
+          if (!consultationData?.meet_link) {
+            const apptRes = await fetch(`${API_BASE}/appointments/${consultationId}`, { headers: authH() });
+            if (apptRes.ok) {
+              const appt = await apptRes.json();
+              if (!consultationData) consultationData = {};
+              consultationData.meet_link = consultationData.meet_link || appt.meeting_link;
+            }
+          }
+        }
+
+        setConsultation(consultationData);
       } catch (e) {
         console.error("Failed to load meeting room", e);
       } finally {
@@ -59,7 +122,9 @@ export default function InAppMeetingRoom() {
     return () => clearTimeout(timer);
   }, [consultation?.meet_link]);
 
-  const meetLink = consultation?.meet_link;
+  // meet_link lives on Consultation model; meeting_link on Appointment model
+  const meetLink = consultation?.meet_link || consultation?.meeting_link;
+  const resolvedConsultationId = consultation?.id || consultationId;
   const isDoctor = currentUser?.role === "doctor";
   const displayName = isDoctor
     ? `Dr. ${currentUser?.full_name}`
@@ -249,7 +314,7 @@ export default function InAppMeetingRoom() {
             </div>
             <div className="flex-1 overflow-hidden">
               <LiveChat
-                consultationId={consultationId}
+                consultationId={resolvedConsultationId}
                 userName={displayName}
                 userRole={isDoctor ? "doctor" : "patient"}
               />
