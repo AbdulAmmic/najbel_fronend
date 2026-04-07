@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import {
     Calendar, Clock, Video, MapPin, Search,
     CheckCircle, XCircle, ChevronRight, RefreshCcw,
-    Play, X, AlertCircle, Stethoscope, Save, Check
+    Play, X, AlertCircle, Stethoscope, Save, Check,
+    Users, Phone, MessageSquare, ExternalLink, AlertTriangle,
+    Activity, Shield, Link as LinkIcon
 } from "lucide-react";
 import { appointments as appointmentsApi } from "@/services/api";
 import api from "@/services/api";
@@ -58,8 +60,99 @@ const PRIORITY_DOT: Record<string, string> = {
     low:    "bg-emerald-500",
 };
 
+const PRIORITY_BADGE: Record<string, string> = {
+    high:   "bg-red-50 text-red-600 border-red-100",
+    medium: "bg-amber-50 text-amber-600 border-amber-100",
+    low:    "bg-emerald-50 text-emerald-600 border-emerald-100",
+};
+
 const FILTERS = ["All", "Pending", "Confirmed", "Completed", "Cancelled"] as const;
 type FilterType = typeof FILTERS[number];
+
+// ─── Doctor Meeting Warning Dialog ───────────────────────────
+
+const MeetingWarningDialog = ({
+    apt,
+    meetLink,
+    onConfirm,
+    onCancel,
+}: {
+    apt: Appointment;
+    meetLink: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) => (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Warning stripe */}
+            <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400" />
+
+            <div className="p-6">
+                {/* Icon */}
+                <div className="flex items-center justify-center mb-4">
+                    <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                        <AlertTriangle className="w-8 h-8 text-amber-500" />
+                    </div>
+                </div>
+
+                {/* Title */}
+                <h2 className="text-xl font-black text-gray-900 text-center mb-1">
+                    Starting Video Consultation
+                </h2>
+                <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+                    You are about to join a Google Meet session with{" "}
+                    <span className="font-bold text-gray-800">{apt.patient.name}</span>.
+                    This will open in your browser.
+                </p>
+
+                {/* Info cards */}
+                <div className="space-y-2.5 mb-6">
+                    <div className="flex items-center gap-3 bg-blue-50 rounded-2xl px-4 py-3">
+                        <Users className="w-4 h-4 text-blue-500 shrink-0" />
+                        <div>
+                            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Patient</p>
+                            <p className="text-sm font-bold text-blue-900">{apt.patient.name}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-purple-50 rounded-2xl px-4 py-3">
+                        <Video className="w-4 h-4 text-purple-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Meet Link</p>
+                            <p className="text-xs font-semibold text-purple-800 truncate">{meetLink}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-emerald-50 rounded-2xl px-4 py-3">
+                        <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+                        <p className="text-xs text-emerald-700 font-medium">
+                            Patient will join from inside the app via an embedded webview.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2.5">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-transform"
+                    >
+                        Cancel
+                    </button>
+                    <a
+                        href={meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={onConfirm}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-lg shadow-blue-200"
+                    >
+                        <ExternalLink className="w-4 h-4" />
+                        Open Meet
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+);
 
 // ─── Appointment Card ────────────────────────────────────────
 
@@ -191,16 +284,16 @@ const ApptCard = ({
     );
 };
 
-// ─── Bottom Sheet ────────────────────────────────────────────
+// ─── Modal/Sheet ────────────────────────────────────────────
 
 const BottomSheet = ({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) => (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-t-[32px] max-h-[85vh] overflow-y-auto">
+        <div className="relative bg-white rounded-t-[32px] max-h-[88vh] overflow-y-auto">
             <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 bg-gray-300 rounded-full" />
             </div>
-            <div className="px-5 pt-2 pb-3 flex items-center justify-between">
+            <div className="px-5 pt-2 pb-3 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-sm z-10">
                 <h2 className="text-lg font-black text-gray-900">{title}</h2>
                 <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
                     <X className="w-4 h-4 text-gray-500" />
@@ -211,20 +304,221 @@ const BottomSheet = ({ title, children, onClose }: { title: string; children: Re
     </div>
 );
 
+// ─── Appointment Detail Sheet ────────────────────────────────
+
+const AppointmentDetailSheet = ({
+    apt,
+    meetLinks,
+    meetInput,
+    setMeetInput,
+    savingMeet,
+    meetSaved,
+    onSaveMeetLink,
+    onStart,
+    onAccept,
+    onClose,
+    onShowMeetWarning,
+}: {
+    apt: Appointment;
+    meetLinks: Record<number, string>;
+    meetInput: string;
+    setMeetInput: (v: string) => void;
+    savingMeet: boolean;
+    meetSaved: boolean;
+    onSaveMeetLink: (id: number) => void;
+    onStart: (apt: Appointment) => void;
+    onAccept: (id: number) => void;
+    onClose: () => void;
+    onShowMeetWarning: () => void;
+}) => {
+    const grad = avatarGrad(apt.patient.name);
+    const hasMeetLink = !!meetLinks[apt.id];
+    const isVirtual = apt.type === "virtual";
+
+    return (
+        <BottomSheet title="Appointment Details" onClose={onClose}>
+            <div className="space-y-4">
+
+                {/* ── Patient Hero Card ── */}
+                <div className={`rounded-3xl p-5 bg-gradient-to-br ${grad} text-white relative overflow-hidden`}>
+                    {/* Decorative circles */}
+                    <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
+                    <div className="absolute -bottom-8 -left-4 w-20 h-20 bg-white/10 rounded-full" />
+
+                    <div className="relative flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-white/20 border-2 border-white/30 flex items-center justify-center font-black text-2xl shadow-lg">
+                            {initials(apt.patient.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-black text-lg leading-tight">{apt.patient.name}</p>
+                            {apt.patient.age ? (
+                                <p className="text-white/80 text-xs mt-0.5 font-medium">
+                                    {apt.patient.age}y · {apt.patient.gender}
+                                </p>
+                            ) : null}
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/20 border border-white/20 capitalize">
+                                    {apt.status}
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 border border-white/20`}>
+                                    {apt.priority} priority
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Info Grid ── */}
+                <div className="grid grid-cols-2 gap-2.5">
+                    {[
+                        { label: "Date", value: apt.date, icon: Calendar, color: "text-blue-500", bg: "bg-blue-50" },
+                        { label: "Time", value: apt.time, icon: Clock, color: "text-violet-500", bg: "bg-violet-50" },
+                        {
+                            label: "Type",
+                            value: apt.type === "virtual" ? "Video Call" : "In-Person",
+                            icon: apt.type === "virtual" ? Video : MapPin,
+                            color: apt.type === "virtual" ? "text-purple-500" : "text-blue-500",
+                            bg: apt.type === "virtual" ? "bg-purple-50" : "bg-blue-50",
+                        },
+                        { label: "Duration", value: apt.duration, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-50" },
+                    ].map(({ label, value, icon: Icon, color, bg }) => (
+                        <div key={label} className={`${bg} rounded-2xl p-3.5`}>
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                                <Icon className={`w-3.5 h-3.5 ${color}`} />
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</p>
+                            </div>
+                            <p className="text-sm font-bold text-gray-900 capitalize">{value}</p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* ── Reason ── */}
+                <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100/60">
+                    <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-blue-400" />
+                        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide">Reason for Visit</p>
+                    </div>
+                    <p className="text-sm font-semibold text-blue-900 leading-relaxed">{apt.reason}</p>
+                </div>
+
+                {/* ── Google Meet Panel ── */}
+                <div className="bg-slate-900 rounded-2xl overflow-hidden">
+                    {/* Header */}
+                    <div className="px-4 pt-4 pb-3 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
+                            <Video className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-bold">Google Meet Link</p>
+                            <p className="text-slate-400 text-[11px] mt-0.5">
+                                {hasMeetLink ? "✓ Link is set — patient can join in-app" : "Paste the Meet link to enable video call"}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Link display / input */}
+                    {hasMeetLink ? (
+                        <div className="px-4 pb-3">
+                            <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                                <LinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <p className="text-xs text-slate-300 truncate flex-1">{meetLinks[apt.id]}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="px-4 pb-3 flex gap-2">
+                            <input
+                                type="url"
+                                value={meetInput}
+                                onChange={e => setMeetInput(e.target.value)}
+                                placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                                className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all min-w-0"
+                            />
+                            <button
+                                onClick={() => onSaveMeetLink(apt.id)}
+                                disabled={savingMeet || !meetInput.trim()}
+                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
+                                    meetSaved
+                                        ? "bg-emerald-500 text-white"
+                                        : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40"
+                                }`}
+                            >
+                                {savingMeet ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : meetSaved ? (
+                                    <Check className="w-4 h-4" />
+                                ) : (
+                                    <Save className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Warning note */}
+                    <div className="px-4 pb-4">
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 flex items-start gap-2">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-300 leading-relaxed">
+                                <span className="font-bold">Doctor:</span> Clicking "Join Video" will open Google Meet in your browser and show a confirmation. The patient connects in-app via webview.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Action Buttons ── */}
+                <div className="space-y-2.5 pt-1">
+                    {isVirtual && hasMeetLink && (apt.status === "confirmed" || apt.status === "checked-in") && (
+                        <button
+                            onClick={onShowMeetWarning}
+                            className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-lg shadow-blue-200"
+                        >
+                            <Video className="w-5 h-5" />
+                            Join Video Consultation
+                            <ExternalLink className="w-4 h-4 opacity-70" />
+                        </button>
+                    )}
+                    {!isVirtual && (apt.status === "confirmed" || apt.status === "checked-in") && (
+                        <button
+                            onClick={() => { onStart(apt); onClose(); }}
+                            className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold text-sm active:scale-95 transition-transform shadow-lg shadow-emerald-200"
+                        >
+                            <Stethoscope className="w-5 h-5" />
+                            Start Consultation
+                        </button>
+                    )}
+                    {apt.status === "pending" && (
+                        <button
+                            onClick={() => { onAccept(apt.id); onClose(); }}
+                            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-600 text-white font-bold text-sm active:scale-95 transition-transform"
+                        >
+                            <CheckCircle className="w-4 h-4" /> Accept Appointment
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-sm active:scale-95 transition-transform"
+                    >
+                        <X className="w-4 h-4" /> Close
+                    </button>
+                </div>
+            </div>
+        </BottomSheet>
+    );
+};
+
 // ─── Main Page ───────────────────────────────────────────────
 
 export default function DoctorAppointments() {
     const router = useRouter();
-    const [appts, setAppts]       = useState<Appointment[]>([]);
-    const [loading, setLoading]   = useState(true);
-    const [filter, setFilter]     = useState<FilterType>("All");
-    const [search, setSearch]     = useState("");
+    const [appts, setAppts]     = useState<Appointment[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter]   = useState<FilterType>("All");
+    const [search, setSearch]   = useState("");
     const [selected, setSelected] = useState<Appointment | null>(null);
 
-    const [cancelId, setCancelId]           = useState<number | null>(null);
-    const [rescheduleId, setRescheduleId]   = useState<number | null>(null);
-    const [actionNote, setActionNote]       = useState("");
-    const [newTime, setNewTime]             = useState("");
+    const [cancelId, setCancelId]         = useState<number | null>(null);
+    const [rescheduleId, setRescheduleId] = useState<number | null>(null);
+    const [actionNote, setActionNote]     = useState("");
+    const [newTime, setNewTime]           = useState("");
     const [actionLoading, setActionLoading] = useState(false);
 
     // Meet link
@@ -233,16 +527,24 @@ export default function DoctorAppointments() {
     const [savingMeet, setSavingMeet] = useState(false);
     const [meetSaved, setMeetSaved]   = useState(false);
 
+    // Warning dialog
+    const [showMeetWarning, setShowMeetWarning] = useState(false);
+
     const handleSaveMeetLink = async (aptId: number) => {
         if (!meetInput.trim()) return;
         setSavingMeet(true);
         try {
             await api.put(`appointments/${aptId}/meet-link`, { meet_link: meetInput.trim() });
-        } catch { /* ignore — save locally */ }
-        setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
-        setMeetSaved(true);
-        setTimeout(() => setMeetSaved(false), 2500);
-        setSavingMeet(false);
+            setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
+            setMeetSaved(true);
+            setTimeout(() => setMeetSaved(false), 2500);
+        } catch {
+            setMeetLinks(prev => ({ ...prev, [aptId]: meetInput.trim() }));
+            setMeetSaved(true);
+            setTimeout(() => setMeetSaved(false), 2500);
+        } finally {
+            setSavingMeet(false);
+        }
     };
 
     const fetchAll = async () => {
@@ -307,13 +609,17 @@ export default function DoctorAppointments() {
     };
 
     const handleStart = (apt: Appointment) => {
-        if (apt.type === "virtual") router.push(`/dashboard/meeting/${apt.id}`);
-        else router.push(`/dashboard/Doctor/consultations/${apt.id}`);
+        if (apt.type === "virtual") {
+            // Doctor: show warning, then open Google Meet externally
+            setShowMeetWarning(true);
+        } else {
+            router.push(`/dashboard/Doctor/consultations/${apt.id}`);
+        }
     };
 
-    const today        = new Date().toDateString();
-    const todayCount   = appts.filter(a => isValidDate(a.fullDate) && new Date(a.fullDate || "").toDateString() === today).length;
-    const pendingCount = appts.filter(a => a.status === "pending").length;
+    const today = new Date().toDateString();
+    const todayCount     = appts.filter(a => isValidDate(a.fullDate) && new Date(a.fullDate || "").toDateString() === today).length;
+    const pendingCount   = appts.filter(a => a.status === "pending").length;
     const confirmedCount = appts.filter(a => a.status === "confirmed" || a.status === "checked-in").length;
     const completedCount = appts.filter(a => a.status === "completed").length;
 
@@ -331,6 +637,7 @@ export default function DoctorAppointments() {
             {/* ── Sticky header ── */}
             <div className="sticky top-0 z-30 bg-[#F4F6FB]/95 backdrop-blur-lg px-4 pt-4 pb-3">
 
+                {/* Title row */}
                 <div className="flex items-center justify-between mb-3">
                     <div>
                         <h1 className="text-xl font-black text-gray-900">Appointments</h1>
@@ -349,10 +656,10 @@ export default function DoctorAppointments() {
                 {/* Stat pills */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar mb-3">
                     {[
-                        { label: `${todayCount} Today`,      color: "text-blue-600",    bg: "bg-blue-50"   },
-                        { label: `${pendingCount} Pending`,  color: "text-amber-600",   bg: "bg-amber-50"  },
-                        { label: `${confirmedCount} Active`, color: "text-emerald-600", bg: "bg-emerald-50"},
-                        { label: `${completedCount} Done`,   color: "text-gray-600",    bg: "bg-white"     },
+                        { label: `${todayCount} Today`,     color: "text-blue-600",    bg: "bg-blue-50" },
+                        { label: `${pendingCount} Pending`,  color: "text-amber-600",   bg: "bg-amber-50" },
+                        { label: `${confirmedCount} Active`, color: "text-emerald-600", bg: "bg-emerald-50" },
+                        { label: `${completedCount} Done`,   color: "text-gray-600",    bg: "bg-white" },
                     ].map(({ label, color, bg }) => (
                         <div key={label} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${bg} border border-gray-100 flex-shrink-0`}>
                             <span className={`text-[11px] font-bold ${color}`}>{label}</span>
@@ -439,7 +746,7 @@ export default function DoctorAppointments() {
                             onDecline={id => { setCancelId(id); setActionNote(""); }}
                             onReschedule={id => { setRescheduleId(id); setActionNote(""); setNewTime(""); }}
                             onStart={handleStart}
-                            onSelect={(a) => { setSelected(a); setMeetInput(meetLinks[a.id] || ""); }}
+                            onSelect={a => { setSelected(a); setMeetInput(meetLinks[a.id] || ""); }}
                         />
                     ))
                 )}
@@ -456,16 +763,15 @@ export default function DoctorAppointments() {
                         onChange={e => setActionNote(e.target.value)}
                     />
                     <div className="flex gap-2">
-                        <button onClick={() => setCancelId(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm">
-                            Go Back
-                        </button>
+                        <button
+                            onClick={() => setCancelId(null)}
+                            className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm"
+                        >Go Back</button>
                         <button
                             disabled={actionLoading}
                             onClick={submitCancel}
                             className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-bold text-sm shadow-md shadow-red-200 disabled:opacity-50"
-                        >
-                            {actionLoading ? "Cancelling…" : "Confirm Cancel"}
-                        </button>
+                        >{actionLoading ? "Cancelling…" : "Confirm Cancel"}</button>
                     </div>
                 </BottomSheet>
             )}
@@ -475,7 +781,7 @@ export default function DoctorAppointments() {
                 <BottomSheet title="Reschedule Appointment" onClose={() => setRescheduleId(null)}>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">New Date &amp; Time</label>
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">New Date & Time</label>
                             <input
                                 type="datetime-local"
                                 className="w-full border border-gray-200 rounded-2xl p-3.5 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
@@ -508,128 +814,34 @@ export default function DoctorAppointments() {
                 </BottomSheet>
             )}
 
-            {/* ── Appointment detail sheet ── */}
+            {/* ── Appointment Detail Sheet ── */}
             {selected && (
-                <BottomSheet title="Appointment Details" onClose={() => setSelected(null)}>
-                    <div className="space-y-4">
+                <AppointmentDetailSheet
+                    apt={selected}
+                    meetLinks={meetLinks}
+                    meetInput={meetInput}
+                    setMeetInput={setMeetInput}
+                    savingMeet={savingMeet}
+                    meetSaved={meetSaved}
+                    onSaveMeetLink={handleSaveMeetLink}
+                    onStart={handleStart}
+                    onAccept={handleAccept}
+                    onClose={() => setSelected(null)}
+                    onShowMeetWarning={() => setShowMeetWarning(true)}
+                />
+            )}
 
-                        {/* Patient card */}
-                        <div className={`rounded-3xl p-4 bg-gradient-to-br ${avatarGrad(selected.patient.name)} text-white`}>
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-white/20 border border-white/30 flex items-center justify-center font-black text-lg">
-                                    {initials(selected.patient.name)}
-                                </div>
-                                <div>
-                                    <p className="font-black text-base">{selected.patient.name}</p>
-                                    {selected.patient.age ? (
-                                        <p className="text-white/80 text-xs mt-0.5">{selected.patient.age}y · {selected.patient.gender}</p>
-                                    ) : null}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Details grid */}
-                        <div className="grid grid-cols-2 gap-2.5">
-                            {[
-                                { label: "Date",     value: selected.date,                                                icon: Calendar    },
-                                { label: "Time",     value: selected.time,                                                icon: Clock       },
-                                { label: "Type",     value: selected.type === "virtual" ? "Video Call" : "In-Person",   icon: selected.type === "virtual" ? Video : MapPin },
-                                { label: "Priority", value: selected.priority,                                           icon: AlertCircle },
-                            ].map(({ label, value, icon: Icon }) => (
-                                <div key={label} className="bg-gray-50 rounded-2xl p-3.5">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-                                    <div className="flex items-center gap-1.5">
-                                        <Icon className="w-3.5 h-3.5 text-blue-500" />
-                                        <p className="text-sm font-bold text-gray-900 capitalize">{value}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Reason */}
-                        <div className="bg-blue-50 rounded-2xl p-4">
-                            <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wide mb-1">Reason for Visit</p>
-                            <p className="text-sm font-semibold text-blue-900">{selected.reason}</p>
-                        </div>
-
-                        {/* Google Meet Link */}
-                        <div className="bg-slate-900 rounded-2xl p-4">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center shrink-0">
-                                    <Video className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-white text-sm font-bold leading-none">Google Meet Link</p>
-                                    <p className="text-slate-400 text-[10px] mt-0.5">
-                                        {meetLinks[selected.id] ? "Link set — tap Join to attend" : "Paste your meet link for this appointment"}
-                                    </p>
-                                </div>
-                                {meetLinks[selected.id] && (
-                                    <a
-                                        href={meetLinks[selected.id]}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 bg-emerald-500 text-white text-[11px] font-black px-3 py-1.5 rounded-xl shrink-0"
-                                    >
-                                        <Video className="w-3.5 h-3.5" /> Join
-                                    </a>
-                                )}
-                            </div>
-                            <div className="flex gap-2">
-                                <input
-                                    type="url"
-                                    value={meetInput}
-                                    onChange={e => setMeetInput(e.target.value)}
-                                    placeholder="https://meet.google.com/xxx-xxxx-xxx"
-                                    className="flex-1 bg-white/10 border border-white/10 text-white text-sm placeholder:text-slate-500 rounded-xl px-3 py-2.5 outline-none focus:border-blue-400 focus:bg-white/15 transition-all min-w-0"
-                                />
-                                <button
-                                    onClick={() => handleSaveMeetLink(selected.id)}
-                                    disabled={savingMeet || !meetInput.trim()}
-                                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold transition-all shrink-0 ${
-                                        meetSaved
-                                            ? "bg-emerald-500 text-white"
-                                            : "bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40"
-                                    }`}
-                                >
-                                    {savingMeet ? (
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : meetSaved ? (
-                                        <Check className="w-4 h-4" />
-                                    ) : (
-                                        <Save className="w-4 h-4" />
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex gap-2 pt-1">
-                            {(selected.status === "confirmed" || selected.status === "checked-in") && (
-                                <button
-                                    onClick={() => { handleStart(selected); setSelected(null); }}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm shadow-md shadow-blue-200 active:scale-95"
-                                >
-                                    <Play className="w-4 h-4" /> Start Consultation
-                                </button>
-                            )}
-                            {selected.status === "pending" && (
-                                <button
-                                    onClick={() => { handleAccept(selected.id); setSelected(null); }}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-emerald-600 text-white font-bold text-sm active:scale-95"
-                                >
-                                    <CheckCircle className="w-4 h-4" /> Accept
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setSelected(null)}
-                                className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center active:scale-95"
-                            >
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-                    </div>
-                </BottomSheet>
+            {/* ── Doctor Meeting Warning Dialog ── */}
+            {showMeetWarning && selected && meetLinks[selected.id] && (
+                <MeetingWarningDialog
+                    apt={selected}
+                    meetLink={meetLinks[selected.id]}
+                    onConfirm={() => {
+                        setShowMeetWarning(false);
+                        setSelected(null);
+                    }}
+                    onCancel={() => setShowMeetWarning(false)}
+                />
             )}
         </div>
     );

@@ -174,12 +174,14 @@ export default function PatientAppointmentsPage() {
                   {apt.type === 'online' ? 'Online' : 'Clinic'}
                 </div>
               </div>
-              {apt.status === 'confirmed' && apt.type === 'online' && (
+              {(apt.status === 'confirmed' || apt.status === 'checked-in') && (apt.type === 'online' || apt.type === 'virtual') && (
                 <button
                   onClick={() => router.push(`/dashboard/meeting/${apt.id}`)}
-                  className="w-full py-2 bg-blue-600 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 hover:bg-blue-700 active:scale-[0.98] transition"
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-[12px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition shadow-md shadow-blue-200"
                 >
-                  <Video className="w-3.5 h-3.5" /> Join Video Call <ArrowUpRight className="w-3 h-3" />
+                  <Video className="w-3.5 h-3.5" />
+                  Join Video Call
+                  <span className="ml-auto text-[10px] font-semibold bg-white/20 px-1.5 py-0.5 rounded-md">In-App</span>
                 </button>
               )}
               {apt.status === 'in-consultation' && (
