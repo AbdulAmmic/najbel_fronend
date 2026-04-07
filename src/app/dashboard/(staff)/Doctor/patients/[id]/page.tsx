@@ -1332,26 +1332,48 @@ export default function DoctorPatientDetailPage() {
                                                                         >
                                                                             <Edit2 className="w-3.5 h-3.5" />
                                                                         </button>
-                                                                        {/* Unveil toggle */}
+                                                                        {/* Unveil toggle — optimistic UI */}
                                                                         <button
                                                                             onClick={async () => {
+                                                                                const newVis = !c.is_visible_to_patient;
+                                                                                // Optimistic update: flip immediately in local state
+                                                                                setConsultHistory((prev: any[]) =>
+                                                                                    prev.map((item: any) =>
+                                                                                        item.id === c.id
+                                                                                            ? { ...item, is_visible_to_patient: newVis }
+                                                                                            : item
+                                                                                    )
+                                                                                );
                                                                                 try {
-                                                                                    const newVis = !c.is_visible_to_patient;
                                                                                     await consultations.toggleVisibility(c.id, newVis);
-                                                                                    showToast(newVis ? "Shared with patient!" : "Hidden from patient");
-                                                                                    fetchData();
+                                                                                    showToast(newVis ? "✅ Shared with patient!" : "Hidden from patient");
+                                                                                    fetchData(); // sync with server state in background
                                                                                 } catch (e: any) {
+                                                                                    // Roll back optimistic change
+                                                                                    setConsultHistory((prev: any[]) =>
+                                                                                        prev.map((item: any) =>
+                                                                                            item.id === c.id
+                                                                                                ? { ...item, is_visible_to_patient: !newVis }
+                                                                                                : item
+                                                                                        )
+                                                                                    );
                                                                                     if (e?.response?.status === 403) {
                                                                                         showToast("Backend unveil not supported yet — contact admin", false);
                                                                                     } else {
-                                                                                        showToast(e?.response?.data?.detail || "Failed", false);
+                                                                                        showToast(e?.response?.data?.detail || "Failed to update", false);
                                                                                     }
                                                                                 }
                                                                             }}
                                                                             title={c.is_visible_to_patient ? "Hide from patient" : "Share with patient"}
-                                                                            className={`p-1.5 rounded-lg transition-all ${c.is_visible_to_patient ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                                                            className={`p-1.5 rounded-lg transition-all duration-200 ${c.is_visible_to_patient
+                                                                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 ring-1 ring-emerald-300'
+                                                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                                            }`}
                                                                         >
-                                                                            {c.is_visible_to_patient ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                                                                            {c.is_visible_to_patient
+                                                                                ? <Eye className="w-3.5 h-3.5" />
+                                                                                : <EyeOff className="w-3.5 h-3.5" />
+                                                                            }
                                                                         </button>
                                                                         {/* Expand */}
                                                                         <button

@@ -13,9 +13,9 @@ export default function VisitHistoryPage() {
         const load = async () => {
             try {
                 const data = await consultations.getMyHistory().catch(() => []);
-                // Only show consultations that the doctor has unveiled to the patient
+                // Only show consultations explicitly marked visible by the doctor (strictly true)
                 const visible = (Array.isArray(data) ? data : [])
-                    .filter((v: any) => v.is_visible_to_patient !== false)
+                    .filter((v: any) => v.is_visible_to_patient === true)
                     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 setVisits(visible);
             } catch (err) { console.error(err); }
@@ -55,9 +55,27 @@ export default function VisitHistoryPage() {
                         const isEdited = visit.updated_at && visit.created_at &&
                             (new Date(visit.updated_at).getTime() - new Date(visit.created_at).getTime()) > 60000;
                         const isOpen = expanded === visit.id;
+                        const hasMeeting = !!visit.meet_link;
 
                         return (
-                            <div key={visit.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${isEdited ? 'border-amber-100' : 'border-gray-100/80'}`}>
+                            <div key={visit.id} className={`bg-white rounded-2xl border overflow-hidden transition-all ${isEdited ? 'border-amber-100' : 'border-gray-100/80'} ${hasMeeting ? 'border-l-2 border-l-teal-400' : ''}`}>
+                                {/* Meeting banner */}
+                                {hasMeeting && (
+                                    <div className="flex items-center justify-between px-4 py-2 bg-teal-50 border-b border-teal-100">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
+                                            <p className="text-[10px] font-bold text-teal-700">Meeting active for this consultation</p>
+                                        </div>
+                                        <a
+                                            href={visit.meet_link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-[10px] font-black text-white bg-teal-600 px-3 py-1 rounded-lg hover:bg-teal-700 transition-all"
+                                        >
+                                            📹 Join
+                                        </a>
+                                    </div>
+                                )}
                                 <button
                                     className="w-full text-left p-4"
                                     onClick={() => setExpanded(isOpen ? null : visit.id)}
@@ -76,6 +94,9 @@ export default function VisitHistoryPage() {
                                                         <Edit2 className="w-2.5 h-2.5" /> Amended
                                                     </span>
                                                 )}
+                                                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <Eye className="w-2.5 h-2.5" /> Shared by Dr.
+                                                </span>
                                             </div>
                                             {visit.diagnosis && (
                                                 <p className="text-[11px] text-blue-600 font-semibold truncate">Dx: {visit.diagnosis}</p>
@@ -115,6 +136,14 @@ export default function VisitHistoryPage() {
                                             <div>
                                                 <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Notes</p>
                                                 <p className="text-xs text-gray-600 leading-relaxed">{visit.notes}</p>
+                                            </div>
+                                        )}
+                                        {hasMeeting && (
+                                            <div className="flex items-center justify-between p-2.5 bg-teal-50 rounded-xl border border-teal-100">
+                                                <p className="text-[10px] text-teal-700 font-semibold">Your doctor has set up a virtual meeting</p>
+                                                <a href={visit.meet_link} target="_blank" rel="noopener noreferrer" className="text-xs font-black text-teal-600 hover:text-teal-800">
+                                                    Join →
+                                                </a>
                                             </div>
                                         )}
                                         {isEdited && (
