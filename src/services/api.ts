@@ -163,6 +163,16 @@ export const appointments = {
     acceptReschedule: async (id: number) => {
         const response = await api.post(`appointments/${id}/accept-reschedule`);
         return response.data;
+    },
+    getAdminAll: async () => {
+        try {
+            const response = await api.get('appointments/all');
+            return response.data;
+        } catch {
+            // fallback to my-appointments if /all is not available
+            const response = await api.get('appointments/my-appointments');
+            return response.data;
+        }
     }
 };
 

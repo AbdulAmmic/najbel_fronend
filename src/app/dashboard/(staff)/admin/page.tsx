@@ -114,10 +114,10 @@ export default function AdminDashboard() {
 
   const quickActions = [
     { name: "New Patient", icon: Plus, href: "/dashboard/reception/register", color: "bg-blue-600" },
-    { name: "User Control", icon: Users, href: "/dashboard/admin/users", color: "bg-indigo-600" },
+    { name: "Appointments", icon: Calendar, href: "/dashboard/admin/appointments", color: "bg-indigo-600" },
+    { name: "User Control", icon: Users, href: "/dashboard/admin/users", color: "bg-violet-600" },
     { name: "Financials", icon: Wallet, href: "/dashboard/billing", color: "bg-emerald-600" },
-    { name: "Order Logic", icon: ShoppingBag, href: "/dashboard/pharmacy/orders", color: "bg-amber-600" },
-    { name: "Drugs Control", icon: Pill, href: "/dashboard/pharmacy/inventory", color: "bg-violet-600" },
+    { name: "Drugs Control", icon: Pill, href: "/dashboard/pharmacy/inventory", color: "bg-amber-600" },
   ];
 
   return (
@@ -187,7 +187,7 @@ export default function AdminDashboard() {
               </div>
               <h2 className="text-xl font-black text-slate-900 tracking-tight">Activity Ledger</h2>
             </div>
-            <Link href="/dashboard/schedule/appointments" className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 flex items-center gap-1.5 group">
+            <Link href="/dashboard/admin/appointments" className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 hover:text-blue-800 flex items-center gap-1.5 group">
               Full Spectrum <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
