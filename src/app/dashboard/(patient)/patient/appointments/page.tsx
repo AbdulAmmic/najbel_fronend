@@ -68,6 +68,10 @@ export default function PatientAppointmentsPage() {
     load();
   }, []);
 
+  const STATUS_ORDER: Record<string, number> = {
+    pending: 0, confirmed: 1, "checked-in": 2, rescheduled: 3, "in-consultation": 4, completed: 5, cancelled: 6,
+  };
+
   const filtered = appointmentsList.filter(apt => {
     if (activeTab === "upcoming") return apt.status === "confirmed" || apt.status === "pending" || apt.status === "rescheduled";
     if (activeTab === "history") return apt.status === "completed" || apt.status === "cancelled";
@@ -75,7 +79,7 @@ export default function PatientAppointmentsPage() {
   }).filter(apt =>
     apt.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
     apt.specialty.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ).sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
 
   const statusColor = (s: string) => {
     switch (s) {
@@ -177,12 +181,6 @@ export default function PatientAppointmentsPage() {
               </div>
               {(apt.status === 'confirmed' || apt.status === 'checked-in') && (apt.type === 'online' || apt.type === 'virtual') && (
                 <div className="space-y-2">
-                  {apt.meet_link && (
-                    <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
-                      <Video className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                      <p className="text-[11px] text-indigo-700 font-semibold flex-1 truncate">{apt.meet_link}</p>
-                    </div>
-                  )}
                   {apt.meet_link ? (
                     <button
                       onClick={() => {
